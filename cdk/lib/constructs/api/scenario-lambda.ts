@@ -39,13 +39,10 @@ export class ScenarioLambdaConstruct extends Construct {
   constructor(scope: Construct, id: string, props: ScenarioLambdaConstructProps) {
     super(scope, id);
 
-    const powertools_layer = lambda.LayerVersion.fromLayerVersionArn(this, 'lambdaPowerToolLayer', `arn:aws:lambda:${cdk.Aws.REGION}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:22`)
-
     // シナリオ管理Lambda関数の作成
     // PythonFunctionを使用して依存関係を自動的にインストール
     this.function = new PythonFunction(this, 'Function', {
       runtime: lambda.Runtime.PYTHON_3_13,
-      architecture: lambda.Architecture.ARM_64,
       entry: path.join(__dirname, '../../../lambda/scenarios'),
       index: 'index.py',
       handler: 'lambda_handler',
@@ -61,7 +58,6 @@ export class ScenarioLambdaConstruct extends Construct {
         KNOWLEDGE_BASE_ID: props.knowledgeBaseId,
       },
       description: 'シナリオ管理API実装Lambda関数',
-      layers: [powertools_layer],
     });
 
     props.scenariosTable.grantReadWriteData(this.function)

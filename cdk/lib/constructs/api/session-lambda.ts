@@ -69,13 +69,10 @@ export class SessionLambdaConstruct extends Construct {
   constructor(scope: Construct, id: string, props: SessionLambdaConstructProps) {
     super(scope, id);
 
-    const powertools_layer = lambda.LayerVersion.fromLayerVersionArn(this, 'lambdaPowerToolLayer', `arn:aws:lambda:${cdk.Aws.REGION}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:22`)
-
     // セッション管理Lambda関数の作成
     // PythonFunctionを使用して依存関係を自動的にインストール
     this.function = new PythonFunction(this, 'Function', {
       runtime: lambda.Runtime.PYTHON_3_13,
-      architecture: lambda.Architecture.ARM_64,
       entry: path.join(__dirname, '../../../lambda/sessions'),
       index: 'index.py',
       handler: 'lambda_handler',
@@ -102,7 +99,6 @@ export class SessionLambdaConstruct extends Construct {
         ...(props.sessionFeedbackTableName && { SESSION_FEEDBACK_TABLE: props.sessionFeedbackTableName })
       },
       description: 'セッション履歴管理API実装Lambda関数',
-      layers: [powertools_layer],
     });
 
     // Lambda関数にDynamoDBテーブルへのアクセス権限を付与

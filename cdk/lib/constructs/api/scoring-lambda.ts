@@ -49,8 +49,6 @@ export class ScoringLambdaConstruct extends Construct {
       ],
     });
 
-    const powertools_layer = lambda.LayerVersion.fromLayerVersionArn(this, 'lambdaPowerToolLayer', `arn:aws:lambda:${cdk.Aws.REGION}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:22`)
-
     // Bedrockへのアクセス権限を追加
     lambdaExecutionRole.addToPolicy(
       new iam.PolicyStatement({
@@ -128,7 +126,6 @@ export class ScoringLambdaConstruct extends Construct {
     // Python Lambda関数の作成
     this.function = new PythonFunction(this, 'Function', {
       runtime: lambda.Runtime.PYTHON_3_13,
-      architecture: lambda.Architecture.ARM_64,
       entry: path.join(__dirname, '../../../lambda/scoring'),
       index: 'index.py',
       handler: 'lambda_handler',
@@ -149,7 +146,6 @@ export class ScoringLambdaConstruct extends Construct {
         // Guardrail関連の環境変数を追加
         ...guardrailsEnvVars
       },
-      layers: [powertools_layer], // requirements.txtで管理するため削除
     });
 
     props.sessionFeedbackTable.grantReadWriteData(this.function)

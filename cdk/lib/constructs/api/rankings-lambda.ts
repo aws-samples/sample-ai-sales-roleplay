@@ -42,8 +42,6 @@ export class RankingsLambdaConstruct extends Construct {
       ],
     });
 
-    const powertools_layer = lambda.LayerVersion.fromLayerVersionArn(this, 'lambdaPowerToolLayer', `arn:aws:lambda:${cdk.Aws.REGION}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:22`)
-
     // DynamoDBへのアクセス権限を追加
     lambdaExecutionRole.addToPolicy(
       new iam.PolicyStatement({
@@ -79,7 +77,6 @@ export class RankingsLambdaConstruct extends Construct {
     // Python Lambda関数の作成
     this.function = new PythonFunction(this, 'Function', {
       runtime: lambda.Runtime.PYTHON_3_13,
-      architecture: lambda.Architecture.ARM_64,
       entry: path.join(__dirname, '../../../lambda/rankings'),
       index: 'index.py',
       handler: 'lambda_handler',
@@ -95,7 +92,6 @@ export class RankingsLambdaConstruct extends Construct {
         POWERTOOLS_SERVICE_NAME: 'rankings-api',
         POWERTOOLS_LOG_LEVEL: 'DEBUG',
       },
-      layers: [powertools_layer],
     });
   }
 }

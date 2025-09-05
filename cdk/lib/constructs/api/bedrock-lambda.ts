@@ -63,12 +63,9 @@ export class BedrockLambdaConstruct extends Construct {
       })
     );
 
-    const powertools_layer = lambda.LayerVersion.fromLayerVersionArn(this, 'lambdaPowerToolLayer', `arn:aws:lambda:${cdk.Aws.REGION}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:22`)
-
     // Python Lambda関数の作成
     this.function = new PythonFunction(this, 'Function', {
       runtime: lambda.Runtime.PYTHON_3_13,
-      architecture: lambda.Architecture.ARM_64,
       entry: path.join(__dirname, '../../../lambda/bedrock'),
       index: 'index.py',
       handler: 'lambda_handler',
@@ -88,7 +85,6 @@ export class BedrockLambdaConstruct extends Construct {
         BEDROCK_MODEL_FEEDBACK: props.bedrockModels?.feedback || 'amazon.nova-pro-v1:0',
         BEDROCK_MODEL_GUARDRAIL: props.bedrockModels?.guardrail || 'amazon.nova-lite-v1:0'
       },
-      layers: [powertools_layer],
     });
   }
 }

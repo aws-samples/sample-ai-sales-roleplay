@@ -25,8 +25,6 @@ export class GuardrailsLambdaConstruct extends Construct {
       ],
     });
 
-    const powertools_layer = lambda.LayerVersion.fromLayerVersionArn(this, 'lambdaPowerToolLayer', `arn:aws:lambda:${cdk.Aws.REGION}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:22`)
-
     // Bedrockへのアクセス権限を追加
     lambdaExecutionRole.addToPolicy(
       new iam.PolicyStatement({
@@ -44,7 +42,6 @@ export class GuardrailsLambdaConstruct extends Construct {
     // Lambda関数の作成
     this.function = new PythonFunction(this, 'Function', {
       runtime: lambda.Runtime.PYTHON_3_13,
-      architecture: lambda.Architecture.ARM_64,
       entry: path.join(__dirname, '../../../lambda/guardrails'),
       index: 'index.py',  // Lambda関数のエントリポイント
       handler: 'lambda_handler',  // ハンドラー関数名
@@ -57,7 +54,6 @@ export class GuardrailsLambdaConstruct extends Construct {
           cdk.Stack.of(this).stackName.includes('Staging') ? 'staging' : 'dev',
         'POWERTOOLS_LOG_LEVEL': "DEBUG"
       },
-      layers: [powertools_layer],
     });
   }
 }

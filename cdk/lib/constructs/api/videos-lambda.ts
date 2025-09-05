@@ -48,12 +48,9 @@ export class VideosLambdaConstruct extends Construct {
       ],
     });
 
-    const powertools_layer = lambda.LayerVersion.fromLayerVersionArn(this, 'lambdaPowerToolLayer', `arn:aws:lambda:${cdk.Aws.REGION}:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-arm64:22`)
-
     // Python Lambda関数の作成
     this.function = new PythonFunction(this, 'Function', {
       runtime: lambda.Runtime.PYTHON_3_13,
-      architecture: lambda.Architecture.ARM_64,
       entry: path.join(__dirname, '../../../lambda/videos'),
       index: 'index.py',
       handler: 'lambda_handler',
@@ -70,7 +67,6 @@ export class VideosLambdaConstruct extends Construct {
         VIDEO_ANALYSIS_MODEL_ID: props.videoAnalysisModelId || 'us.amazon.nova-premier-v1:0',
         POWERTOOLS_LOG_LEVEL: "DEBUG",
       },
-      layers: [powertools_layer],
     });
 
     // S3バケットへのアクセス許可
