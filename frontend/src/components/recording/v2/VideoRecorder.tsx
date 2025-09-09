@@ -250,6 +250,56 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
     }
   };
 
+  // リトライ機能付きアップロード
+  const uploadWithRetry = async (uploadInfo: any, blob: Blob, videoKey: string, maxRetries = 3) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`アップロード試行 ${attempt}/${maxRetries}`);
+        
+        const formData = new FormData();
+        Object.entries(uploadInfo.formData).forEach(([key, value]) => {
+          formData.append(key, value);
+        });
+        formData.append("file", blob);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 300000); // 5分タイムアウト
+
+        const response = await fetch(uploadInfo.uploadUrl, {
+          method: "POST",
+          body: formData,
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          console.log(t("recording.s3UploadSuccess"), response.status);
+          localStorage.setItem("lastRecordingKey", videoKey);
+          console.log("録画キーをlocalStorageに保存:", videoKey);
+          
+          // 録画完了イベントを発火
+          const event = new CustomEvent('recordingComplete', { 
+            detail: { videoKey, sessionId } 
+          });
+          window.dispatchEvent(event);
+          return; // 成功したら終了
+        } else {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+      } catch (error) {
+        console.error(`アップロード試行 ${attempt} 失敗:`, error);
+        
+        if (attempt === maxRetries) {
+          throw error; // 最後の試行で失敗したらエラーを投げる
+        }
+        
+        // 指数バックオフで待機
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+      }
+    }
+  };
+
   // 録画データの保存処理
   const saveRecordingData = async (blob: Blob) => {
     try {
@@ -259,7 +309,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
       }
 
       const videoKey = `session_${sessionId}_${new Date().getTime()}.mp4`;
-      console.log(t("recording.s3UploadStart") + ": " + videoKey);
+      console.log(t("recording.s3UploadStart") + ": " + videoKey, "サイズ:", Math.round(blob.size / 1024 / 1024 * 100) / 100, "MB");
 
       // APIサービスを使用して署名付きURLを取得してS3にアップロード
       try {
@@ -274,44 +324,23 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
           contentType,
           videoKey,
         );
-        console.log(
-          t("recording.signedUrlObtained") + ":",
-          uploadInfo.uploadUrl,
-        );
+        console.log(t("recording.signedUrlObtained") + ":", uploadInfo.uploadUrl);
 
-        // BlobをS3にPOSTフォームでアップロード
-        const formData = new FormData();
+        // BlobをS3にPOSTフォームでアップロード（リトライ機能付き）
+        await uploadWithRetry(uploadInfo, blob, videoKey);
 
-        // 署名付きフォームデータのフィールドを追加
-        Object.entries(uploadInfo.formData).forEach(([key, value]) => {
-          formData.append(key, value);
-        });
-
-        // ファイルを最後に追加
-        formData.append("file", blob);
-
-        const response = await fetch(uploadInfo.uploadUrl, {
-          method: "POST",
-          body: formData,
-          // Content-Typeヘッダーは設定しない（FormDataが自動設定）
-          // これによりプリフライトリクエストを回避
-        });
-
-        if (response.ok) {
-          console.log(t("recording.s3UploadSuccess"), response.status);
-        } else {
-          throw new Error(
-            `${t("recording.s3UploadError")}: ${response.status} ${response.statusText}`,
-          );
-        }
       } catch (uploadError) {
         console.error(t("recording.s3UploadProcessError") + ":", uploadError);
-        // エラーが発生しても、親コンポーネントにビデオキーを渡して処理を続行
+        // エラーが発生した場合でも、親コンポーネントにエラー情報を渡す
+        if (onError) {
+          onError(`アップロードエラー: ${uploadError}`);
+        }
+        // エラーが発生してもvideoKeyは渡して処理を続行
       }
 
       console.log(t("recording.recordingDataSaved") + ":", videoKey);
 
-      // コールバックを呼び出し
+      // コールバックを呼び出し（エラーが発生してもvideoKeyは渡す）
       if (onRecordingComplete) {
         onRecordingComplete(videoKey);
       }
