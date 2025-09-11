@@ -150,7 +150,7 @@ def create_goal_results_from_feedback(feedback_data, scenario_goals, session_id)
                 # AIが未達成として挙げている場合
                 missed_match = any(goal_description in missed_goal for missed_goal in missed_goals)
                 if missed_match:
-                    progress = 25
+                    progress = 0
                     achieved = False
                 else:
                     # AIの総合ゴール達成度スコアに基づく（0-10を0-100%に変換）
@@ -461,26 +461,156 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                 elif data_type == 'realtime-metrics':
                     realtime_metrics.append(item)
             
-            # 通常セッション用のレスポンスデータを構築
-            response_data = {
-                "success": True,
-                "sessionType": "regular",  # セッション種別を明示
-                "sessionId": session_id,
-                "sessionInfo": session_info,
-                "messages": messages,
-                "realtimeMetrics": realtime_metrics,
-                "complianceViolations": []
-            }
-            
-            if final_feedback:
-                response_data["feedback"] = final_feedback.get("feedbackData")
-                response_data["finalMetrics"] = final_feedback.get("finalMetrics")
-                response_data["feedbackCreatedAt"] = final_feedback.get("createdAt")
+            # フィードバックが存在しない場合は新規生成
+            if not final_feedback and realtime_metrics:
+                logger.info("通常セッション用フィードバック生成開始", extra={
+                    "session_id": session_id,
+                    "realtime_metrics_count": len(realtime_metrics)
+                })
+                
+                # シナリオ情報を取得
+                scenario_info = None
+                scenario_goals = []
+                scenario_id = session_info.get('scenarioId')
+                if scenario_id and scenarios_table:
+                    try:
+                        scenario_response = scenarios_table.get_item(Key={'scenarioId': scenario_id})
+                        scenario_data = scenario_response.get('Item')
+                        if scenario_data:
+                            scenario_info = scenario_data
+                            scenario_goals = scenario_data.get('goals', [])
+                            logger.info("通常セッション用シナリオ情報を取得", extra={
+                                "session_id": session_id,
+                                "scenario_id": scenario_id,
+                                "goals_count": len(scenario_goals)
+                            })
+                    except Exception as e:
+                        logger.warning("通常セッション用シナリオ情報の取得に失敗", extra={
+                            "error": str(e),
+                            "scenario_id": scenario_id
+                        })
+                
+                # リアルタイムメトリクスから最終メトリクスを計算
+                latest_realtime_metric = realtime_metrics[0] if realtime_metrics else None
+                if latest_realtime_metric:
+                    final_metrics = {
+                        "angerLevel": int(latest_realtime_metric.get("angerLevel", 1)),
+                        "trustLevel": int(latest_realtime_metric.get("trustLevel", 5)),
+                        "progressLevel": int(latest_realtime_metric.get("progressLevel", 5)),
+                        "analysis": latest_realtime_metric.get("analysis", "")
+                    }
+                    
+                    # 最新のゴール状況を取得
+                    current_goal_statuses = latest_realtime_metric.get("goalStatuses", [])
+                    
+                    # フィードバック生成
+                    try:
+                        feedback_data = generate_feedback_with_bedrock(
+                            session_id=session_id,
+                            metrics=final_metrics,
+                            messages=messages,
+                            goal_statuses=current_goal_statuses,
+                            scenario_goals=scenario_goals,
+                            language=session_info.get('language', 'ja')
+                        )
+                        
+                        logger.info("通常セッションフィードバック生成完了", extra={
+                            "session_id": session_id,
+                            "overall_score": feedback_data.get("scores", {}).get("overall")
+                        })
+                        
+                        # ゴール結果を生成
+                        goal_results = create_goal_results_from_feedback(
+                            feedback_data, scenario_goals, session_id
+                        ) if scenario_goals else None
+                        
+                        # 通常セッション用のレスポンスデータを構築（フィードバック付き）
+                        response_data = {
+                            "success": True,
+                            "sessionType": "regular",
+                            "sessionId": session_id,
+                            "sessionInfo": session_info,
+                            "messages": messages,
+                            "realtimeMetrics": realtime_metrics,
+                            "feedback": feedback_data,
+                            "finalMetrics": final_metrics,
+                            "feedbackCreatedAt": latest_realtime_metric.get("createdAt"),
+                            "complianceViolations": [],
+                            "goalResults": goal_results
+                        }
+                        
+                    except Exception as feedback_error:
+                        logger.error("通常セッションフィードバック生成エラー", extra={
+                            "error": str(feedback_error),
+                            "session_id": session_id
+                        })
+                        # フィードバック生成に失敗した場合でも基本データは返す
+                        response_data = {
+                            "success": True,
+                            "sessionType": "regular",
+                            "sessionId": session_id,
+                            "sessionInfo": session_info,
+                            "messages": messages,
+                            "realtimeMetrics": realtime_metrics,
+                            "finalMetrics": final_metrics,
+                            "complianceViolations": []
+                        }
+                else:
+                    # リアルタイムメトリクスがない場合
+                    response_data = {
+                        "success": True,
+                        "sessionType": "regular",
+                        "sessionId": session_id,
+                        "sessionInfo": session_info,
+                        "messages": messages,
+                        "realtimeMetrics": realtime_metrics,
+                        "complianceViolations": []
+                    }
+            else:
+                # 既存のフィードバックがある場合
+                response_data = {
+                    "success": True,
+                    "sessionType": "regular",
+                    "sessionId": session_id,
+                    "sessionInfo": session_info,
+                    "messages": messages,
+                    "realtimeMetrics": realtime_metrics,
+                    "complianceViolations": []
+                }
+                
+                if final_feedback:
+                    response_data["feedback"] = final_feedback.get("feedbackData")
+                    response_data["finalMetrics"] = final_feedback.get("finalMetrics")
+                    response_data["feedbackCreatedAt"] = final_feedback.get("createdAt")
+                    
+                    # 既存フィードバックからゴール結果も生成
+                    feedback_data = final_feedback.get("feedbackData")
+                    if feedback_data:
+                        scenario_id = session_info.get('scenarioId')
+                        scenario_goals = []
+                        if scenario_id and scenarios_table:
+                            try:
+                                scenario_response = scenarios_table.get_item(Key={'scenarioId': scenario_id})
+                                scenario_data = scenario_response.get('Item')
+                                if scenario_data:
+                                    scenario_goals = scenario_data.get('goals', [])
+                            except Exception as e:
+                                logger.warning("既存フィードバック用シナリオ情報の取得に失敗", extra={
+                                    "error": str(e),
+                                    "scenario_id": scenario_id
+                                })
+                        
+                        if scenario_goals:
+                            goal_results = create_goal_results_from_feedback(
+                                feedback_data, scenario_goals, session_id
+                            )
+                            response_data["goalResults"] = goal_results
             
             logger.info("通常セッション分析結果取得成功", extra={
                 "session_id": session_id,
                 "messages_count": len(messages),
-                "realtime_metrics_count": len(realtime_metrics)
+                "realtime_metrics_count": len(realtime_metrics),
+                "has_feedback": "feedback" in response_data
             })
             
             return response_data
