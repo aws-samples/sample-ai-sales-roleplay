@@ -2,6 +2,19 @@
 プロンプトモジュール - プロンプトテンプレートを管理するモジュール
 """
 
+# 新しいプロンプトテンプレートをエクスポート
+from .analysis_prompt import (
+    ANALYSIS_PROMPT_JA,
+    ANALYSIS_PROMPT_EN,
+    ANALYSIS_PROMPT_TEMPLATE,
+    REALTIME_SCORING_PROMPT_JA,
+    REALTIME_SCORING_PROMPT_EN,
+    REALTIME_SCORING_PROMPT_TEMPLATE,
+    GOAL_EVALUATION_PROMPT_JA,
+    GOAL_EVALUATION_PROMPT_EN,
+    GOAL_EVALUATION_PROMPT_TEMPLATE
+)
+
 def get_analysis_prompt(anger_value, trust_value, progress_value, conversation_text, goal_analysis_section="", language="ja"):
     """
     会話分析用のプロンプトを生成する関数
@@ -17,8 +30,6 @@ def get_analysis_prompt(anger_value, trust_value, progress_value, conversation_t
     Returns:
         str: 分析用のプロンプト
     """
-    from .analysis_prompt import ANALYSIS_PROMPT_JA, ANALYSIS_PROMPT_EN
-    
     # 言語に応じたテンプレートを選択
     template = ANALYSIS_PROMPT_EN if language == "en" else ANALYSIS_PROMPT_JA
     

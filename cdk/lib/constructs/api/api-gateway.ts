@@ -31,6 +31,8 @@ export interface ApiGatewayConstructProps {
   videosFunction: lambda.Function;
   /** リファレンスチェックLambda関数 */
   referenceCheckFunction?: lambda.Function;
+  /** 音声分析Lambda関数 */
+  audioAnalysisFunction?: lambda.Function;
 }
 
 export class ApiGatewayConstruct extends Construct {
@@ -220,9 +222,9 @@ export class ApiGatewayConstruct extends Construct {
       }
     );
 
-    // GET /sessions/{sessionId}/complete-data - セッション完全データ取得
-    const completeDataResource = sessionDetailResource.addResource('complete-data');
-    completeDataResource.addMethod(
+    // GET /sessions/{sessionId}/analysis-results - セッション分析結果取得（音声分析対応）
+    const analysisResultsResource = sessionDetailResource.addResource('analysis-results');
+    analysisResultsResource.addMethod(
       'GET',
       new apigateway.LambdaIntegration(props.sessionFunction),
       {
@@ -366,6 +368,58 @@ export class ApiGatewayConstruct extends Construct {
       sessionDetailResource.addMethod(
         'GET',
         new apigateway.LambdaIntegration(props.referenceCheckFunction),
+        {
+          authorizer: auth,
+          authorizationType: apigateway.AuthorizationType.COGNITO,
+        }
+      );
+    }
+
+    // 音声分析API endpoints (音声分析API)
+    if (props.audioAnalysisFunction) {
+      const audioAnalysisResource = this.api.root.addResource('audio-analysis');
+
+      // POST /audio-analysis/upload-url - 音声アップロード用署名付きURL生成
+      const audioUploadUrlResource = audioAnalysisResource.addResource('upload-url');
+      audioUploadUrlResource.addMethod(
+        'POST',
+        new apigateway.LambdaIntegration(props.audioAnalysisFunction),
+        {
+          authorizer: auth,
+          authorizationType: apigateway.AuthorizationType.COGNITO,
+        }
+      );
+
+      // 音声分析セッション関連API
+      const audioSessionResource = audioAnalysisResource.addResource('{session_id}');
+
+      // POST /audio-analysis/{sessionId}/analyze - 音声分析開始
+      const analyzeResource = audioSessionResource.addResource('analyze');
+      analyzeResource.addMethod(
+        'POST',
+        new apigateway.LambdaIntegration(props.audioAnalysisFunction),
+        {
+          authorizer: auth,
+          authorizationType: apigateway.AuthorizationType.COGNITO,
+        }
+      );
+
+      // GET /audio-analysis/{sessionId}/status - 分析状況確認
+      const statusResource = audioSessionResource.addResource('status');
+      statusResource.addMethod(
+        'GET',
+        new apigateway.LambdaIntegration(props.audioAnalysisFunction),
+        {
+          authorizer: auth,
+          authorizationType: apigateway.AuthorizationType.COGNITO,
+        }
+      );
+
+      // GET /audio-analysis/{sessionId}/results - 分析結果取得
+      const resultsResource = audioSessionResource.addResource('results');
+      resultsResource.addMethod(
+        'GET',
+        new apigateway.LambdaIntegration(props.audioAnalysisFunction),
         {
           authorizer: auth,
           authorizationType: apigateway.AuthorizationType.COGNITO,

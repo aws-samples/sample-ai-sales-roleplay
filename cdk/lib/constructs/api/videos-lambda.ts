@@ -66,6 +66,7 @@ export class VideosLambdaConstruct extends Construct {
         DEFAULT_PRESIGNED_URL_EXPIRY: '600', // 10分
         VIDEO_ANALYSIS_MODEL_ID: props.videoAnalysisModelId || 'us.amazon.nova-premier-v1:0',
         POWERTOOLS_LOG_LEVEL: "DEBUG",
+        AWS_MAX_ATTEMPTS: "10",
       },
     });
 

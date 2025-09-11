@@ -137,6 +137,7 @@ export class ScoringLambdaConstruct extends Construct {
       environment: {
         // ログレベル
         POWERTOOLS_LOG_LEVEL: "DEBUG",
+        AWS_MAX_ATTEMPTS: "10",
         // 各用途別モデル設定
         BEDROCK_MODEL_SCORING: props.scoringModelId,
         BEDROCK_MODEL_GUARDRAIL: props.guardrailModelId,

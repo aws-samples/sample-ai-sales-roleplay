@@ -37,7 +37,7 @@ export class AudioStorageConstruct extends Construct {
       cors: [
         {
           allowedHeaders: ['*'],
-          allowedMethods: [s3.HttpMethods.GET],
+          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.POST],
           allowedOrigins: ['*'], // クロスオリジンリクエストを許可（署名付きURLで安全に制御）
           maxAge: 3600,
         },

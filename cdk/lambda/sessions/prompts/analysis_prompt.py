@@ -204,5 +204,137 @@ Please output the following content in JSON format:
 
 Please output only in the JSON format above. Do not include explanatory text or comments."""
 
-# Default template to maintain backward compatibility
+# リアルタイムスコアリング用プロンプトテンプレート - 日本語
+REALTIME_SCORING_PROMPT_JA = """あなたは営業会話のリアルタイム評価システムです。以下の会話を分析し、3つの基本メトリクスを1-10のスケールで評価してください。
+
+## 会話履歴
+{conversation_history}
+
+## ユーザー（営業担当者）の最新の発言
+{user_input}
+
+## 評価すべき3つの基本メトリクス
+1. 怒りレベル (angerLevel): 顧客の不満や苛立ちの度合い（1=穏やか、10=非常に怒っている）
+2. 信頼レベル (trustLevel): 顧客が営業担当者に対して持つ信頼の度合い（1=不信、10=完全な信頼）
+3. 商談進捗度 (progressLevel): 商談の進行度合い（1=初期段階、10=成約間近）
+
+## 評価の際の考慮点
+- 会話の文脈と流れ
+- 顧客の反応と感情表現
+- 営業担当者のアプローチの適切性
+- 商談の目的達成度
+- 過去の会話履歴からの変化
+
+## 出力形式
+以下のJSON形式で回答してください:
+```json
+{{
+  "angerLevel": <1から10の整数値>,
+  "trustLevel": <1から10の整数値>,
+  "progressLevel": <1から10の整数値>,
+  "analysis": "<簡潔な分析（50文字以内）>"
+}}
+```
+
+注意：必ず上記のJSON形式で回答し、他の説明は含めないでください。すべてのスコアは1から10の整数値にしてください。"""
+
+# リアルタイムスコアリング用プロンプトテンプレート - 英語
+REALTIME_SCORING_PROMPT_EN = """You are a real-time evaluation system for sales conversations. Please analyze the following conversation and evaluate three key metrics on a scale of 1-10:
+
+## Conversation History
+{conversation_history}
+
+## User's (Sales Representative's) Latest Statement
+{user_input}
+
+## Three Key Metrics to Evaluate
+1. Anger Level (angerLevel): The degree of customer dissatisfaction or irritation (1=calm, 10=very angry)
+2. Trust Level (trustLevel): The degree of trust the customer has in the sales representative (1=distrust, 10=complete trust)
+3. Progress Level (progressLevel): The degree of progress in the sales negotiation (1=early stage, 10=close to agreement)
+
+## Points to Consider in Evaluation
+- Context and flow of the conversation
+- Customer reactions and emotional expressions
+- Appropriateness of the sales representative's approach
+- Achievement of sales objectives
+- Changes from previous conversation history
+
+## Output Format
+Please respond in the following JSON format:
+```json
+{{
+  "angerLevel": <integer from 1 to 10>,
+  "trustLevel": <integer from 1 to 10>,
+  "progressLevel": <integer from 1 to 10>,
+  "analysis": "<brief analysis (within 50 characters)>"
+}}
+```
+
+Note: Please respond only in the JSON format above without any additional explanation. All scores must be integer values from 1 to 10."""
+
+# ゴール評価用プロンプトテンプレート - 日本語
+GOAL_EVALUATION_PROMPT_JA = """あなたは営業会話のゴール達成度を評価するシステムです。以下の会話とゴール情報を分析し、各ゴールの進捗度と達成状況を評価してください。
+
+## 会話履歴
+{conversation_text}
+
+## 評価対象のゴール
+{goals_json}
+
+## 評価のポイント
+1. 各ゴールの進捗度を0-100%で評価してください
+2. 進捗度が100%に達した場合、ゴールは達成されたと判断します
+3. 不適切な発言や否定的な反応がある場合は、進捗度を下げるか現状維持してください
+4. ゴールの優先度や必須性を考慮して評価してください
+
+## 出力形式
+以下のJSON形式で回答してください：
+```json
+[
+  {{
+    "goalId": "<ゴールID>",
+    "progress": <0-100の整数値>,
+    "achieved": <trueまたはfalse>,
+    "reason": "<評価理由の簡潔な説明>"
+  }},
+  ...
+]
+```
+
+注意：必ずJSON形式のみで回答し、他の説明は含めないでください。"""
+
+# ゴール評価用プロンプトテンプレート - 英語
+GOAL_EVALUATION_PROMPT_EN = """You are a system for evaluating goal achievement in sales conversations. Please analyze the following conversation and goal information to evaluate the progress and achievement status of each goal.
+
+## Conversation History
+{conversation_text}
+
+## Goals to Evaluate
+{goals_json}
+
+## Evaluation Points
+1. Please evaluate the progress of each goal as a percentage from 0-100%
+2. When progress reaches 100%, the goal is considered achieved
+3. If there are inappropriate statements or negative reactions, lower the progress or maintain the current status
+4. Consider the priority and importance of goals in your evaluation
+
+## Output Format
+Please respond in the following JSON format:
+```json
+[
+  {{
+    "goalId": "<Goal ID>",
+    "progress": <integer value from 0-100>,
+    "achieved": <true or false>,
+    "reason": "<brief explanation of evaluation rationale>"
+  }},
+  ...
+]
+```
+
+Note: Please respond only in JSON format without any other explanations."""
+
+# Default templates to maintain backward compatibility
 ANALYSIS_PROMPT_TEMPLATE = ANALYSIS_PROMPT_JA
+REALTIME_SCORING_PROMPT_TEMPLATE = REALTIME_SCORING_PROMPT_JA
+GOAL_EVALUATION_PROMPT_TEMPLATE = GOAL_EVALUATION_PROMPT_JA

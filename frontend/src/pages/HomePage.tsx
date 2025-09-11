@@ -15,6 +15,7 @@ import {
   TrendingUp as TrendingUpIcon,
   MenuBook as MenuBookIcon,
   Psychology as PsychologyIcon,
+  Audiotrack as AudiotrackIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 
@@ -50,6 +51,11 @@ const HomePage: React.FC = () => {
       title: t("home.features.feedback.title"),
       description: t("home.features.feedback.description"),
     },
+    {
+      icon: <AudiotrackIcon color="primary" sx={{ fontSize: 40 }} />,
+      title: t("home.features.audioAnalysis.title"),
+      description: t("home.features.audioAnalysis.description"),
+    },
   ];
 
   return (
@@ -82,20 +88,25 @@ const HomePage: React.FC = () => {
       {/* 特徴セクション */}
       <Box
         sx={{
-          display: "flex",
-          flexWrap: "wrap",
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "1fr 1fr",
+            md: "1fr 1fr",
+          },
           gap: 3,
           mb: 4,
-          justifyContent: "center",
+          maxWidth: "800px",
+          mx: "auto",
         }}
       >
         {features.map((feature, index) => (
           <Card
             key={index}
             sx={{
-              width: { xs: "100%", md: "300px" },
               textAlign: "center",
               p: 2,
+              height: "100%",
             }}
           >
             <CardContent>
@@ -166,7 +177,7 @@ const HomePage: React.FC = () => {
       </Card>
 
       {/* スタートボタン */}
-      <Box textAlign="center" display="flex" gap={2} justifyContent="center">
+      <Box textAlign="center" display="flex" gap={2} justifyContent="center" flexWrap="wrap">
         <Button
           variant="contained"
           size="large"
@@ -180,6 +191,25 @@ const HomePage: React.FC = () => {
           }}
         >
           {t("home.startButton")}
+        </Button>
+
+        <Button
+          variant="contained"
+          size="large"
+          startIcon={<AudiotrackIcon />}
+          onClick={() => navigate("/audio-analysis")}
+          sx={{
+            fontSize: "1.2rem",
+            py: 2,
+            px: 4,
+            boxShadow: 3,
+            bgcolor: "secondary.main",
+            "&:hover": {
+              bgcolor: "secondary.dark",
+            },
+          }}
+        >
+          {t("home.audioAnalysisButton")}
         </Button>
 
         <Button

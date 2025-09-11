@@ -4,6 +4,7 @@
     "subtitle": "AIと対話しながら営業スキルを磨こう",
     "description": "実際の営業シーンを模したAI対話で、安全な環境で営業スキルを向上させましょう。様々な業界・性格の顧客との商談を体験できます。",
     "startButton": "営業ロールプレイを開始",
+    "audioAnalysisButton": "音声分析",
     "demoGuideButton": "デモガイドを見る",
     "recentScenarios": "最近のシナリオ",
     "noRecentScenarios": "最近プレイしたシナリオはありません",
@@ -39,7 +40,33 @@
       "feedback": {
         "title": "個別フィードバック",
         "description": "対話内容を分析し、具体的な改善ポイントを提案"
+      },
+      "audioAnalysis": {
+        "title": "音声データ分析",
+        "description": "実際の商談音声をアップロードしてAI分析・評価を受けられます"
       }
+    }
+  },
+  "audioAnalysis": {
+    "title": "音声分析",
+    "description": "実際の商談音声データをアップロードして、選択したシナリオで分析を行います。",
+    "settings": "分析設定",
+    "language": "言語設定",
+    "selectScenario": "分析シナリオを選択",
+    "selectFile": "音声ファイルを選択",
+    "startAnalysis": "分析開始",
+    "progress": "分析進行状況",
+    "processingNote": "※ 処理に時間がかかる場合があります。画面を閉じずにお待ちください。",
+    "analysisComplete": "音声分析完了",
+    "analysisCompleteMessage": "音声分析が完了しました。結果を確認しますか？",
+    "resultViewNote": "分析結果画面では、話者の役割分析、評価スコア、リファレンスチェックなどの詳細を確認できます。",
+    "viewResults": "結果を確認",
+    "status": {
+      "waiting": "待機中",
+      "uploading": "アップロード中",
+      "analyzing": "分析中",
+      "completed": "完了",
+      "failed": "失敗"
     }
   },
   "common": {

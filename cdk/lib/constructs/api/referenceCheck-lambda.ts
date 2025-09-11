@@ -91,7 +91,8 @@ export class ReferenceCheckLambdaConstruct extends Construct {
         KNOWLEDGE_BASE_ID: props.knowledgeBaseId,
         BEDROCK_MODEL_REFERENCE_CHECK: props.bedrockModels.referenceCheck,
         POWERTOOLS_LOG_LEVEL: "DEBUG",
-        STRANDS_KNOWLEDGE_BASE_ID: props.knowledgeBaseId
+        STRANDS_KNOWLEDGE_BASE_ID: props.knowledgeBaseId,
+        AWS_MAX_ATTEMPTS: "10",
       },
     });
 

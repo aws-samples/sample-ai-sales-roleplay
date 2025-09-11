@@ -50,9 +50,10 @@ export class GuardrailsLambdaConstruct extends Construct {
       logRetention: logs.RetentionDays.ONE_WEEK,  // CloudWatchログの保持期間
       environment: {
         // 環境変数の設定
-        'ENVIRONMENT_PREFIX': cdk.Stack.of(this).stackName.includes('Prod') ? 'prod' :
+        ENVIRONMENT_PREFIX: cdk.Stack.of(this).stackName.includes('Prod') ? 'prod' :
           cdk.Stack.of(this).stackName.includes('Staging') ? 'staging' : 'dev',
-        'POWERTOOLS_LOG_LEVEL': "DEBUG"
+        POWERTOOLS_LOG_LEVEL: "DEBUG",
+        AWS_MAX_ATTEMPTS: "10",
       },
     });
   }

@@ -77,6 +77,7 @@ export class BedrockLambdaConstruct extends Construct {
       environment: {
         POWERTOOLS_LOG_LEVEL: 'DEBUG',
         MESSAGE_TTL_DAYS: '180', // メッセージのTTL（日数）
+        AWS_MAX_ATTEMPTS: "10",
         ...(props.sessionsTableName ? { SESSIONS_TABLE: props.sessionsTableName } : {}),
         ...(props.messagesTableName ? { MESSAGES_TABLE: props.messagesTableName } : {}),
         // 各用途別モデルIDを設定

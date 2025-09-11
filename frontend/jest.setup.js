@@ -112,7 +112,7 @@ global.speechSynthesis = {
 // Mock window.confirm
 global.confirm = jest.fn(() => true);
 
-// Mock console.error to fail tests on prop type warnings
+// Mock console.error to fail tests on prop type warnings but allow act() warnings
 const originalConsoleError = console.error;
 console.error = (...args) => {
   // Check if the error is a prop type warning
@@ -121,8 +121,22 @@ console.error = (...args) => {
       typeof arg === "string" && arg.includes("Warning: Failed prop type"),
   );
 
+  // Check if the error is an act() warning
+  const isActWarning = args.some(
+    (arg) =>
+      typeof arg === "string" && 
+      (arg.includes("An update to") && arg.includes("inside a test was not wrapped in act(...)")) ||
+      arg.includes("When testing, code that causes React state updates should be wrapped into act(...)")
+  );
+
   if (isPropTypeWarning) {
     throw new Error(args.join(" "));
+  }
+
+  // Log act() warnings but don't fail the test
+  if (isActWarning) {
+    // Suppress act() warnings in test environment to reduce noise
+    return;
   }
 
   originalConsoleError(...args);

@@ -1,0 +1,4 @@
+strands-agents
+strands-agents-tools
+boto3==1.40.24
+aws-lambda-powertools==3.19.0
