@@ -8,6 +8,7 @@ interface VideoRecorderProps {
   isActive: boolean; // セッションがアクティブかどうか（録画を行うべきかどうか）
   onRecordingComplete?: (videoKey: string) => void;
   onError?: (error: string) => void;
+  onCameraInitialized?: (initialized: boolean) => void; // カメラ初期化状態の通知
 }
 
 /**
@@ -21,6 +22,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
   isActive,
   onRecordingComplete,
   onError,
+  onCameraInitialized,
 }, ref) => {
   const { t } = useTranslation();
 
@@ -65,12 +67,16 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
           videoRef.current.srcObject = stream;
           setIsAccessGranted(true);
           console.log(t("recording.cameraInitialized"));
+          // 親コンポーネントにカメラ初期化完了を通知
+          if (onCameraInitialized) onCameraInitialized(true);
         }
       } catch (error) {
         console.error("カメラアクセスエラー:", error);
         setError(t("recording.cameraAccessError"));
         setSnackbarOpen(true);
         if (onError) onError(t("recording.cameraAccessError"));
+        // 親コンポーネントにカメラ初期化失敗を通知
+        if (onCameraInitialized) onCameraInitialized(false);
       }
     };
 
@@ -95,11 +101,19 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
       isRecording,
       "sessionId:",
       sessionId,
+      "カメラ初期化状態:",
+      isAccessGranted,
     );
 
     if (isActive && !isRecording && sessionId) {
       // セッションがアクティブで、sessionIdが有効な場合のみ録画開始
-      startRecording();
+      // カメラ初期化が完了していれば即座に録画開始
+      if (isAccessGranted) {
+        console.log("カメラ初期化完了、録画を開始します");
+        startRecording();
+      } else {
+        console.log("カメラ初期化待機中：録画開始は保留");
+      }
     } else if (!isActive && isRecording) {
       // セッションが非アクティブになったら録画停止
       stopRecording();
@@ -251,7 +265,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
   };
 
   // リトライ機能付きアップロード
-  const uploadWithRetry = async (uploadInfo: any, blob: Blob, videoKey: string, maxRetries = 3) => {
+  const uploadWithRetry = async (uploadInfo: { uploadUrl: string; formData: Record<string, string> }, blob: Blob, videoKey: string, maxRetries = 3) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`アップロード試行 ${attempt}/${maxRetries}`);

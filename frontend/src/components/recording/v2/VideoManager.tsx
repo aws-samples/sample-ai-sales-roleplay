@@ -7,6 +7,7 @@ interface VideoManagerProps {
   sessionId: string;
   sessionStarted: boolean;
   sessionEnded: boolean;
+  onCameraInitialized?: (initialized: boolean) => void; // カメラ初期化状態の通知
 }
 
 /**
@@ -19,12 +20,13 @@ const VideoManager = forwardRef<VideoManagerRef, VideoManagerProps>(({
   sessionId,
   sessionStarted,
   sessionEnded,
+  onCameraInitialized,
 }, ref) => {
   const [videoKey, setVideoKey] = useState<string>("");
   const [recordingError, setRecordingError] = useState<string>("");
   const videoRecorderRef = useRef<VideoRecorderRef | null>(null);
 
-  // sessionIdの変化をログ出力
+  // sessionIdの変化をログ出力（詳細版）
   useEffect(() => {
     console.log(
       "VideoManager: sessionId変更:",
@@ -33,6 +35,8 @@ const VideoManager = forwardRef<VideoManagerRef, VideoManagerProps>(({
       sessionStarted,
       "sessionEnded:",
       sessionEnded,
+      "isActive計算結果:",
+      sessionStarted && !sessionEnded && sessionId !== "",
     );
   }, [sessionId, sessionStarted, sessionEnded]);
 
@@ -123,6 +127,7 @@ const VideoManager = forwardRef<VideoManagerRef, VideoManagerProps>(({
         isActive={sessionStarted && !sessionEnded && sessionId !== ""}
         onRecordingComplete={handleRecordingComplete}
         onError={handleRecordingError}
+        onCameraInitialized={onCameraInitialized}
       />
 
       {recordingError && (

@@ -13,6 +13,7 @@ interface MessageListProps {
   currentMetrics: Metrics;
   scenario: Scenario;
   onStartConversation: () => void;
+  isCameraInitialized?: boolean; // カメラ初期化状態
 }
 
 /**
@@ -26,6 +27,7 @@ const MessageList: React.FC<MessageListProps> = ({
   currentMetrics,
   scenario,
   onStartConversation,
+  isCameraInitialized = false,
 }) => {
   const { t } = useTranslation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -53,13 +55,30 @@ const MessageList: React.FC<MessageListProps> = ({
           <Typography variant="body2" color="text.secondary" mb={3}>
             {scenario.description}
           </Typography>
+          
+          {!isCameraInitialized && (
+            <Typography 
+              variant="caption" 
+              color="warning.main" 
+              sx={{ display: "block", mb: 2 }}
+            >
+              📹 カメラを初期化しています。しばらくお待ちください...
+            </Typography>
+          )}
+          
           <Button
             variant="contained"
             size="large"
             onClick={onStartConversation}
             startIcon={<SendIcon />}
+            disabled={!isCameraInitialized}
+            sx={{
+              opacity: isCameraInitialized ? 1 : 0.6,
+            }}
           >
-            {t("conversation.startButton")}
+            {isCameraInitialized 
+              ? t("conversation.startButton") 
+              : "カメラ初期化中..."}
           </Button>
         </Box>
       ) : (
