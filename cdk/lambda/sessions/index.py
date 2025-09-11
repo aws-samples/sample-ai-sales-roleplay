@@ -38,7 +38,7 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 # 分割されたハンドラーモジュールをインポート
 from session_handlers import register_session_routes
 from message_handlers import register_message_routes
-from complete_data_handlers import register_complete_data_routes
+from analysis_results_handlers import register_analysis_results_routes
 
 # Powertools ロガー設定
 logger = Logger(service="sessions-api")
@@ -57,7 +57,7 @@ app = APIGatewayRestResolver(cors=cors_config)
 # 各ハンドラーモジュールからルートを登録
 register_session_routes(app)
 register_message_routes(app)
-register_complete_data_routes(app)
+register_analysis_results_routes(app)
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 def lambda_handler(event: dict, context: LambdaContext) -> dict:

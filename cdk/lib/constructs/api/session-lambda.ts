@@ -87,6 +87,8 @@ export class SessionLambdaConstruct extends Construct {
         POWERTOOLS_LOG_LEVEL: "DEBUG",
         // フィードバック生成用モデル
         BEDROCK_MODEL_FEEDBACK: props.bedrockModels.feedback,
+        // リアルタイムスコアリング用モデル
+        BEDROCK_MODEL_SCORING: props.bedrockModels.scoring,
         // 発言内容検証用モデル
         BEDROCK_MODEL_GUARDRAIL: props.bedrockModels.guardrail,
         // ビデオ分析用モデル（デフォルト値を設定）
@@ -95,6 +97,7 @@ export class SessionLambdaConstruct extends Construct {
         VIDEO_BUCKET: props.videoBucketName || '',
         // Knowledge Base ID
         KNOWLEDGE_BASE_ID: props.knowledgeBaseId,
+        AWS_MAX_ATTEMPTS: "10",
         // セッションフィードバックテーブル
         ...(props.sessionFeedbackTableName && { SESSION_FEEDBACK_TABLE: props.sessionFeedbackTableName })
       },

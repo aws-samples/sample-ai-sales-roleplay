@@ -101,6 +101,9 @@ const ResultPage: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [feedback, setFeedback] = useState<string[]>([]);
   const [tabValue, setTabValue] = useState(0);
+  
+  // セッション種別の状態管理（音声分析かどうか）
+  const [isAudioAnalysis, setIsAudioAnalysis] = useState(false);
 
   // シナリオ情報の状態管理
   const [scenario, setScenario] = useState<ScenarioInfo | null>(null);
@@ -143,6 +146,49 @@ const ResultPage: React.FC = () => {
     setTabValue(newValue);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleAudioAnalysisSession = (completeData: any, sessionId: string) => {
+    try {
+      console.log("音声分析セッションの処理を開始:", completeData);
+      
+      // 音声分析データから既にメッセージが構築されているのでそのまま使用
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const messages = (completeData.messages || []).map((msg: any) => ({
+        id: (msg.messageId as string) || crypto.randomUUID(),
+        sender: msg.sender as "user" | "npc",
+        content: msg.content as string,
+        timestamp: new Date(msg.timestamp as string),
+        metrics: undefined, // 音声分析では個別メトリクスなし
+      }));
+
+      // 音声分析用のSessionオブジェクトを構築
+      const constructedSession: Session = {
+        id: sessionId,
+        scenarioId: (completeData.sessionInfo?.scenarioId as string) || "default",
+        startTime: new Date((completeData.sessionInfo?.createdAt as string) || new Date().toISOString()),
+        endTime: new Date((completeData.sessionInfo?.createdAt as string) || new Date().toISOString()),
+        messages: messages,
+        finalMetrics: completeData.finalMetrics as Metrics,
+        finalScore: (completeData.feedback?.scores?.overall as number) || 0,
+        feedback: [],
+        goalStatuses: (completeData.goalResults?.goalStatuses as GoalStatus[]) || [],
+        goalScore: (completeData.goalResults?.goalScore as number) || 0,
+        endReason: "音声分析完了",
+        complianceViolations: [],
+      };
+
+      setSession(constructedSession);
+      setDetailedFeedback(completeData.feedback as FeedbackAnalysisResult);
+      setRealtimeMetricsHistory([]); // 音声分析ではリアルタイムメトリクス履歴なし
+      setScenarioGoals((completeData.goalResults?.scenarioGoals as Goal[]) || []);
+      
+      console.log("音声分析セッション処理完了:", constructedSession);
+    } catch (err) {
+      console.error("音声分析セッション処理エラー:", err);
+      setError("音声分析結果の読み込み中にエラーが発生しました");
+    }
+  };
+
   useEffect(() => {
     if (!sessionId) return;
 
@@ -150,7 +196,7 @@ const ResultPage: React.FC = () => {
       try {
         setLoading(true);
 
-        // セッション完全データをAPIから取得
+        // セッション分析結果をAPIから取得
         console.log(t("results.fetchingCompleteSessionData"), sessionId);
         const completeData = await apiService.getSessionCompleteData(sessionId);
 
@@ -158,6 +204,21 @@ const ResultPage: React.FC = () => {
           t("results.completeSessionDataFetched") + ":",
           completeData,
         );
+
+        // 音声分析セッションかどうかを判定
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sessionType = (completeData as any).sessionType;
+        if (sessionType === "audio-analysis") {
+          // 音声分析セッションフラグを設定
+          setIsAudioAnalysis(true);
+          // 音声分析セッションの処理
+          handleAudioAnalysisSession(completeData, sessionId);
+          setLoading(false); // ローディング状態を解除
+          return;
+        }
+        
+        // 通常セッションの場合
+        setIsAudioAnalysis(false);
 
         // セッション基本情報からSessionオブジェクトを構築
         const sessionInfo = completeData.sessionInfo;
@@ -501,17 +562,19 @@ const ResultPage: React.FC = () => {
             id="result-tab-2"
             aria-controls="result-tabpanel-2"
           />
-          <Tab
-            icon={<VideocamIcon />}
-            label={t("videoAnalysis.title")}
-            id="result-tab-3"
-            aria-controls="result-tabpanel-3"
-          />
+          {!isAudioAnalysis && (
+            <Tab
+              icon={<VideocamIcon />}
+              label={t("videoAnalysis.title")}
+              id="result-tab-3"
+              aria-controls="result-tabpanel-3"
+            />
+          )}
           <Tab
             icon={<DescriptionIcon />}
             label={t("referenceCheck.title")}
-            id="result-tab-4"
-            aria-controls="result-tabpanel-4"
+            id={isAudioAnalysis ? "result-tab-3" : "result-tab-4"}
+            aria-controls={isAudioAnalysis ? "result-tabpanel-3" : "result-tabpanel-4"}
           />
         </Tabs>
       </Box>
@@ -641,11 +704,11 @@ const ResultPage: React.FC = () => {
                             {
                               label: t("results.currentScore"),
                               data: [
-                                detailedFeedback.scores.communication,
-                                detailedFeedback.scores.needsAnalysis,
-                                detailedFeedback.scores.proposalQuality,
-                                detailedFeedback.scores.flexibility,
-                                detailedFeedback.scores.trustBuilding,
+                                detailedFeedback.scores.communication || 0,
+                                detailedFeedback.scores.needsAnalysis || 0,
+                                detailedFeedback.scores.proposalQuality || 0,
+                                detailedFeedback.scores.flexibility || 0,
+                                detailedFeedback.scores.trustBuilding || 0,
                               ],
                               backgroundColor: "rgba(54, 162, 235, 0.2)",
                               borderColor: "rgba(54, 162, 235, 1)",
@@ -796,7 +859,7 @@ const ResultPage: React.FC = () => {
                       )}
 
                       {/* 重要な洞察 */}
-                      {detailedFeedback.keyInsights.map(
+                      {detailedFeedback.keyInsights?.map(
                         (insight: string, index: number) => (
                           <Alert
                             key={`insight-${index}`}
@@ -809,12 +872,14 @@ const ResultPage: React.FC = () => {
                       )}
 
                       {/* 次のステップ */}
-                      <Alert severity="info" sx={{ mb: 2 }}>
-                        <Typography variant="subtitle2" gutterBottom>
-                          {t("results.nextSteps")}
-                        </Typography>
-                        {detailedFeedback.nextSteps}
-                      </Alert>
+                      {detailedFeedback.nextSteps && (
+                        <Alert severity="info" sx={{ mb: 2 }}>
+                          <Typography variant="subtitle2" gutterBottom>
+                            {t("results.nextSteps")}
+                          </Typography>
+                          {detailedFeedback.nextSteps}
+                        </Alert>
+                      )}
                     </>
                   ) : (
                     <Alert severity="warning" sx={{ mb: 2 }}>
@@ -1445,21 +1510,23 @@ const ResultPage: React.FC = () => {
         </Box>
       </TabPanel>
 
-      {/* ビデオ分析タブ */}
-      <TabPanel value={tabValue} index={3}>
-        <Box sx={{ maxWidth: 900, mx: "auto" }}>
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              {sessionId && (
-                <VideoFeedback sessionId={sessionId} isVisible={true} />
-              )}
-            </CardContent>
-          </Card>
-        </Box>
-      </TabPanel>
+      {/* ビデオ分析タブ（音声分析セッションでは非表示） */}
+      {!isAudioAnalysis && (
+        <TabPanel value={tabValue} index={3}>
+          <Box sx={{ maxWidth: 900, mx: "auto" }}>
+            <Card sx={{ mb: 3 }}>
+              <CardContent>
+                {sessionId && (
+                  <VideoFeedback sessionId={sessionId} isVisible={true} />
+                )}
+              </CardContent>
+            </Card>
+          </Box>
+        </TabPanel>
+      )}
 
       {/* リファレンスチェックタブ */}
-      <TabPanel value={tabValue} index={4}>
+      <TabPanel value={tabValue} index={isAudioAnalysis ? 3 : 4}>
         <Box sx={{ maxWidth: 900, mx: "auto" }}>
           <Card sx={{ mb: 3 }}>
             <CardContent>

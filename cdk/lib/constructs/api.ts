@@ -16,11 +16,13 @@ import { ScenarioLambdaConstruct } from './api/scenario-lambda';
 import { RankingsLambdaConstruct } from './api/rankings-lambda';
 import { GuardrailsLambdaConstruct } from './api/guardrails-lambda';
 import { ReferenceCheckLambdaConstruct } from './api/referenceCheck-lambda'
+import { AudioAnalysisLambdaConstruct } from './api/audio-analysis-lambda';
 
 // DatabaseTablesをインポート
 import { DatabaseTables } from './storage/database-tables';
 
 import { GuardrailsConstruct } from './guardrails';
+import { AudioAnalysisStepFunctionsConstruct } from './audio-analysis-stepfunctions';
 
 export interface BackendApiProps {
   userPool?: cognito.UserPool;
@@ -71,6 +73,12 @@ export class Api extends Construct {
 
   /** リファレンスチェックLambda */
   public readonly referenceCheckLambda: ReferenceCheckLambdaConstruct;
+
+  /** 音声分析Lambda */
+  public readonly audioAnalysisLambda: AudioAnalysisLambdaConstruct;
+
+  /** 音声分析Step Functions */
+  public readonly audioAnalysisStepFunctions: AudioAnalysisStepFunctionsConstruct;
 
   constructor(scope: Construct, id: string, props: BackendApiProps) {
     super(scope, id);
@@ -206,6 +214,29 @@ export class Api extends Construct {
       knowledgeBaseId: props.knowledgeBaseId
     });
 
+    // 音声分析Lambda関数を作成
+    this.audioAnalysisLambda = new AudioAnalysisLambdaConstruct(this, 'AudioAnalysisLambda', {
+      sessionFeedbackTable: this.databaseTables.sessionFeedbackTable,
+      scenariosTable: this.databaseTables.scenariosTable,
+      audioBucket: this.audioStorage.bucket,
+      knowledgeBaseId: props.knowledgeBaseId,
+      bedrockModels: {
+        analysis: bedrockModels.scoring // 分析用モデル
+      }
+    });
+
+    // 音声分析Step Functionsを作成
+    this.audioAnalysisStepFunctions = new AudioAnalysisStepFunctionsConstruct(this, 'AudioAnalysisStepFunctions', {
+      resourceNamePrefix: props.resourceNamePrefix,
+      audioAnalysisLambda: this.audioAnalysisLambda
+    });
+
+    // 音声分析API関数にStep Functions ARNを設定
+    this.audioAnalysisLambda.apiFunction.addEnvironment(
+      'AUDIO_ANALYSIS_STATE_MACHINE_ARN', 
+      this.audioAnalysisStepFunctions.stateMachine.stateMachineArn
+    );
+
     // API Gateway
     this.api = new ApiGatewayConstruct(this, 'ApiGateway', {
       userPool: props.userPool!,
@@ -219,6 +250,7 @@ export class Api extends Construct {
       videosFunction: this.videosLambda.function, // 動画管理Lambda関数を追加
       guardrailsFunction: this.guardrailsLambda.function, // 新しいガードレールLambdaを使用
       referenceCheckFunction: this.referenceCheckLambda.function,
+      audioAnalysisFunction: this.audioAnalysisLambda.apiFunction, // 音声分析API関数を追加
     });
 
     // スコアリングAPIエンドポイントを設定

@@ -88,32 +88,90 @@ def format_messages_to_conversation(message_items: List[Dict[str, Any]]) -> str:
 def get_messages(sessionId: str, scenarioId: str) -> List[Dict[str, Any]]:
     """
     セッションIDに対応するメッセージリストを取得する
+    通常セッションと音声分析セッション両方に対応
 
     Args:
       sessionId: セッションID
+      scenarioId: シナリオID
 
     Returns:
       メッセージアイテムのリスト
     """
     logger.debug("会話履歴をDynamoDBから取得")
-    messages_table = dynamodb.Table(MESSAGES_TABLE)
-    response = messages_table.query(
-        KeyConditionExpression=boto3.dynamodb.conditions.Key("sessionId").eq(sessionId),
-        ScanIndexForward=True,  # 昇順ソート（最新が末尾）
-    )
+    
+    # まず音声分析セッションかどうかを確認
+    feedback_table = dynamodb.Table(SESSION_FEEDBACK_TABLE)
+    logger.debug(f"音声分析セッション判定開始: sessionId={sessionId}")
+    logger.debug(f"使用するテーブル名: {SESSION_FEEDBACK_TABLE}")
+    
+    # 音声分析セッションかどうかの判定を簡単にするため、全データタイプを取得
+    try:
+        all_response = feedback_table.query(
+            KeyConditionExpression=boto3.dynamodb.conditions.Key("sessionId").eq(sessionId),
+            ScanIndexForward=False,
+            Limit=10  # 複数のデータタイプを確認
+        )
+        
+        all_items = all_response.get("Items", [])
+        logger.info(f"セッション全データ取得結果: Items数={len(all_items)}")
+        
+        # データタイプごとに分類
+        audio_analysis_items = []
+        for item in all_items:
+            data_type = item.get("dataType", "")
+            logger.debug(f"見つかったデータタイプ: {data_type}")
+            if data_type == "audio-analysis-result":
+                audio_analysis_items.append(item)
+                break
+        
+        logger.info(f"音声分析セッション判定結果: Items数={len(audio_analysis_items)}")
+            
+    except Exception as query_error:
+        logger.error(f"音声分析セッション判定クエリエラー: {str(query_error)}")
+        audio_analysis_items = []
+    
+    if audio_analysis_items:
+        # 音声分析セッションの場合：セグメントからメッセージを構築
+        logger.info(f"音声分析セッションのメッセージを構築: sessionId={sessionId}")
+        audio_analysis_data = audio_analysis_items[0].get("audioAnalysisData", {})
+        segments = audio_analysis_data.get("segments", [])
+        
+        message_items = []
+        for segment in segments:
+            sender = "user" if segment.get("role") == "customer" else "npc"
+            message_items.append({
+                "sender": sender,
+                "content": segment.get("text", "")
+            })
+        
+        logger.info(f"音声分析セッション：構築したメッセージ数={len(message_items)}")
+        
+        if not message_items:
+            logger.warn(f"音声分析セッション {sessionId} にメッセージセグメントが見つかりません")
+            raise ResourceNotFoundError(f"Audio analysis segments not found for session: {sessionId}")
+        
+        return message_items
+    
+    else:
+        # 通常セッションの場合：Messagesテーブルから取得
+        messages_table = dynamodb.Table(MESSAGES_TABLE)
+        response = messages_table.query(
+            KeyConditionExpression=boto3.dynamodb.conditions.Key("sessionId").eq(sessionId),
+            ScanIndexForward=True,  # 昇順ソート（最新が末尾）
+        )
 
-    logger.info(f"DynamoDBクエリレスポンス: Items数={len(response.get('Items', []))}")
-    message_items = response.get("Items", [])
-    if not message_items:
-        logger.warn(f"セッション {sessionId} のメッセージが見つかりません")
-        raise ResourceNotFoundError(f"Messages not found for session: {sessionId}")
+        logger.info(f"通常セッション DynamoDBクエリレスポンス: Items数={len(response.get('Items', []))}")
+        message_items = response.get("Items", [])
+        if not message_items:
+            logger.warn(f"通常セッション {sessionId} のメッセージが見つかりません")
+            raise ResourceNotFoundError(f"Messages not found for session: {sessionId}")
 
-    # NPCの初期メッセージを登録
-    initialMessage = get_initial_message(scenarioId)
-    message_items.insert(0, {"sender": "npc", "content": initialMessage})
+        # NPCの初期メッセージを登録
+        initialMessage = get_initial_message(scenarioId)
+        message_items.insert(0, {"sender": "npc", "content": initialMessage})
 
-    logger.debug(f"message_items: {message_items}")
-    return message_items
+        logger.debug(f"通常セッション message_items: {len(message_items)}件")
+        return message_items
 
 
 def get_user_messages(message_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -151,27 +209,41 @@ def create_full_context(message_items: List[Dict[str, Any]]) -> str:
 
 def get_scenario_id(sessionId: str) -> str:
     logger.debug("シナリオIDをDynamoDBのフィードバックテーブルから取得")
-    # DynamoDBのセッションフィードバックテーブルからシナリオIDを取得する
     feedback_table = dynamodb.Table(SESSION_FEEDBACK_TABLE)
+    
+    # まず通常セッション（final-feedback）を検索
     response = feedback_table.query(
         KeyConditionExpression=boto3.dynamodb.conditions.Key("sessionId").eq(sessionId),
-        FilterExpression=boto3.dynamodb.conditions.Attr("dataType").eq(
-            "final-feedback"
-        ),
+        FilterExpression=boto3.dynamodb.conditions.Attr("dataType").eq("final-feedback"),
         ScanIndexForward=False,  # 降順ソート（最新が先頭）
     )
     feedback_items = response.get("Items", [])
-    if not feedback_items:
-        logger.warn(f"セッション {sessionId} のフィードバックデータが見つかりません")
-        raise ResourceNotFoundError(f"Feedback data not found for session: {sessionId}")
-
-    # 最新のfinal-feedbackアイテムを取得
-    item = feedback_items[0]
-    logger.info(f"取得したアイテムのキー: {list(item.keys())}")
-    logger.info(f"シナリオID: {item.get('scenarioId')}")
-    scenario_id = item.get("scenarioId")
-
-    return scenario_id
+    
+    if feedback_items:
+        # 通常セッションの場合
+        item = feedback_items[0]
+        scenario_id = item.get("scenarioId")
+        logger.info(f"通常セッションのシナリオID: {scenario_id}")
+        return scenario_id
+    
+    # 音声分析セッション（audio-analysis-result）を検索
+    response = feedback_table.query(
+        KeyConditionExpression=boto3.dynamodb.conditions.Key("sessionId").eq(sessionId),
+        FilterExpression=boto3.dynamodb.conditions.Attr("dataType").eq("audio-analysis-result"),
+        ScanIndexForward=False,  # 降順ソート（最新が先頭）
+    )
+    audio_analysis_items = response.get("Items", [])
+    
+    if audio_analysis_items:
+        # 音声分析セッションの場合
+        item = audio_analysis_items[0]
+        scenario_id = item.get("scenarioId")
+        logger.info(f"音声分析セッションのシナリオID: {scenario_id}")
+        return scenario_id
+    
+    # どちらも見つからない場合はエラー
+    logger.warn(f"セッション {sessionId} のデータが見つかりません（final-feedback, audio-analysis-result両方とも）")
+    raise ResourceNotFoundError(f"Session data not found for session: {sessionId}")
 
 
 def get_initial_message(scenarioId: str) -> str:

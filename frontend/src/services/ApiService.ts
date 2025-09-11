@@ -1180,33 +1180,36 @@ export class ApiService {
   }
 
   /**
-   * セッション完全データを取得する
+   * セッション分析結果を取得する
    *
    * ResultPageで使用するセッションの全データを一括取得します。
-   * セッション情報、メッセージ履歴、リアルタイムメトリクス、フィードバックを含みます。
+   * 通常セッションと音声分析セッション両方に対応。
    *
    * @param sessionId セッションID
-   * @returns セッション完全データ
+   * @returns セッション分析結果データ
    * @throws Error - API呼び出し失敗時やセッションが見つからない時
    */
   public async getSessionCompleteData(
     sessionId: string,
   ): Promise<SessionCompleteDataResponse> {
     try {
-      // API呼び出し
+      // API呼び出し（音声分析セッション対応）
       const response = await this.apiGet<SessionCompleteDataResponse>(
-        `/sessions/${sessionId}/complete-data`,
+        `/sessions/${sessionId}/analysis-results`,
       );
 
-      console.log("セッション完全データ取得成功:", response);
+      console.log("セッション分析結果取得成功:", response);
 
       if (response.success) {
         if (process.env.NODE_ENV !== "test") {
-          console.log("セッション完全データを返します:", {
+          const sessionType = (response as unknown as Record<string, unknown>).sessionType || "regular";
+          console.log("セッション分析結果を返します:", {
+            sessionType: sessionType,
             hasMessages: response.messages.length > 0,
-            hasRealtimeMetrics: response.realtimeMetrics.length > 0,
+            hasRealtimeMetrics: response.realtimeMetrics?.length > 0,
             hasFeedback: !!response.feedback,
             hasGoalResults: !!response.goalResults,
+            hasAudioAnalysis: !!(response as unknown as Record<string, unknown>).audioAnalysis,
             hasComplianceViolations:
               response.complianceViolations &&
               response.complianceViolations.length > 0,
@@ -1217,20 +1220,20 @@ export class ApiService {
 
         return response;
       } else {
-        throw new Error("セッション完全データが正常に取得できませんでした");
+        throw new Error("セッション分析結果が正常に取得できませんでした");
       }
     } catch (error) {
       console.error(
-        `セッション完全データの取得に失敗しました (${sessionId}):`,
+        `セッション分析結果の取得に失敗しました (${sessionId}):`,
         error,
       );
 
       if (error instanceof Error) {
         throw new Error(
-          `セッション完全データの取得に失敗しました: ${error.message}`,
+          `セッション分析結果の取得に失敗しました: ${error.message}`,
         );
       } else {
-        throw new Error("セッション完全データの取得に失敗しました");
+        throw new Error("セッション分析結果の取得に失敗しました");
       }
     }
   }
@@ -1622,6 +1625,174 @@ export class ApiService {
         throw new Error(`Polly音声合成に失敗しました: ${error.message}`);
       } else {
         throw new Error("Polly音声合成に失敗しました");
+      }
+    }
+  }
+
+  /**
+   * 音声ファイルアップロード用の署名付きURLを生成
+   * @param fileName ファイル名
+   * @param contentType 音声ファイルの形式
+   * @param language 言語設定
+   * @returns 署名付きURLとセッション情報
+   */
+  public async generateAudioUploadUrl(
+    fileName: string,
+    contentType: string,
+    language: string
+  ): Promise<{
+    success: boolean;
+    uploadUrl: string;
+    formData: Record<string, string>;
+    audioKey: string;
+    sessionId: string;
+    language: string;
+  }> {
+    try {
+      const requestBody = {
+        fileName,
+        contentType,
+        language
+      };
+
+      const response = await this.apiPost<{
+        success: boolean;
+        uploadUrl: string;
+        formData: Record<string, string>;
+        audioKey: string;
+        sessionId: string;
+        language: string;
+      }>('/audio-analysis/upload-url', requestBody);
+
+      if (!response.success) {
+        throw new Error('署名付きURL生成に失敗しました');
+      }
+
+      return response;
+    } catch (error) {
+      console.error('音声アップロードURL生成エラー:', error);
+      
+      if (error instanceof Error) {
+        throw new Error(`音声アップロードURL生成に失敗しました: ${error.message}`);
+      } else {
+        throw new Error('音声アップロードURL生成に失敗しました');
+      }
+    }
+  }
+
+  /**
+   * 音声分析を開始
+   * @param sessionId セッションID
+   * @param audioKey 音声ファイルのS3キー
+   * @param scenarioId シナリオID
+   * @param language 言語設定
+   * @returns 分析開始結果
+   */
+  public async startAudioAnalysis(
+    sessionId: string,
+    audioKey: string,
+    scenarioId: string,
+    language: string
+  ): Promise<{
+    success: boolean;
+    sessionId: string;
+    executionArn?: string;
+    status: string;
+    message?: string;
+  }> {
+    try {
+      const requestBody = {
+        audioKey,
+        scenarioId,
+        language
+      };
+
+      const response = await this.apiPost<{
+        success: boolean;
+        sessionId: string;
+        executionArn?: string;
+        status: string;
+        message?: string;
+      }>(`/audio-analysis/${sessionId}/analyze`, requestBody);
+
+      return response;
+    } catch (error) {
+      console.error('音声分析開始エラー:', error);
+      
+      if (error instanceof Error) {
+        throw new Error(`音声分析開始に失敗しました: ${error.message}`);
+      } else {
+        throw new Error('音声分析開始に失敗しました');
+      }
+    }
+  }
+
+  /**
+   * 音声分析の状況を確認
+   * @param sessionId セッションID
+   * @returns 分析状況
+   */
+  public async getAudioAnalysisStatus(sessionId: string): Promise<{
+    success: boolean;
+    sessionId: string;
+    status: string;
+    currentStep?: string;
+    hasResult: boolean;
+    progress?: Record<string, unknown>;
+  }> {
+    try {
+      const response = await this.apiGet<{
+        success: boolean;
+        sessionId: string;
+        status: string;
+        currentStep?: string;
+        hasResult: boolean;
+        progress?: Record<string, unknown>;
+      }>(`/audio-analysis/${sessionId}/status`);
+
+      return response;
+    } catch (error) {
+      console.error('分析状況確認エラー:', error);
+      
+      if (error instanceof Error) {
+        throw new Error(`分析状況確認に失敗しました: ${error.message}`);
+      } else {
+        throw new Error('分析状況確認に失敗しました');
+      }
+    }
+  }
+
+  /**
+   * 音声分析結果を取得
+   * @param sessionId セッションID
+   * @returns 分析結果
+   */
+  public async getAudioAnalysisResults(sessionId: string): Promise<{
+    success: boolean;
+    sessionId: string;
+    audioAnalysis?: Record<string, unknown>;
+    scenarioId?: string;
+    language?: string;
+    createdAt?: string;
+  }> {
+    try {
+      const response = await this.apiGet<{
+        success: boolean;
+        sessionId: string;
+        audioAnalysis?: Record<string, unknown>;
+        scenarioId?: string;
+        language?: string;
+        createdAt?: string;
+      }>(`/audio-analysis/${sessionId}/results`);
+
+      return response;
+    } catch (error) {
+      console.error('音声分析結果取得エラー:', error);
+      
+      if (error instanceof Error) {
+        throw new Error(`音声分析結果取得に失敗しました: ${error.message}`);
+      } else {
+        throw new Error('音声分析結果取得に失敗しました');
       }
     }
   }
