@@ -1,5 +1,4 @@
-import React from "react";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen} from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { I18nextProvider } from "react-i18next";
 // テスト用のi18n設定
