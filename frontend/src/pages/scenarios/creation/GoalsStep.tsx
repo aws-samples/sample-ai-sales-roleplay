@@ -333,7 +333,11 @@ const GoalsStep: React.FC<GoalsStepProps> = ({ formData, updateFormData }) => {
 
               <Box sx={{ mt: 2, mb: 1 }}>
                 <Typography gutterBottom>
-                  {t("scenarios.fields.goalPriority")}: {newGoalPriority}
+                  {t("scenarios.fields.goalPriority")}: {newGoalPriority} {newGoalPriority === 5 ? `(${t("scenarios.priority.highest")})` : 
+                  newGoalPriority === 4 ? `(${t("scenarios.priority.high")})` : 
+                  newGoalPriority === 3 ? `(${t("scenarios.priority.medium")})` : 
+                  newGoalPriority === 2 ? `(${t("scenarios.priority.low")})` : 
+                  `(${t("scenarios.priority.lowest")})`}
                 </Typography>
                 <Slider
                   value={newGoalPriority}
@@ -481,7 +485,11 @@ const GoalsStep: React.FC<GoalsStepProps> = ({ formData, updateFormData }) => {
                     color="text.secondary"
                     sx={{ mt: 1 }}
                   >
-                    {t("scenarios.fields.priority")}: {goal.priority}/5 •
+                    {t("scenarios.fields.priority")}: {goal.priority}/5 {goal.priority === 5 ? `(${t("scenarios.priority.highest")})` : 
+                    goal.priority === 4 ? `(${t("scenarios.priority.high")})` : 
+                    goal.priority === 3 ? `(${t("scenarios.priority.medium")})` : 
+                    goal.priority === 2 ? `(${t("scenarios.priority.low")})` : 
+                    `(${t("scenarios.priority.lowest")})`} •
                     {goal.isRequired
                       ? ` ${t("scenarios.fields.required")}`
                       : ` ${t("scenarios.fields.optional")}`}

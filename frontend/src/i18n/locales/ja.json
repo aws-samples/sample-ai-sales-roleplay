@@ -232,6 +232,13 @@
     "profileAuth": "プロフィール"
   },
   "scenarios": {
+    "priority": {
+      "highest": "最高",
+      "high": "高",
+      "medium": "中",
+      "low": "低",
+      "lowest": "最低"
+    },
     "title": "シナリオ一覧",
     "subtitle": "練習したいシナリオを選択してください。各シナリオには異なる難易度とNPCキャラクターが設定されています。",
     "beginner": "初級",
