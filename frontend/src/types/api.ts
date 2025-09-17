@@ -3,6 +3,34 @@
  */
 
 /**
+ * Transcribe WebSocket関連の型定義
+ */
+export interface TranscribeMessageEvent {
+  transcript?: string;
+  isFinal?: boolean;
+  voiceActivity?: boolean;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
+export interface TranscribeRequest {
+  action: 'sendAudio';
+  audio: string; // Base64エンコードされた音声データ
+}
+
+export interface TranscribeResponse {
+  transcript?: string;
+  isFinal?: boolean;
+  voiceActivity?: boolean;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
+/**
  * 難易度レベルの型
  */
 export type DifficultyLevel = "easy" | "normal" | "hard" | "expert";

@@ -21,6 +21,7 @@ import { ApiService } from "../services/ApiService";
 import { AudioService } from "../services/AudioService";
 import { LanguageService } from "../services/LanguageService";
 import { PollyService } from "../services/PollyService";
+import { TranscribeService } from "../services/TranscribeService";
 import { getSpeechRecognitionLanguage } from "../i18n/utils/languageUtils";
 import type { EmotionState } from "../types/index";
 import {
@@ -69,12 +70,16 @@ const ConversationPage: React.FC = () => {
   const [audioVolume, setAudioVolume] = useState<number>(80);
   const [speechRate, setSpeechRate] = useState<number>(1.15);
   const [isListening, setIsListening] = useState(false);
+  const [continuousListening, setContinuousListening] = useState(false); // 常時マイク入力モード
   const [speechRecognitionError, setSpeechRecognitionError] = useState<
     string | null
   >(null);
   const [metricsUpdating, setMetricsUpdating] = useState(false);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [goalStatuses, setGoalStatuses] = useState<GoalStatus[]>([]);
+  
+  // Transcribe音声認識サービスへの参照
+  const transcribeServiceRef = useRef<TranscribeService | null>(null);
   // ゴールの達成スコア（セッション終了時に使用）
   const [goalScore, setGoalScore] = useState<number>(0);
   // コンプライアンス違反の通知管理
@@ -91,6 +96,16 @@ const ConversationPage: React.FC = () => {
     hasComponentMounted.current = true;
     // コンポーネントのマウント状態をログ出力
     console.log("ConversationPageコンポーネントがマウントされました");
+    
+    // TranscribeServiceの初期化
+    transcribeServiceRef.current = TranscribeService.getInstance();
+    
+    return () => {
+      // コンポーネントのアンマウント時にリソース解放
+      if (transcribeServiceRef.current) {
+        transcribeServiceRef.current.dispose();
+      }
+    };
   }, []);
 
   // 初期化
@@ -283,6 +298,15 @@ const ConversationPage: React.FC = () => {
 
     // セッションIDを先に設定し、状態更新を確実に行う
     setSessionId(newSessionId);
+    
+    // Transcribe WebSocketの初期化
+    if (transcribeServiceRef.current) {
+      transcribeServiceRef.current.initializeConnection(newSessionId)
+        .catch(error => {
+          console.error("Transcribe WebSocket接続エラー:", error);
+          // エラーがあっても通常の会話は続行できるようにする
+        });
+    }
 
     // 短い遅延を入れてセッションIDの状態更新を確実に反映させる
     setTimeout(() => {
@@ -662,7 +686,78 @@ const ConversationPage: React.FC = () => {
   };
 
   // 音声入力を開始
-  const startSpeechRecognition = () => {
+  const startSpeechRecognition = useCallback(async () => {
+    // すでにリスニング中なら停止（トグル動作）
+    if (isListening && transcribeServiceRef.current) {
+      transcribeServiceRef.current.stopListening();
+      setIsListening(false);
+      setContinuousListening(false);
+      return;
+    }
+
+    try {
+      if (!transcribeServiceRef.current) {
+        throw new Error("TranscribeServiceが初期化されていません");
+      }
+      
+      // WebSocketが接続されていなければ再接続を試みる
+      if (!transcribeServiceRef.current.isConnected() && sessionId) {
+        try {
+          await transcribeServiceRef.current.initializeConnection(sessionId);
+        } catch (error) {
+          console.error("Transcribe WebSocket接続エラー:", error);
+          
+          // WebSocket接続に失敗した場合は従来の方法を試す
+          fallbackToWebSpeechAPI();
+          return;
+        }
+      }
+      
+      // Amazon Transcribeを使った常時マイク入力を開始
+      await transcribeServiceRef.current.startListening(
+        // 文字起こしコールバック
+        (text, isFinal) => {
+          if (isFinal) {
+            setUserInput((prevInput) => {
+              if (prevInput && prevInput.trim()) {
+                return `${prevInput} ${text}`;
+              }
+              return text;
+            });
+          }
+        },
+        // 無音検出コールバック
+        () => {
+          if (userInput.trim()) {
+            sendMessage(); // 無音検出時に自動送信
+          }
+        },
+        // エラーコールバック
+        (error) => {
+          console.error("音声認識エラー:", error);
+          setIsListening(false);
+          setContinuousListening(false);
+          setSpeechRecognitionError("network");
+          
+          // エラー発生時に従来の方法にフォールバック
+          fallbackToWebSpeechAPI();
+        }
+      );
+      
+      setIsListening(true);
+      setContinuousListening(true);
+      setSpeechRecognitionError(null);
+    } catch (error) {
+      console.error("音声認識の開始に失敗:", error);
+      
+      // エラー時はWeb Speech APIにフォールバック
+      fallbackToWebSpeechAPI();
+    }
+  }, [isListening, sessionId, sendMessage, userInput]);
+  
+  // 従来のWeb Speech APIを使った音声認識にフォールバックする関数
+  const fallbackToWebSpeechAPI = () => {
+    // Web Speech APIのサポートをチェック
     if (
       !("webkitSpeechRecognition" in window) &&
       !("SpeechRecognition" in window)
@@ -684,7 +779,7 @@ const ConversationPage: React.FC = () => {
       const languageCode = scenario?.language || "ja";
       const speechRecognitionLang = getSpeechRecognitionLanguage(languageCode);
       console.log(
-        `音声認識言語を設定: ${speechRecognitionLang} (シナリオ言語: ${languageCode})`,
+        `音声認識言語を設定 (フォールバック): ${speechRecognitionLang} (シナリオ言語: ${languageCode})`,
       );
       recognition.lang = speechRecognitionLang;
       recognition.continuous = false;
@@ -692,6 +787,7 @@ const ConversationPage: React.FC = () => {
 
       recognition.onstart = () => {
         setIsListening(true);
+        setContinuousListening(false); // フォールバック時は常時モードではない
         setSpeechRecognitionError(null);
       };
 
@@ -707,7 +803,7 @@ const ConversationPage: React.FC = () => {
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error("音声認識エラー:", event.error);
+        console.error("音声認識エラー (フォールバック):", event.error);
         setIsListening(false);
 
         switch (event.error) {
@@ -731,17 +827,25 @@ const ConversationPage: React.FC = () => {
       };
 
       recognition.start();
+      console.log("Web Speech APIにフォールバックしました");
     } catch (error) {
-      console.error("音声認識の開始エラー:", error);
+      console.error("フォールバック音声認識の開始エラー:", error);
+      setIsListening(false);
       setSpeechRecognitionError("unknown");
     }
   };
 
   // テキスト入力モードに切り替え
-  const switchToTextInput = () => {
+  const switchToTextInput = useCallback(() => {
     setSpeechRecognitionError(null);
     setIsListening(false);
-  };
+    setContinuousListening(false);
+    
+    // Transcribeサービスの停止
+    if (transcribeServiceRef.current && transcribeServiceRef.current.isListening()) {
+      transcribeServiceRef.current.stopListening();
+    }
+  }, []);
 
   // 感情状態変化のハンドラー
   const handleEmotionChange = useCallback((emotion: EmotionState) => {
@@ -901,6 +1005,7 @@ const ConversationPage: React.FC = () => {
             handleKeyDown={handleKeyDown}
             sessionStarted={sessionStarted}
             sessionEnded={sessionEnded}
+            continuousListening={continuousListening}
           />
         </Box>
 

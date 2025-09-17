@@ -149,6 +149,12 @@ export class InfrastructureStack extends cdk.Stack {
       description: 'API Gateway Endpoint URL',
       exportName: `${prefix}ApiEndpoint`
     });
+    
+    new cdk.CfnOutput(this, 'TranscribeWebSocketEndpoint', {
+      value: api.transcribeWebSocket.webSocketApiEndpoint,
+      description: 'WebSocket API Endpoint for Transcribe integration',
+      exportName: `${prefix}TranscribeWebSocketEndpoint`
+    });
 
     new cdk.CfnOutput(this, 'CloudFrontURL', {
       value: `https://${web.distribution.domainName}`,
