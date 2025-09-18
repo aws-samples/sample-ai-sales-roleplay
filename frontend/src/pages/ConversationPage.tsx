@@ -20,7 +20,8 @@ import { AudioService } from "../services/AudioService";
 import { LanguageService } from "../services/LanguageService";
 import { PollyService } from "../services/PollyService";
 import { TranscribeService } from "../services/TranscribeService";
-import { getTranscribeLanguage } from "../i18n/utils/languageUtils";
+// テスト中のため一時的にインポートを削除 (lint error 回避)
+// import { getTranscribeLanguage } from "../i18n/utils/languageUtils";
 import type { EmotionState } from "../types/index";
 import {
   initializeGoalStatuses,

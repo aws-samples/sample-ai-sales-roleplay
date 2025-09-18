@@ -39,22 +39,11 @@ export class TranscribeService {
     this.websocketUrl = url;
     console.log(`WebSocketエンドポイントを設定: ${url}`);
   }
-    this.websocketUrl = process.env.REACT_APP_TRANSCRIBE_WEBSOCKET_URL || '';
-    if (!this.websocketUrl) {
-      console.warn('Transcribe WebSocket URL is not defined in environment variables');
-    }
-    
-    // AudioContextの初期化
-    try {
-      window.AudioContext = window.AudioContext || window.webkitAudioContext;
-      this.audioContext = new AudioContext();
-    } catch (e) {
-      console.error('Web Audio APIはこのブラウザでサポートされていません', e);
-    }
-  }
-  
+
   /**
    * シングルトンインスタンスを取得
+   *
+   * @returns {TranscribeService} シングルトンインスタンス
    */
   public static getInstance(): TranscribeService {
     if (!TranscribeService.instance) {
@@ -62,230 +51,258 @@ export class TranscribeService {
     }
     return TranscribeService.instance;
   }
-  
+
   /**
    * WebSocket接続を初期化
+   *
    * @param sessionId セッションID
-   * @param authToken 認証トークン
    */
-  public initializeConnection(sessionId: string, authToken?: string): Promise<void> {
+  public async initializeConnection(sessionId: string): Promise<void> {
+    if (!this.websocketUrl) {
+      throw new Error('WebSocketエンドポイントが設定されていません');
+    }
+
+    // 既存の接続を閉じる
+    this.closeConnection();
+
+    const url = `${this.websocketUrl}?sessionId=${sessionId}`;
+    console.log(`WebSocket接続を初期化: ${url}`);
+
     return new Promise((resolve, reject) => {
       try {
-        // 既存の接続をクローズ
-        if (this.socket) {
-          this.socket.close();
-          this.socket = null;
-        }
-        
-        // WebSocketの初期化
-        const url = `${this.websocketUrl}?session=${sessionId}${authToken ? `&token=${authToken}` : ''}`;
         this.socket = new WebSocket(url);
-        
+
         this.socket.onopen = () => {
-          console.log('Transcribe WebSocketに接続しました');
+          console.log('WebSocket接続確立');
           resolve();
         };
-        
+
         this.socket.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            if (data.transcript) {
-              // 文字起こし結果をコールバックで通知
-              if (this.onTranscriptCallback) {
-                this.onTranscriptCallback(data.transcript, !!data.isFinal);
-              }
-              
-              // 最終確定した文字起こし結果の場合は無音タイマーをリセット
-              if (data.isFinal) {
-                this.resetSilenceTimer();
-              }
+            if (data.transcript && this.onTranscriptCallback) {
+              this.onTranscriptCallback(data.transcript, data.isFinal || false);
             }
             
-            // 音声アクティビティ情報の処理
+            // 音声アクティビティを検出した場合、タイムスタンプを更新
             if (data.voiceActivity === true) {
               this.lastVoiceActivityTime = Date.now();
-              this.resetSilenceTimer();
             }
-          } catch (e) {
-            console.error('WebSocket message parsing error:', e);
+          } catch (error) {
+            console.error('WebSocketメッセージ解析エラー:', error);
           }
         };
-        
+
         this.socket.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          if (this.onErrorCallback) {
-            this.onErrorCallback(new Error('WebSocket connection error'));
-          }
+          console.error('WebSocketエラー:', error);
           reject(error);
         };
-        
+
         this.socket.onclose = (event) => {
-          console.log('WebSocket closed:', event.code, event.reason);
-          // 予期しない切断の場合
-          if (this.isRecording && this.onErrorCallback) {
-            this.onErrorCallback(new Error('WebSocket connection closed unexpectedly'));
-          }
+          console.log(`WebSocket切断: コード=${event.code}, 理由=${event.reason}`);
         };
-        
       } catch (error) {
-        console.error('WebSocket initialization error:', error);
+        console.error('WebSocket初期化エラー:', error);
         reject(error);
       }
     });
   }
-  
+
   /**
    * 音声認識を開始
-   * @param onTranscript 文字起こし結果のコールバック
-   * @param onSilenceDetected 無音検出時のコールバック
+   *
+   * @param onTranscript テキスト認識時のコールバック
+   * @param onSilence 無音検出時のコールバック
    * @param onError エラー発生時のコールバック
    */
   public async startListening(
     onTranscript: (text: string, isFinal: boolean) => void,
-    onSilenceDetected: () => void,
+    onSilence?: () => void,
     onError?: (error: Error) => void
   ): Promise<void> {
     if (this.isRecording) {
-      console.log('すでに録音中です');
-      return;
+      this.stopListening();
     }
-    
-    // コールバックを設定
+
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket接続が確立されていません');
+    }
+
     this.onTranscriptCallback = onTranscript;
-    this.onSilenceDetectedCallback = onSilenceDetected;
+    this.onSilenceDetectedCallback = onSilence || null;
     this.onErrorCallback = onError || null;
-    
+
     try {
-      // WebSocketが接続されていることを確認
-      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-        throw new Error('WebSocketが接続されていません');
-      }
-      
-      // マイク入力の取得
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // MediaRecorderの設定
-      this.mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus',
-      });
-      
-      // データ取得時の処理
-      this.mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0 && this.socket && this.socket.readyState === WebSocket.OPEN) {
-          // 音声データをバイナリ化してWebSocketで送信
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const base64data = reader.result?.toString().split(',')[1];
-            if (base64data && this.socket) {
-              this.socket.send(JSON.stringify({
-                action: 'sendAudio',
-                audio: base64data
-              }));
-            }
-          };
-          reader.readAsDataURL(event.data);
+      // マイクへのアクセスを要求
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
         }
-      };
-      
-      // 録音開始
-      this.mediaRecorder.start(100); // 100ms間隔でデータを取得
-      this.isRecording = true;
-      
-      // 無音検出タイマーの初期化
+      });
+
+      // MediaRecorderを設定
+      this.mediaRecorder = new MediaRecorder(stream);
+      this.mediaRecorder.addEventListener('dataavailable', async (event) => {
+        if (event.data.size > 0 && this.socket?.readyState === WebSocket.OPEN) {
+          try {
+            // 音声データをBase64エンコードして送信
+            const buffer = await event.data.arrayBuffer();
+            const base64Audio = this.arrayBufferToBase64(buffer);
+            
+            this.socket.send(JSON.stringify({
+              action: 'sendAudio',
+              audio: base64Audio
+            }));
+          } catch (error) {
+            console.error('音声データ送信エラー:', error);
+          }
+        }
+      });
+
+      // 無音検出タイマーを設定
       this.lastVoiceActivityTime = Date.now();
-      this.resetSilenceTimer();
-      
+      this.startSilenceDetection();
+
+      // 録音開始
+      this.mediaRecorder.start(250); // 250msごとにデータを送信
+      this.isRecording = true;
+
       console.log('音声認識を開始しました');
-      
     } catch (error) {
-      console.error('音声認識の開始エラー:', error);
+      console.error('音声認識開始エラー:', error);
       if (this.onErrorCallback) {
-        this.onErrorCallback(error instanceof Error ? error : new Error(String(error)));
+        this.onErrorCallback(error instanceof Error ? error : new Error('音声認識開始エラー'));
       }
       throw error;
     }
   }
-  
+
+  /**
+   * 無音検出処理を開始
+   *
+   * @private
+   */
+  private startSilenceDetection(): void {
+    // 既存のタイマーをクリア
+    if (this.silenceDetectionTimer) {
+      clearInterval(this.silenceDetectionTimer);
+    }
+
+    // 定期的に無音状態をチェック
+    this.silenceDetectionTimer = setInterval(() => {
+      const now = Date.now();
+      const elapsed = now - this.lastVoiceActivityTime;
+      
+      // 設定された閾値より長く無音が続いた場合
+      if (elapsed > this.silenceThresholdMs && this.onSilenceDetectedCallback) {
+        console.log(`無音検出: ${elapsed}ms経過`);
+        this.onSilenceDetectedCallback();
+        
+        // 無音検出後は検出を一時停止（連続検出を防止）
+        this.lastVoiceActivityTime = now;
+      }
+    }, 500);
+  }
+
   /**
    * 音声認識を停止
    */
   public stopListening(): void {
-    if (!this.isRecording) {
-      return;
+    // 無音検出タイマーを停止
+    if (this.silenceDetectionTimer) {
+      clearInterval(this.silenceDetectionTimer);
+      this.silenceDetectionTimer = null;
     }
-    
-    // MediaRecorderの停止
-    if (this.mediaRecorder) {
+
+    // MediaRecorderを停止
+    if (this.mediaRecorder && this.isRecording) {
       try {
         this.mediaRecorder.stop();
         this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
       } catch (e) {
-        console.warn('MediaRecorderの停止中にエラーが発生しました:', e);
+        console.warn('MediaRecorder停止エラー:', e);
       }
       this.mediaRecorder = null;
     }
-    
-    // 無音検出タイマーのクリア
-    if (this.silenceDetectionTimer) {
-      clearTimeout(this.silenceDetectionTimer);
-      this.silenceDetectionTimer = null;
-    }
-    
+
     this.isRecording = false;
     console.log('音声認識を停止しました');
   }
-  
+
   /**
-   * 無音検出タイマーをリセット
+   * WebSocket接続を閉じる
    */
-  private resetSilenceTimer(): void {
-    // 既存のタイマーをクリア
-    if (this.silenceDetectionTimer) {
-      clearTimeout(this.silenceDetectionTimer);
-    }
-    
-    // 新しいタイマーを設定
-    this.silenceDetectionTimer = setTimeout(() => {
-      const timeSinceLastActivity = Date.now() - this.lastVoiceActivityTime;
-      if (timeSinceLastActivity >= this.silenceThresholdMs && this.onSilenceDetectedCallback) {
-        console.log('無音を検出しました - 発話終了と判断');
-        this.onSilenceDetectedCallback();
+  private closeConnection(): void {
+    if (this.socket) {
+      try {
+        if (this.socket.readyState === WebSocket.OPEN || 
+            this.socket.readyState === WebSocket.CONNECTING) {
+          this.socket.close();
+        }
+      } catch (e) {
+        console.warn('WebSocket切断エラー:', e);
       }
-    }, this.silenceThresholdMs);
+      this.socket = null;
+    }
   }
-  
+
   /**
-   * WebSocket接続が有効かどうかを確認
+   * リソースを解放
    */
-  public isConnected(): boolean {
-    return !!this.socket && this.socket.readyState === WebSocket.OPEN;
+  public dispose(): void {
+    this.stopListening();
+    this.closeConnection();
+    
+    if (this.audioContext) {
+      try {
+        this.audioContext.close();
+      } catch (e) {
+        console.warn('AudioContext停止エラー:', e);
+      }
+      this.audioContext = null;
+    }
   }
-  
+
   /**
-   * 録音中かどうかを確認
+   * 現在音声認識中かどうかを取得
+   *
+   * @returns {boolean} 音声認識中の場合true
    */
   public isListening(): boolean {
     return this.isRecording;
   }
-  
+
   /**
-   * リソースの解放
+   * WebSocketが接続されているかを確認
+   *
+   * @returns {boolean} 接続されている場合true
    */
-  public dispose(): void {
-    this.stopListening();
-    
-    if (this.socket) {
-      this.socket.close();
-      this.socket = null;
+  public isConnected(): boolean {
+    return this.socket !== null && this.socket.readyState === WebSocket.OPEN;
+  }
+
+  /**
+   * ArrayBufferをBase64に変換
+   *
+   * @param buffer 変換するArrayBuffer
+   * @returns {string} Base64エンコードされた文字列
+   */
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i]);
     }
-    
-    if (this.audioContext) {
-      this.audioContext.close().catch(e => console.warn('AudioContextのクローズ中にエラー:', e));
-      this.audioContext = null;
-    }
-    
-    this.onTranscriptCallback = null;
-    this.onSilenceDetectedCallback = null;
-    this.onErrorCallback = null;
+    return window.btoa(binary);
+  }
+}
+
+// WebAudioAPI用の型定義
+declare global {
+  interface Window {
+    webkitAudioContext: typeof AudioContext;
   }
 }
