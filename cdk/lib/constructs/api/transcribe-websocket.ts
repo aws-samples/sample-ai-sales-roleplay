@@ -156,12 +156,11 @@ export class TranscribeWebSocketConstruct extends Construct {
       sourceArn: `arn:aws:execute-api:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:${this.webSocketApi.ref}/*/*`
     });
     
-    // 接続ルートの設定 (Cognito認証付き)
+    // 接続ルートの設定 (一時的に認証を無効化)
     new apigatewayv2.CfnRoute(this, 'ConnectRoute', {
       apiId: this.webSocketApi.ref,
       routeKey: '$connect',
-      authorizationType: 'CUSTOM',
-      authorizerId: authorizer.ref,
+      authorizationType: 'NONE', // 認証を一時的に無効化
       target: 'integrations/' + connectIntegration.ref
     });
     

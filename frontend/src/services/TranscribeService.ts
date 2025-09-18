@@ -79,9 +79,10 @@ export class TranscribeService {
       // WebSocketエンドポイントベースURLの作成（URLオブジェクトを使用）
       const wsUrl = new URL(this.websocketUrl);
       
-      // クエリパラメータを適切にエンコードして追加
+      // クエリパラメータを適切にエンコードして追加（認証を無効化したため、tokenは不要に）
       wsUrl.searchParams.append('session', sessionId);
-      wsUrl.searchParams.append('token', jwtToken); // AuthorizerのIdentitySourceに合わせてパラメータ名を'token'に変更
+      // 認証を無効化したため、トークンパラメータは一時的にコメントアウト
+      // wsUrl.searchParams.append('token', jwtToken);
       
       // 完全なURLを取得
       const url = wsUrl.toString();

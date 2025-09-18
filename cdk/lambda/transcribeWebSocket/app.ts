@@ -351,8 +351,24 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
  * Cognitoトークンを検証してWebSocket接続を認証
  */
 export const authorizerHandler = async (event: APIGatewayRequestAuthorizerEvent): Promise<APIGatewayAuthorizerResult> => {
-  console.log('WebSocket認証:', event);
+  console.log('WebSocket認証 (現在は無効):', event);
   
+  // 全てのリクエストを許可する
+  return {
+    principalId: 'anonymous',
+    policyDocument: {
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Action: 'execute-api:Invoke',
+          Effect: 'Allow',
+          Resource: event.methodArn
+        }
+      ]
+    }
+  };
+  
+  /* 本来の認証処理（一時的に無効化）
   try {
     // 簡単な認証実装（本格的なCognito JWT検証は後で追加）
     const token = event.queryStringParameters?.token;
@@ -384,6 +400,7 @@ export const authorizerHandler = async (event: APIGatewayRequestAuthorizerEvent)
     console.error('認証エラー:', error);
     throw new Error('Unauthorized');
   }
+  */
 };
 
 /**
