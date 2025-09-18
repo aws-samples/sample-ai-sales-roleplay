@@ -1,5 +1,3 @@
-import { fetchAuthSession } from 'aws-amplify/auth';
-
 /**
  * Amazon Transcribeストリーミング統合サービス
  * 

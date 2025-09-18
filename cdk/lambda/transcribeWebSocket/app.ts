@@ -67,7 +67,10 @@ export const connectHandler = async (event: APIGatewayProxyEvent): Promise<APIGa
     }));
     
     // クライアントに接続成功を通知
-    const apiClient = createApiGatewayManagementApiClient(event);
+    const apiClient = new ApiGatewayManagementApiClient({
+      region: REGION,
+      endpoint: `https://${event.requestContext.domainName}/${event.requestContext.stage}`
+    });
     try {
       await apiClient.send(new PostToConnectionCommand({
         ConnectionId: connectionId,

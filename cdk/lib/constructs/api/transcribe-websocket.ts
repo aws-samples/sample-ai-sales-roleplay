@@ -100,22 +100,15 @@ export class TranscribeWebSocketConstruct extends Construct {
     this.webSocketApi = new apigatewayv2.CfnApi(this, 'TranscribeWebSocketApi', {
       name: `transcribe-websocket-${props.envId}`,
       protocolType: 'WEBSOCKET',
-      routeSelectionExpression: '$request.body.action',
-      corsConfiguration: {
-        allowOrigins: ['*'], // 開発環境では全てのオリジンを許可（本番環境では制限すること）
-        allowMethods: ['*'],
-        allowHeaders: ['*'],
-        maxAge: 300 // 5分間のプリフライトキャッシュ
-      }
+      routeSelectionExpression: '$request.body.action'
     });
     
-    // WebSocket APIのステージ設定（CORS設定追加）
+    // WebSocket APIのステージ設定
     const stage = new apigatewayv2.CfnStage(this, 'Stage', {
       apiId: this.webSocketApi.ref,
       stageName: props.stageName,
       autoDeploy: true,
       defaultRouteSettings: {
-        // CORS関連設定
         dataTraceEnabled: true, // ログ有効化
         throttlingBurstLimit: 100,
         throttlingRateLimit: 100
@@ -164,6 +157,22 @@ export class TranscribeWebSocketConstruct extends Construct {
 
     // Lambda関数にAPIGatewayからの呼び出し権限を付与
     authorizerFunction.addPermission('AuthorizerInvokePermission', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:${this.webSocketApi.ref}/*/*`
+    });
+
+    // WebSocket Lambda関数にAPIGatewayからの実行権限を付与
+    connectHandler.addPermission('ConnectInvokePermission', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:${this.webSocketApi.ref}/*/*`
+    });
+
+    disconnectHandler.addPermission('DisconnectInvokePermission', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:${this.webSocketApi.ref}/*/*`
+    });
+
+    defaultHandler.addPermission('DefaultInvokePermission', {
       principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
       sourceArn: `arn:aws:execute-api:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:${this.webSocketApi.ref}/*/*`
     });
