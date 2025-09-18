@@ -11,9 +11,7 @@ import type {
 } from "../types/index";
 import type { 
   ComplianceViolation, 
-  DifficultyLevel, 
-  SpeechRecognitionEvent, 
-  SpeechRecognitionErrorEvent 
+  DifficultyLevel
 } from "../types/api";
 import type { CompositionEventType } from "../types/components";
 import { shouldEndSession, getSessionEndReason } from "../utils/dialogueEngine";
@@ -101,6 +99,15 @@ const ConversationPage: React.FC = () => {
     
     // TranscribeServiceの初期化
     transcribeServiceRef.current = TranscribeService.getInstance();
+    
+    // 環境変数からWebSocketエンドポイントを取得
+    const websocketEndpoint = process.env.REACT_APP_TRANSCRIBE_WEBSOCKET_URL;
+    if (websocketEndpoint) {
+      console.log("Transcribe WebSocketエンドポイントを設定:", websocketEndpoint);
+      transcribeServiceRef.current.setWebSocketEndpoint(websocketEndpoint);
+    } else {
+      console.warn("Transcribe WebSocketエンドポイントが設定されていません");
+    }
     
     return () => {
       // コンポーネントのアンマウント時にリソース解放
@@ -733,9 +740,7 @@ const ConversationPage: React.FC = () => {
           await transcribeServiceRef.current.initializeConnection(sessionId);
         } catch (error) {
           console.error("Transcribe WebSocket接続エラー:", error);
-          
-          // WebSocket接続に失敗した場合は従来の方法を試す
-          fallbackToWebSpeechAPI();
+          setSpeechRecognitionError("network");
           return;
         }
       }
@@ -765,9 +770,6 @@ const ConversationPage: React.FC = () => {
           setIsListening(false);
           setContinuousListening(false);
           setSpeechRecognitionError("network");
-          
-          // エラー発生時に従来の方法にフォールバック
-          fallbackToWebSpeechAPI();
         }
       );
       
@@ -776,93 +778,12 @@ const ConversationPage: React.FC = () => {
       setSpeechRecognitionError(null);
     } catch (error) {
       console.error("音声認識の開始に失敗:", error);
-      
-      // エラー時はWeb Speech APIにフォールバック
-      fallbackToWebSpeechAPI();
+      setSpeechRecognitionError("not-supported");
+      setIsListening(false);
     }
   }, [isListening, sessionId, sendMessage, userInput]);
-  
-  // 従来のWeb Speech APIを使った音声認識にフォールバックする関数
-  const fallbackToWebSpeechAPI = () => {
-    // Web Speech APIのサポートをチェック
-    if (
-      !("webkitSpeechRecognition" in window) &&
-      !("SpeechRecognition" in window)
-    ) {
-      setSpeechRecognitionError("not-supported");
-      return;
-    }
 
-    try {
-      const SpeechRecognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        setSpeechRecognitionError("not-supported");
-        return;
-      }
-      const recognition = new SpeechRecognition();
-
-      // シナリオの言語に基づいて音声認識の言語を設定
-      const languageCode = scenario?.language || "ja";
-      const speechRecognitionLang = getSpeechRecognitionLanguage(languageCode);
-      console.log(
-        `音声認識言語を設定 (フォールバック): ${speechRecognitionLang} (シナリオ言語: ${languageCode})`,
-      );
-      recognition.lang = speechRecognitionLang;
-      recognition.continuous = false;
-      recognition.interimResults = false;
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        setContinuousListening(false); // フォールバック時は常時モードではない
-        setSpeechRecognitionError(null);
-      };
-
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        const transcript = event.results[0][0].transcript;
-        // 既存のテキストに追加する（既にテキストがある場合はスペースを挿入）
-        setUserInput((prevInput) => {
-          if (prevInput && prevInput.trim()) {
-            return `${prevInput} ${transcript}`;
-          }
-          return transcript;
-        });
-      };
-
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error("音声認識エラー (フォールバック):", event.error);
-        setIsListening(false);
-
-        switch (event.error) {
-          case "not-allowed":
-            setSpeechRecognitionError("permission");
-            break;
-          case "no-speech":
-            setSpeechRecognitionError("no-speech");
-            break;
-          case "network":
-            setSpeechRecognitionError("network");
-            break;
-          default:
-            setSpeechRecognitionError("unknown");
-        }
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-        // 音声認識が終了しても、テキストはクリアせず保持する
-      };
-
-      recognition.start();
-      console.log("Web Speech APIにフォールバックしました");
-    } catch (error) {
-      console.error("フォールバック音声認識の開始エラー:", error);
-      setIsListening(false);
-      setSpeechRecognitionError("unknown");
-    }
-  };
-
-  // テキスト入力モードに切り替え
+  // 音声認識を停止し、テキスト入力モードに切り替え
   const switchToTextInput = useCallback(() => {
     setSpeechRecognitionError(null);
     setIsListening(false);
