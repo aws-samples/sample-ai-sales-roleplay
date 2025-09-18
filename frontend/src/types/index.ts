@@ -24,7 +24,6 @@ export interface Scenario {
   initialMessage?: string; // シナリオごとの初期メッセージ
   language?: string; // シナリオの言語 (ja|en)
   npc: NPCInfo;
-  objectives: string[];
   initialMetrics: ExtendedMetrics;
   goals: GoalInfo[]; // シナリオのゴール一覧
   maxTurns?: number; // 最大会話ターン数（指定しない場合はデフォルト値を使用）

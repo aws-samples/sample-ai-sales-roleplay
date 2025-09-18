@@ -203,6 +203,13 @@
     "profileAuth": "Profile"
   },
   "scenarios": {
+    "priority": {
+      "highest": "Highest",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "lowest": "Lowest"
+    },
     "title": "Scenario List",
     "subtitle": "Select a scenario to practice. Each scenario has different difficulty levels and NPC characters.",
     "beginner": "Beginner",

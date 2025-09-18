@@ -361,7 +361,11 @@ const PreviewStep: React.FC<PreviewStepProps> = ({ formData }) => {
                             variant="body2"
                             color="text.primary"
                           >
-                            {t("scenarios.fields.priority")}: {goal.priority}/5
+                            {t("scenarios.fields.priority")}: {goal.priority}/5 {goal.priority === 5 ? `(${t("scenarios.priority.highest")})` : 
+                            goal.priority === 4 ? `(${t("scenarios.priority.high")})` : 
+                            goal.priority === 3 ? `(${t("scenarios.priority.medium")})` : 
+                            goal.priority === 2 ? `(${t("scenarios.priority.low")})` : 
+                            `(${t("scenarios.priority.lowest")})`}
                           </Typography>
                           {" • "}
                           <Typography

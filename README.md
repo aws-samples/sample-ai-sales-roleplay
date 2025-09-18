@@ -53,7 +53,40 @@
 - AWS CLI最新版
 - AWS CDK最新版
 
-### インストール
+### デプロイ方法
+
+#### AWS CloudShellを使った簡単デプロイ
+
+事前準備不要で、AWS CloudShellを使って簡単にデプロイできます：
+
+1. **AWS コンソールにログイン**して、画面上部のCloudShellアイコン（ターミナルマーク）をクリックします
+
+2. **以下のコマンドを実行**
+```bash
+# リポジトリをクローン
+git clone https://github.com/aws-samples/sample-ai-sales-roleplay.git
+cd sample-ai-sales-roleplay
+
+# デプロイスクリプトを実行
+chmod +x bin.sh
+./bin.sh
+```
+
+3. **デプロイオプション**（任意）
+```bash
+# セルフサインアップ機能を無効化
+./bin.sh --disable-self-register
+
+# 別のBedrockリージョンを使用
+./bin.sh --bedrock-region us-west-2
+
+# 詳細なカスタマイズ
+./bin.sh --cdk-json-override '{"context":{"allowedSignUpEmailDomains":["example.com"]}}'
+```
+
+4. **デプロイ完了後、表示されるURLからアプリケーションにアクセスできます**
+
+#### 手動インストール
 
 1. **リポジトリのクローン**
 ```bash
@@ -63,7 +96,6 @@ cd sample-ai-sales-roleplay
 
 2. **依存関係のインストール**
 ```bash
-
 # フロントエンド
 cd frontend
 npm install

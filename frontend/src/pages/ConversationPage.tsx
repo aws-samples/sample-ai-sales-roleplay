@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Container, Box } from "@mui/material";
 import type {
@@ -37,6 +37,8 @@ import NPCInfoCard from "../components/conversation/NPCInfoCard";
 import EmojiFeedbackContainer from "../components/conversation/EmojiFeedbackContainer";
 import MessageList from "../components/conversation/MessageList";
 import MessageInput from "../components/conversation/MessageInput";
+// クリーンアップ用のuseEffectを追加
+import { useEffect, useState, useCallback, useRef } from "react";
 import SidebarPanel from "../components/conversation/SidebarPanel";
 import ComplianceAlert from "../components/compliance/ComplianceAlert";
 
@@ -161,7 +163,6 @@ const ConversationPage: React.FC = () => {
                 scenarioInfo.maxTurns !== undefined
                   ? Number(scenarioInfo.maxTurns)
                   : undefined,
-              objectives: scenarioInfo.objectives || [],
               goals: (scenarioInfo.goals || []).map((goal) => {
                 // goalが文字列の場合はオブジェクトに変換
                 if (typeof goal === "string") {
@@ -202,26 +203,14 @@ const ConversationPage: React.FC = () => {
             setCurrentMetrics(convertedScenario.initialMetrics);
 
             // ゴール情報の初期化
-            if (
-              convertedScenario.objectives &&
-              convertedScenario.objectives.length > 0
-            ) {
-              // goalsが空の場合は、objectivesからgoalsを生成
-              setGoals(
-                convertedScenario.goals && convertedScenario.goals.length > 0
-                  ? convertedScenario.goals
-                  : (convertedScenario.objectives || []).map((obj, index) => ({
-                      id: `goal-${index}`,
-                      description: obj,
-                      priority: 3,
-                      criteria: [],
-                      isRequired: index === 0, // 最初の目標は必須とする
-                    })),
-              );
-              const initialGoalStatuses =
-                initializeGoalStatuses(convertedScenario);
-              setGoalStatuses(initialGoalStatuses);
-            }
+            setGoals(
+              convertedScenario.goals && convertedScenario.goals.length > 0
+                ? convertedScenario.goals
+                : []
+            );
+            const initialGoalStatuses =
+              initializeGoalStatuses(convertedScenario);
+            setGoalStatuses(initialGoalStatuses);
 
             // AudioServiceの初期設定
             const audioSvc = AudioService.getInstance();
@@ -342,6 +331,14 @@ const ConversationPage: React.FC = () => {
       const initialMessageId = crypto.randomUUID();
       audioSvc
         .synthesizeAndQueueAudio(initialContent, initialMessageId)
+        .then(() => {
+          // 音声合成が成功したら、音声再生完了リスナーを追加
+          audioSvc.addPlaybackCompleteListener(initialMessageId, () => {
+            // 音声再生完了時に話している状態を更新
+            console.log(`初期メッセージの音声再生が完了しました。`);
+            setIsSpeaking(false);
+          });
+        })
         .catch((error) => {
           console.error("初期メッセージの音声合成エラー:", error);
           const synth = window.speechSynthesis;
@@ -350,6 +347,9 @@ const ConversationPage: React.FC = () => {
             utterance.lang = "ja-JP";
             utterance.onend = () => setIsSpeaking(false);
             synth.speak(utterance);
+          } else {
+            // フォールバック: 音声合成が利用できない場合
+            setTimeout(() => setIsSpeaking(false), 3000);
           }
         });
     }
@@ -359,6 +359,7 @@ const ConversationPage: React.FC = () => {
   const sendMessage = async () => {
     if (!userInput.trim() || !scenario || isProcessing) return;
 
+    // 入力フィールドを無効化（API処理中）
     setIsProcessing(true);
 
     // ユーザーメッセージを追加
@@ -437,14 +438,34 @@ const ConversationPage: React.FC = () => {
           setMessages(finalMessages);
           setCurrentMetrics(newMetrics);
 
+          // APIからのレスポンスが返ってきた時点で入力処理を有効化
+          // ユーザーは音声を聞きながら次の入力を準備できるように
+          setIsProcessing(false);
+          
           // Amazon Polly で音声合成
           if (audioEnabled) {
             const audioService = AudioService.getInstance();
             audioService
               .synthesizeAndQueueAudio(response, messageId)
+              .then(() => {
+                // 音声合成が成功したら、音声再生完了リスナーを追加
+                // このリスナーは音声再生が完了したときに実行される
+                audioService.addPlaybackCompleteListener(messageId, () => {
+                  // 音声再生完了時に話している状態のみを更新
+                  console.log(`メッセージID ${messageId} の音声再生が完了しました。`);
+                  setIsSpeaking(false);
+                });
+              })
               .catch((error) => {
                 console.error("Amazon Polly音声合成エラー:", error);
+                // エラーが発生した場合も話している状態を更新
+                setIsSpeaking(false);
               });
+          } else {
+            // 音声が無効な場合は、短い遅延後に話している状態を更新
+            setTimeout(() => {
+              setIsSpeaking(false);
+            }, 500);
           }
 
           // NPCの応答後にリアルタイム評価を実行（有効なsessionIDがある場合のみ）
@@ -528,11 +549,17 @@ const ConversationPage: React.FC = () => {
             }
           }
 
-          // 発言の長さに応じて話している状態をシミュレート（音声合成が終わる前に状態を更新）
-          setTimeout(() => {
-            setIsProcessing(false);
-            // 話している状態は音声再生の状態に応じて設定されるため、ここでは変更しない
-          }, response.length * 20); // テキストの長さに比例した時間（短縮）
+          // 音声再生完了イベントが発火しない場合のフォールバック
+          // 音声が無限に再生され続けることを防止
+          const fallbackTimerId = setTimeout(() => {
+            if (isSpeaking) {
+              console.warn("音声再生完了イベントが検出されませんでした。フォールバックタイマーにより話している状態をリセットします。");
+              setIsSpeaking(false);
+            }
+          }, 30000); // 長めのタイムアウト - 通常は音声再生が完了するはず
+          
+          // クリーンアップ関数
+          return () => clearTimeout(fallbackTimerId);
 
           // セッション終了の判定
           if (
@@ -1021,7 +1048,6 @@ const ConversationPage: React.FC = () => {
             currentMetrics={currentMetrics}
             prevMetrics={prevMetrics}
             metricsUpdating={metricsUpdating}
-            objectives={scenario.objectives}
             goals={goals}
             goalStatuses={goalStatuses}
           />

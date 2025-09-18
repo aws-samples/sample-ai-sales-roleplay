@@ -93,7 +93,6 @@ export interface SelectOption {
  */
 export interface GoalsStepProps {
   formData: {
-    objectives: string[];
     initialMetrics: MetricsInfo;
     goals: GoalInfo[];
   };
