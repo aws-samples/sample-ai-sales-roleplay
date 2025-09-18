@@ -1,13 +1,17 @@
+import { PubSub } from '@aws-amplify/pubsub';
+import { fetchAuthSession } from 'aws-amplify/auth';
+
 /**
  * Amazon Transcribeストリーミング統合サービス
  * 
  * WebSocketを通じて音声をストリーミングし、Amazon Transcribeによるリアルタイム音声認識を
  * 実行するためのサービスクラスです。常時マイク入力を可能にし、無音検出による自動発話終了を
- * サポートします。
+ * サポートします。Amplify PubSubを使用して認証された接続を確立します。
  */
 export class TranscribeService {
   private static instance: TranscribeService;
-  private socket: WebSocket | null = null;
+  private pubSubClient: any = null; // PubSubクライアント
+  private subscription: any = null; // PubSubサブスクリプション
   private mediaRecorder: MediaRecorder | null = null;
   private audioContext: AudioContext | null = null;
   private isRecording: boolean = false;
@@ -17,6 +21,7 @@ export class TranscribeService {
   // 設定パラメータ
   private readonly silenceThresholdMs: number = 1500;  // 無音判定閾値（ミリ秒）
   private websocketUrl: string = '';
+  private sessionId: string = '';
   
   // コールバック関数
   private onTranscriptCallback: ((text: string, isFinal: boolean) => void) | null = null;
@@ -53,7 +58,7 @@ export class TranscribeService {
   }
 
   /**
-   * WebSocket接続を初期化
+   * WebSocket接続を初期化（Amplify PubSubを使用）
    *
    * @param sessionId セッションID
    */
@@ -64,22 +69,35 @@ export class TranscribeService {
 
     // 既存の接続を閉じる
     this.closeConnection();
+    
+    // セッションIDを保存
+    this.sessionId = sessionId;
 
-    const url = `${this.websocketUrl}?sessionId=${sessionId}`;
-    console.log(`WebSocket接続を初期化: ${url}`);
-
-    return new Promise((resolve, reject) => {
-      try {
-        this.socket = new WebSocket(url);
-
-        this.socket.onopen = () => {
-          console.log('WebSocket接続確立');
-          resolve();
-        };
-
-        this.socket.onmessage = (event) => {
+    try {
+      console.log(`Amplify PubSubでWebSocket接続を初期化: ${this.websocketUrl}`);
+      
+      // 認証トークンを取得
+      const { tokens } = await fetchAuthSession();
+      const jwtToken = tokens?.accessToken?.toString();
+      
+      if (!jwtToken) {
+        throw new Error('認証トークンを取得できませんでした');
+      }
+      
+      // WebSocketエンドポイントにクエリパラメータを追加
+      // Auth: JWT認証用トークン
+      // sessionId: セッション識別用
+      const wsUrl = new URL(this.websocketUrl);
+      wsUrl.searchParams.append('Auth', jwtToken);
+      wsUrl.searchParams.append('sessionId', sessionId);
+      
+      // PubSub接続を確立
+      this.pubSubClient = PubSub.subscribe({
+        url: wsUrl.toString(),
+      }).subscribe({
+        next: (data: any) => {
           try {
-            const data = JSON.parse(event.data);
+            // 受信データを処理
             if (data.transcript && this.onTranscriptCallback) {
               this.onTranscriptCallback(data.transcript, data.isFinal || false);
             }
@@ -89,23 +107,28 @@ export class TranscribeService {
               this.lastVoiceActivityTime = Date.now();
             }
           } catch (error) {
-            console.error('WebSocketメッセージ解析エラー:', error);
+            console.error('メッセージ解析エラー:', error);
           }
-        };
-
-        this.socket.onerror = (error) => {
-          console.error('WebSocketエラー:', error);
-          reject(error);
-        };
-
-        this.socket.onclose = (event) => {
-          console.log(`WebSocket切断: コード=${event.code}, 理由=${event.reason}`);
-        };
-      } catch (error) {
-        console.error('WebSocket初期化エラー:', error);
-        reject(error);
+        },
+        error: (error: any) => {
+          console.error('PubSub接続エラー:', error);
+          if (this.onErrorCallback) {
+            this.onErrorCallback(error instanceof Error ? error : new Error('PubSub接続エラー'));
+          }
+        },
+        complete: () => {
+          console.log('PubSub接続終了');
+        }
+      });
+      
+      console.log('PubSub接続確立');
+    } catch (error) {
+      console.error('PubSub初期化エラー:', error);
+      if (this.onErrorCallback) {
+        this.onErrorCallback(error instanceof Error ? error : new Error('PubSub初期化エラー'));
       }
-    });
+      throw error;
+    }
   }
 
   /**
@@ -124,8 +147,8 @@ export class TranscribeService {
       this.stopListening();
     }
 
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      throw new Error('WebSocket接続が確立されていません');
+    if (!this.pubSubClient) {
+      throw new Error('PubSub接続が確立されていません');
     }
 
     this.onTranscriptCallback = onTranscript;
@@ -145,16 +168,20 @@ export class TranscribeService {
       // MediaRecorderを設定
       this.mediaRecorder = new MediaRecorder(stream);
       this.mediaRecorder.addEventListener('dataavailable', async (event) => {
-        if (event.data.size > 0 && this.socket?.readyState === WebSocket.OPEN) {
+        if (event.data.size > 0 && this.pubSubClient) {
           try {
             // 音声データをBase64エンコードして送信
             const buffer = await event.data.arrayBuffer();
             const base64Audio = this.arrayBufferToBase64(buffer);
             
-            this.socket.send(JSON.stringify({
-              action: 'sendAudio',
-              audio: base64Audio
-            }));
+            // PubSubを通じて送信
+            await PubSub.publish({
+              data: {
+                action: 'sendAudio',
+                audio: base64Audio,
+                sessionId: this.sessionId
+              }
+            });
           } catch (error) {
             console.error('音声データ送信エラー:', error);
           }
@@ -235,16 +262,13 @@ export class TranscribeService {
    * WebSocket接続を閉じる
    */
   private closeConnection(): void {
-    if (this.socket) {
+    if (this.pubSubClient) {
       try {
-        if (this.socket.readyState === WebSocket.OPEN || 
-            this.socket.readyState === WebSocket.CONNECTING) {
-          this.socket.close();
-        }
+        this.pubSubClient.unsubscribe();
       } catch (e) {
-        console.warn('WebSocket切断エラー:', e);
+        console.warn('PubSub切断エラー:', e);
       }
-      this.socket = null;
+      this.pubSubClient = null;
     }
   }
 
@@ -280,7 +304,7 @@ export class TranscribeService {
    * @returns {boolean} 接続されている場合true
    */
   public isConnected(): boolean {
-    return this.socket !== null && this.socket.readyState === WebSocket.OPEN;
+    return this.pubSubClient !== null;
   }
 
   /**

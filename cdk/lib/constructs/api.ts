@@ -245,7 +245,8 @@ export class Api extends Construct {
     this.transcribeWebSocket = new TranscribeWebSocketConstruct(this, 'TranscribeWebSocket', {
       apiName: props.resourceNamePrefix,
       stageName: 'prod',
-      envId: props.envId
+      envId: props.envId,
+      userPool: props.userPool!
     });
     
     // API Gateway

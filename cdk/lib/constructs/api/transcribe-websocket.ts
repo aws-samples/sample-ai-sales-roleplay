@@ -5,6 +5,7 @@ import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as path from 'path';
 
@@ -12,6 +13,7 @@ export interface TranscribeWebSocketProps {
   apiName: string;
   stageName: string;
   envId: string;
+  userPool: cognito.UserPool;
 }
 
 /**
@@ -127,11 +129,24 @@ export class TranscribeWebSocketConstruct extends Construct {
       integrationUri: `arn:aws:apigateway:${cdk.Stack.of(this).region}:lambda:path/2015-03-31/functions/${defaultHandler.functionArn}/invocations`
     });
     
-    // 接続ルートの設定
+    // Cognito認証の設定
+    const authorizer = new apigatewayv2.CfnAuthorizer(this, 'TranscribeCognitoAuthorizer', {
+      apiId: this.webSocketApi.ref,
+      authorizerType: 'JWT',
+      identitySource: ['route.request.querystring.Auth'],
+      name: 'transcribe-cognito-authorizer',
+      jwtConfiguration: {
+        audience: [props.userPool.userPoolClientIds[0]],
+        issuer: `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${props.userPool.userPoolId}`
+      }
+    });
+    
+    // 接続ルートの設定 (Cognito認証付き)
     new apigatewayv2.CfnRoute(this, 'ConnectRoute', {
       apiId: this.webSocketApi.ref,
       routeKey: '$connect',
-      authorizationType: 'NONE',
+      authorizationType: 'JWT',
+      authorizerId: authorizer.ref,
       target: 'integrations/' + connectIntegration.ref
     });
     
@@ -139,7 +154,7 @@ export class TranscribeWebSocketConstruct extends Construct {
     new apigatewayv2.CfnRoute(this, 'DisconnectRoute', {
       apiId: this.webSocketApi.ref,
       routeKey: '$disconnect',
-      authorizationType: 'NONE',
+      authorizationType: 'NONE', // 切断時は認証不要
       target: 'integrations/' + disconnectIntegration.ref
     });
     
@@ -147,7 +162,7 @@ export class TranscribeWebSocketConstruct extends Construct {
     new apigatewayv2.CfnRoute(this, 'DefaultRoute', {
       apiId: this.webSocketApi.ref,
       routeKey: '$default',
-      authorizationType: 'NONE',
+      authorizationType: 'NONE', // 既に接続確立後は認証不要
       target: 'integrations/' + defaultIntegration.ref
     });
     
