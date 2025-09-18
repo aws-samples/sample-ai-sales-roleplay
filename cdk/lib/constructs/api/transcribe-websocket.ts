@@ -52,7 +52,7 @@ export class TranscribeWebSocketConstruct extends Construct {
     
     // WebSocket接続ハンドラLambda関数
     const connectHandler = new NodejsFunction(this, 'ConnectHandler', {
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'connectHandler',
       entry: path.join(__dirname, '../../../lambda/transcribeWebSocket/app.ts'),
       environment: {
@@ -62,7 +62,7 @@ export class TranscribeWebSocketConstruct extends Construct {
     
     // WebSocket切断ハンドラLambda関数
     const disconnectHandler = new NodejsFunction(this, 'DisconnectHandler', {
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'disconnectHandler',
       entry: path.join(__dirname, '../../../lambda/transcribeWebSocket/app.ts'),
       environment: {
@@ -72,7 +72,7 @@ export class TranscribeWebSocketConstruct extends Construct {
     
     // WebSocketデフォルトハンドラLambda関数（音声データ処理）
     const defaultHandler = new NodejsFunction(this, 'DefaultHandler', {
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'defaultHandler',
       entry: path.join(__dirname, '../../../lambda/transcribeWebSocket/app.ts'),
       environment: {
