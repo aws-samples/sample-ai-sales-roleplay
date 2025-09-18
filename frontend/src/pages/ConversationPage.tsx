@@ -569,21 +569,6 @@ const ConversationPage: React.FC = () => {
           // クリーンアップ関数
           return () => clearTimeout(fallbackTimerId);
 
-          // セッション終了の判定
-          if (
-            scenario &&
-            shouldEndSession(
-              newMetrics,
-              finalMessages.length,
-              goalStatuses,
-              goals,
-              scenario,
-            )
-          ) {
-            setTimeout(async () => {
-              await endSession(finalMessages, newMetrics);
-            }, 2000);
-          }
         } catch (error) {
           console.error("=== ConversationPage: API呼び出しエラー ===");
           console.error("エラー詳細:", error);
