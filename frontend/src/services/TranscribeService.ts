@@ -16,7 +16,7 @@ export class TranscribeService {
   
   // 設定パラメータ
   private readonly silenceThresholdMs: number = 1500;  // 無音判定閾値（ミリ秒）
-  private readonly websocketUrl: string;
+  private websocketUrl: string = '';
   
   // コールバック関数
   private onTranscriptCallback: ((text: string, isFinal: boolean) => void) | null = null;
@@ -27,7 +27,18 @@ export class TranscribeService {
    * コンストラクタ - シングルトンパターン
    */
   private constructor() {
-    // WebSocket URLを環境変数から取得
+    console.log("TranscribeService初期化");
+  }
+  
+  /**
+   * WebSocketエンドポイントを設定
+   * 
+   * @param url WebSocketエンドポイントURL
+   */
+  public setWebSocketEndpoint(url: string): void {
+    this.websocketUrl = url;
+    console.log(`WebSocketエンドポイントを設定: ${url}`);
+  }
     this.websocketUrl = process.env.REACT_APP_TRANSCRIBE_WEBSOCKET_URL || '';
     if (!this.websocketUrl) {
       console.warn('Transcribe WebSocket URL is not defined in environment variables');
