@@ -68,36 +68,21 @@ export class TranscribeService {
     this.closeConnection();
 
     try {
-      // 認証トークンを取得
-      const { tokens } = await fetchAuthSession();
-      const jwtToken = tokens?.accessToken?.toString();
-      
-      if (!jwtToken) {
-        throw new Error('認証トークンを取得できませんでした');
-      }
-      
-      // WebSocketエンドポイントベースURLの作成（URLオブジェクトを使用）
-      const wsUrl = new URL(this.websocketUrl);
-      
-      // クエリパラメータを適切にエンコードして追加（認証を無効化したため、tokenは不要に）
-      wsUrl.searchParams.append('session', sessionId);
-      // 認証を無効化したため、トークンパラメータは一時的にコメントアウト
-      // wsUrl.searchParams.append('token', jwtToken);
-      
-      // 完全なURLを取得
-      const url = wsUrl.toString();
-      console.log(`WebSocket接続を初期化: ${url}`);
+      // 最もシンプルな接続URL (デバッグ用)
+      const simpleUrl = `${this.websocketUrl}?session=${encodeURIComponent(sessionId)}`;
+      console.log(`WebSocketのデバッグ接続を初期化: ${simpleUrl}`);
 
       return new Promise((resolve, reject) => {
         try {
-          this.socket = new WebSocket(url);
+          this.socket = new WebSocket(simpleUrl);
 
           this.socket.onopen = () => {
-            console.log('WebSocket接続確立');
+            console.log('WebSocket接続確立成功!');
             resolve();
           };
 
           this.socket.onmessage = (event) => {
+            console.log('WebSocketメッセージ受信:', event.data);
             try {
               const data = JSON.parse(event.data);
               if (data.transcript && this.onTranscriptCallback) {
@@ -114,12 +99,16 @@ export class TranscribeService {
           };
 
           this.socket.onerror = (error) => {
-            console.error('WebSocketエラー:', error);
+            console.error('WebSocketエラー詳細:', error);
+            console.error('WebSocketエラー状態:', {
+              readyState: this.socket?.readyState,
+              url: this.socket?.url
+            });
             reject(error);
           };
 
           this.socket.onclose = (event) => {
-            console.log(`WebSocket切断: コード=${event.code}, 理由=${event.reason}`);
+            console.log(`WebSocket切断詳細: コード=${event.code}, 理由=${event.reason}, wasClean=${event.wasClean}`);
           };
         } catch (error) {
           console.error('WebSocket初期化エラー:', error);

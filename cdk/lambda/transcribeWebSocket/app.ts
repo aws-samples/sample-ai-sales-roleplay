@@ -27,12 +27,20 @@ const activeTranscribeSessions = new Map<string, any>();
  * クライアント接続時に呼び出され、接続IDとセッションIDをDynamoDBに保存
  */
 export const connectHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-  console.log('WebSocket接続:', event);
+  console.log('WebSocket接続イベント:', JSON.stringify(event));
   
   try {
     const connectionId = event.requestContext.connectionId;
     const queryParams = event.queryStringParameters || {};
     const sessionId = queryParams.session || 'unknown';
+    
+    console.log('WebSocket接続診断情報:', {
+      connectionId,
+      sessionId,
+      requestTime: event.requestContext.requestTime,
+      sourceIp: event.requestContext.identity?.sourceIp,
+      userAgent: event.requestContext.identity?.userAgent
+    });
     
     if (!connectionId) {
       return { statusCode: 400, body: 'Connection ID missing' };
@@ -45,11 +53,45 @@ export const connectHandler = async (event: APIGatewayProxyEvent): Promise<APIGa
         connectionId,
         sessionId,
         ttl: Math.floor(Date.now() / 1000) + 3600, // 1時間後に自動削除
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        connectionInfo: {
+          headers: event.headers || {},
+          queryParams: event.queryStringParameters || {},
+          requestContext: {
+            domainName: event.requestContext.domainName,
+            stage: event.requestContext.stage,
+            connectionId: event.requestContext.connectionId
+          }
+        }
       }
     }));
     
-    return { statusCode: 200, body: 'Connected' };
+    // クライアントに接続成功を通知
+    const apiClient = createApiGatewayManagementApiClient(event);
+    try {
+      await apiClient.send(new PostToConnectionCommand({
+        ConnectionId: connectionId,
+        Data: Buffer.from(JSON.stringify({ 
+          status: 'connected',
+          message: 'WebSocket接続確立',
+          connectionId,
+          timestamp: new Date().toISOString()
+        }))
+      }));
+    } catch (e) {
+      console.warn('接続通知の送信に失敗:', e);
+      // 失敗しても処理を続行
+    }
+    
+    return { 
+      statusCode: 200, 
+      body: 'Connected',
+      headers: {
+        'Access-Control-Allow-Origin': '*', // CORS対応
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+        'Access-Control-Allow-Methods': 'GET,OPTIONS,POST'
+      }
+    };
   } catch (error) {
     console.error('接続エラー:', error);
     return { statusCode: 500, body: 'Connection failed' };

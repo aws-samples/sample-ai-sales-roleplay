@@ -100,14 +100,26 @@ export class TranscribeWebSocketConstruct extends Construct {
     this.webSocketApi = new apigatewayv2.CfnApi(this, 'TranscribeWebSocketApi', {
       name: `transcribe-websocket-${props.envId}`,
       protocolType: 'WEBSOCKET',
-      routeSelectionExpression: '$request.body.action'
+      routeSelectionExpression: '$request.body.action',
+      corsConfiguration: {
+        allowOrigins: ['*'], // 開発環境では全てのオリジンを許可（本番環境では制限すること）
+        allowMethods: ['*'],
+        allowHeaders: ['*'],
+        maxAge: 300 // 5分間のプリフライトキャッシュ
+      }
     });
     
-    // WebSocket APIのステージ設定
+    // WebSocket APIのステージ設定（CORS設定追加）
     const stage = new apigatewayv2.CfnStage(this, 'Stage', {
       apiId: this.webSocketApi.ref,
       stageName: props.stageName,
-      autoDeploy: true
+      autoDeploy: true,
+      defaultRouteSettings: {
+        // CORS関連設定
+        dataTraceEnabled: true, // ログ有効化
+        throttlingBurstLimit: 100,
+        throttlingRateLimit: 100
+      }
     });
     
     // ルートおよびLambda統合の設定
