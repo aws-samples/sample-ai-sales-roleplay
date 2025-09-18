@@ -362,8 +362,8 @@ export const authorizerHandler = async (event: APIGatewayRequestAuthorizerEvent)
       throw new Error('Unauthorized');
     }
     
-    // 基本的なトークン検証（実際の実装ではCognito JWTを検証）
-    if (token === 'test-token' || token.length > 10) {
+    // 基本的なトークン検証（開発環境ではトークンの長さだけで検証）
+    if (token && token.length > 10) {
       return {
         principalId: 'user',
         policyDocument: {

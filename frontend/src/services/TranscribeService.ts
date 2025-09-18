@@ -76,10 +76,15 @@ export class TranscribeService {
         throw new Error('認証トークンを取得できませんでした');
       }
       
-      // WebSocketエンドポイントにクエリパラメータを追加
-      // Auth: JWT認証用トークン
-      // session: セッション識別用（バックエンドの想定に合わせて"session"パラメータ名を使用）
-      const url = `${this.websocketUrl}?session=${sessionId}&Auth=${jwtToken}`;
+      // WebSocketエンドポイントベースURLの作成（URLオブジェクトを使用）
+      const wsUrl = new URL(this.websocketUrl);
+      
+      // クエリパラメータを適切にエンコードして追加
+      wsUrl.searchParams.append('session', sessionId);
+      wsUrl.searchParams.append('token', jwtToken); // AuthorizerのIdentitySourceに合わせてパラメータ名を'token'に変更
+      
+      // 完全なURLを取得
+      const url = wsUrl.toString();
       console.log(`WebSocket接続を初期化: ${url}`);
 
       return new Promise((resolve, reject) => {
