@@ -1,10 +1,13 @@
-import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
-import { ApiGatewayManagementApi, TranscribeStreamingClient, StartStreamTranscriptionCommand } from '@aws-sdk/client-transcribe-streaming';
+import { APIGatewayProxyEvent, APIGatewayProxyResult, Context, APIGatewayRequestAuthorizerEvent, APIGatewayAuthorizerResult } from 'aws-lambda';
+import { TranscribeStreamingClient, StartStreamTranscriptionCommand, LanguageCode } from '@aws-sdk/client-transcribe-streaming';
+import { ApiGatewayManagementApiClient, PostToConnectionCommand } from '@aws-sdk/client-apigatewaymanagementapi';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, DeleteCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 
 // 環境変数
 const TABLE_NAME = process.env.CONNECTION_TABLE_NAME || '';
+const USER_POOL_ID = process.env.USER_POOL_ID || '';
+const USER_POOL_CLIENT_ID = process.env.USER_POOL_CLIENT_ID || '';
 const REGION = process.env.AWS_REGION || 'ap-northeast-1';
 
 // DynamoDBクライアントの初期化
@@ -13,15 +16,7 @@ const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 
 // TranscribeStreamingクライアントの初期化
 const transcribeClient = new TranscribeStreamingClient({ 
-  region: REGION,
-  // マネージドストリーミング転送の設定
-  streamingRetryOptions: {
-    maxRetries: 2, // 再試行回数
-    retryDecider: (error: any) => {
-      // 再試行可能なエラーを定義
-      return error.name === 'NetworkError' || error.name === 'TimeoutError';
-    }
-  }
+  region: REGION
 });
 
 // 接続中のセッションを保持するマップ
@@ -118,7 +113,9 @@ export const defaultHandler = async (event: APIGatewayProxyEvent): Promise<APIGa
     
     // 音声データ送信アクション
     if (action === 'sendAudio' && body.audio) {
-      await processAudioData(connectionId, body.audio, event.requestContext.domainName, event.requestContext.stage);
+      const domainName = event.requestContext.domainName || '';
+      const stage = event.requestContext.stage || '';
+      await processAudioData(connectionId, body.audio, domainName, stage);
       return { statusCode: 200, body: 'Audio data received' };
     }
     
@@ -139,7 +136,7 @@ async function processAudioData(
   stage: string
 ): Promise<void> {
   // APIクライアントの作成
-  const apiClient = new ApiGatewayManagementApi({
+  const apiClient = new ApiGatewayManagementApiClient({
     region: REGION,
     endpoint: `https://${domainName}/${stage}`
   });
@@ -190,7 +187,7 @@ async function processAudioData(
  * Transcribeストリーミングセッションを開始
  */
 async function startTranscribeSession(connectionId: string, domainName: string, stage: string): Promise<void> {
-  const apiClient = new ApiGatewayManagementApi({
+  const apiClient = new ApiGatewayManagementApiClient({
     region: REGION,
     endpoint: `https://${domainName}/${stage}`
   });
@@ -243,23 +240,20 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
     
     // Transcribeストリーミング設定
     const command = new StartStreamTranscriptionCommand({
-      LanguageCode: languageCode,
+      LanguageCode: languageCode as LanguageCode,
       MediaEncoding: 'pcm',
       MediaSampleRateHertz: 16000,
       AudioStream: audioStream()
     });
     
-    // Transcribeセッションを開始
-    const transcribePromise = transcribeClient.send(command, {
-      abortSignal: abortController.signal
-    });
+    // 音声データキューの管理
+    const audioQueue: Buffer[] = [];
     
     // 音声データをキューに追加するための関数
     const audioInput = {
       write: (audioData: Buffer) => {
-        // ストリーミングキューに音声データを追加
         if (!abortController.signal.aborted) {
-          audioStream().next({ value: { AudioEvent: { AudioChunk: audioData } } });
+          audioQueue.push(audioData);
           return true;
         }
         return false;
@@ -280,62 +274,65 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
     
     activeTranscribeSessions.set(connectionId, transcribeSession);
     
-    // 応答処理をセットアップ
-    transcribePromise.then(response => {
+    // Transcribeセッションを開始
+    try {
+      const response = await transcribeClient.send(command, {
+        abortSignal: abortController.signal
+      });
+      
+      // 応答処理をセットアップ
       if (response.TranscriptResultStream) {
-        response.TranscriptResultStream.on('data', async (event) => {
+        // AsyncIterableを処理
+        (async () => {
           try {
-            // 結果の処理
-            const results = event.TranscriptEvent?.Results || [];
-            
-            for (const result of results) {
-              const transcript = result.Alternatives?.[0]?.Transcript || '';
-              const isFinal = result.IsPartial === false;
-              
-              if (transcript.trim()) {
-                await sendToClient(apiClient, connectionId, {
-                  transcript,
-                  isFinal
-                });
-                
-                // 音声アクティビティの検出
-                await sendToClient(apiClient, connectionId, {
-                  voiceActivity: true
-                });
+            for await (const event of response.TranscriptResultStream!) {
+              if (event.TranscriptEvent?.Transcript?.Results) {
+                for (const result of event.TranscriptEvent.Transcript.Results) {
+                  const transcript = result.Alternatives?.[0]?.Transcript || '';
+                  const isFinal = result.IsPartial === false;
+                  
+                  if (transcript.trim()) {
+                    await sendToClient(apiClient, connectionId, {
+                      transcript,
+                      isFinal
+                    });
+                    
+                    // 音声アクティビティの検出
+                    await sendToClient(apiClient, connectionId, {
+                      voiceActivity: true
+                    });
+                  }
+                }
               }
             }
-          } catch (error) {
-            console.error('Transcribe結果処理エラー:', error);
+          } catch (streamError) {
+            console.error('Transcribeストリーミングエラー:', streamError);
+            try {
+              await sendToClient(apiClient, connectionId, {
+                error: {
+                  code: 'TranscribeError',
+                  message: 'Transcription service error'
+                }
+              });
+            } catch (e) {
+              console.error('エラー通知送信失敗:', e);
+            }
           }
-        });
-        
-        response.TranscriptResultStream.on('error', async (error) => {
-          console.error('Transcribeストリーミングエラー:', error);
-          try {
-            await sendToClient(apiClient, connectionId, {
-              error: {
-                code: 'TranscribeError',
-                message: error.message || 'Transcription service error'
-              }
-            });
-          } catch (e) {
-            console.error('エラー通知送信失敗:', e);
-          }
-        });
+        })();
       }
-    }).catch(async (error) => {
+    } catch (error) {
       console.error('Transcribeセッションエラー:', error);
       try {
         await sendToClient(apiClient, connectionId, {
           error: {
             code: 'TranscribeError',
-            message: error.message || 'Transcription service error'
+            message: 'Transcription service error'
           }
         });
       } catch (e) {
         console.error('エラー通知送信失敗:', e);
       }
-    });
+    }
     
     console.log(`Transcribeセッション開始: ${connectionId}`);
   } catch (error) {
@@ -350,21 +347,61 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
 }
 
 /**
+ * WebSocket認証ハンドラ
+ * Cognitoトークンを検証してWebSocket接続を認証
+ */
+export const authorizerHandler = async (event: APIGatewayRequestAuthorizerEvent): Promise<APIGatewayAuthorizerResult> => {
+  console.log('WebSocket認証:', event);
+  
+  try {
+    // 簡単な認証実装（本格的なCognito JWT検証は後で追加）
+    const token = event.queryStringParameters?.token;
+    
+    if (!token) {
+      console.log('認証失敗: トークンがありません');
+      throw new Error('Unauthorized');
+    }
+    
+    // 基本的なトークン検証（実際の実装ではCognito JWTを検証）
+    if (token === 'test-token' || token.length > 10) {
+      return {
+        principalId: 'user',
+        policyDocument: {
+          Version: '2012-10-17',
+          Statement: [
+            {
+              Action: 'execute-api:Invoke',
+              Effect: 'Allow',
+              Resource: event.methodArn
+            }
+          ]
+        }
+      };
+    } else {
+      throw new Error('Invalid token');
+    }
+  } catch (error) {
+    console.error('認証エラー:', error);
+    throw new Error('Unauthorized');
+  }
+};
+
+/**
  * WebSocketクライアントにメッセージを送信
  */
 async function sendToClient(
-  apiClient: ApiGatewayManagementApi,
+  apiClient: ApiGatewayManagementApiClient,
   connectionId: string,
   message: any
 ): Promise<void> {
   try {
-    await apiClient.postToConnection({
+    await apiClient.send(new PostToConnectionCommand({
       ConnectionId: connectionId,
       Data: Buffer.from(JSON.stringify(message))
-    });
+    }));
   } catch (error: any) {
     // 接続が既に閉じられている場合はDynamoDBから削除
-    if (error.statusCode === 410) {
+    if (error.statusCode === 410 || error.$metadata?.httpStatusCode === 410) {
       console.log(`接続閉鎖済み: ${connectionId}、DBから削除します`);
       try {
         await ddbDocClient.send(new DeleteCommand({

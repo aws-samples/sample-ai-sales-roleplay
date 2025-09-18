@@ -1,20 +1,20 @@
 {
-  "name": "transcribe-websocket-handler",
+  "name": "transcribe-websocket-lambda",
   "version": "1.0.0",
-  "description": "Amazon Transcribe WebSocket integration for real-time speech recognition",
-  "main": "app.js",
+  "description": "WebSocket Lambda for Amazon Transcribe integration",
+  "main": "app.ts",
   "dependencies": {
-    "@aws-sdk/client-apigatewaymanagementapi": "^3.891.0",
-    "@aws-sdk/client-dynamodb": "^3.891.0",
-    "@aws-sdk/client-transcribe-streaming": "^3.891.0",
-    "@aws-sdk/lib-dynamodb": "^3.891.0"
+    "@aws-sdk/client-transcribe-streaming": "^3.600.0",
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.600.0",
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-client": "^3.0.1",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
-    "@types/aws-lambda": "^8.10.152",
-    "typescript": "^5.9.2"
-  },
-  "scripts": {
-    "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "@types/jsonwebtoken": "^9.0.3",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
   }
 }

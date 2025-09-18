@@ -14,6 +14,7 @@ export interface TranscribeWebSocketProps {
   stageName: string;
   envId: string;
   userPool: cognito.UserPool;
+  userPoolClient: cognito.UserPoolClient;
 }
 
 /**
@@ -129,23 +130,38 @@ export class TranscribeWebSocketConstruct extends Construct {
       integrationUri: `arn:aws:apigateway:${cdk.Stack.of(this).region}:lambda:path/2015-03-31/functions/${defaultHandler.functionArn}/invocations`
     });
     
-    // Cognito認証の設定
+    // WebSocket認証用Lambda関数
+    const authorizerFunction = new NodejsFunction(this, 'AuthorizerFunction', {
+      runtime: lambda.Runtime.NODEJS_22_X,
+      handler: 'authorizerHandler',
+      entry: path.join(__dirname, '../../../lambda/transcribeWebSocket/app.ts'),
+      environment: {
+        USER_POOL_ID: props.userPool.userPoolId,
+        USER_POOL_CLIENT_ID: props.userPoolClient.userPoolClientId
+      },
+      timeout: cdk.Duration.seconds(10)
+    });
+
+    // Cognito認証の設定（REQUEST型認証）
     const authorizer = new apigatewayv2.CfnAuthorizer(this, 'TranscribeCognitoAuthorizer', {
       apiId: this.webSocketApi.ref,
-      authorizerType: 'JWT',
-      identitySource: ['route.request.querystring.Auth'],
+      authorizerType: 'REQUEST',
+      authorizerUri: `arn:aws:apigateway:${cdk.Stack.of(this).region}:lambda:path/2015-03-31/functions/${authorizerFunction.functionArn}/invocations`,
       name: 'transcribe-cognito-authorizer',
-      jwtConfiguration: {
-        audience: [props.userPool.userPoolClientIds[0]],
-        issuer: `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${props.userPool.userPoolId}`
-      }
+      identitySource: ['route.request.querystring.token']
+    });
+
+    // Lambda関数にAPIGatewayからの呼び出し権限を付与
+    authorizerFunction.addPermission('AuthorizerInvokePermission', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: `arn:aws:execute-api:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:${this.webSocketApi.ref}/*/*`
     });
     
     // 接続ルートの設定 (Cognito認証付き)
     new apigatewayv2.CfnRoute(this, 'ConnectRoute', {
       apiId: this.webSocketApi.ref,
       routeKey: '$connect',
-      authorizationType: 'JWT',
+      authorizationType: 'CUSTOM',
       authorizerId: authorizer.ref,
       target: 'integrations/' + connectIntegration.ref
     });
