@@ -36,6 +36,7 @@
     "@aws-sdk/client-apigatewaymanagementapi": "^3.888.0",
     "@aws-sdk/client-dynamodb": "^3.888.0",
     "@aws-sdk/client-polly": "^3.888.0",
+    "@aws-sdk/client-transcribe-streaming": "^3.891.0",
     "@aws-sdk/lib-dynamodb": "^3.888.0",
     "@aws-sdk/s3-request-presigner": "^3.888.0",
     "@aws-solutions-constructs/aws-cloudfront-apigateway": "^2.92.2",

@@ -12,7 +12,17 @@ const ddbClient = new DynamoDBClient({ region: REGION });
 const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 
 // TranscribeStreamingクライアントの初期化
-const transcribeClient = new TranscribeStreamingClient({ region: REGION });
+const transcribeClient = new TranscribeStreamingClient({ 
+  region: REGION,
+  // マネージドストリーミング転送の設定
+  streamingRetryOptions: {
+    maxRetries: 2, // 再試行回数
+    retryDecider: (error: any) => {
+      // 再試行可能なエラーを定義
+      return error.name === 'NetworkError' || error.name === 'TimeoutError';
+    }
+  }
+});
 
 // 接続中のセッションを保持するマップ
 const activeTranscribeSessions = new Map<string, any>();
@@ -140,13 +150,26 @@ async function processAudioData(
     
     // TranscribeStreamingセッションが存在しなければ作成
     if (!activeTranscribeSessions.has(connectionId)) {
-      startTranscribeSession(connectionId, domainName, stage);
+      await startTranscribeSession(connectionId, domainName, stage);
+      // セッションの初期化には少し時間がかかるため、短い待機を挿入
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    // 音声アクティビティを通知
-    await sendToClient(apiClient, connectionId, {
-      voiceActivity: true
-    });
+    // 既存のTranscribeストリーミングセッションに音声データを送信
+    const session = activeTranscribeSessions.get(connectionId);
+    if (session && session.audioInput) {
+      // 音声データをTranscribeに送信
+      session.audioInput.write(audioBuffer);
+      
+      // 音声アクティビティを通知
+      await sendToClient(apiClient, connectionId, {
+        voiceActivity: true
+      });
+    } else {
+      console.warn(`有効なTranscribeセッションが見つかりません: ${connectionId}`);
+      // セッションがない場合は再作成を試みる
+      await startTranscribeSession(connectionId, domainName, stage);
+    }
     
   } catch (error) {
     console.error('音声処理エラー:', error);
@@ -166,55 +189,142 @@ async function processAudioData(
 /**
  * Transcribeストリーミングセッションを開始
  */
-function startTranscribeSession(connectionId: string, domainName: string, stage: string): void {
+async function startTranscribeSession(connectionId: string, domainName: string, stage: string): Promise<void> {
   const apiClient = new ApiGatewayManagementApi({
     region: REGION,
     endpoint: `https://${domainName}/${stage}`
   });
   
-  // Transcribeストリーミング設定
-  const command = new StartStreamTranscriptionCommand({
-    LanguageCode: 'ja-JP', // 日本語
-    MediaEncoding: 'pcm',
-    MediaSampleRateHertz: 16000,
-    AudioStream: {
-      AudioEvent: {
-        AudioChunk: Buffer.from([]) // 空のバッファで初期化
-      }
+  // セッション情報を取得して言語コードを確認
+  let languageCode = 'ja-JP'; // デフォルト: 日本語
+  try {
+    const connectionInfo = await ddbDocClient.send(new GetCommand({
+      TableName: TABLE_NAME,
+      Key: { connectionId }
+    }));
+    
+    // セッション情報から言語設定があれば使用
+    if (connectionInfo.Item?.languageCode) {
+      languageCode = connectionInfo.Item.languageCode;
     }
-  });
+  } catch (error) {
+    console.warn('言語設定の取得に失敗しました:', error);
+  }
   
-  // 応答ハンドラの設定
-  const responseHandler = {
-    onEvent: async (event: any) => {
-      try {
-        // 結果の処理
-        const results = event.TranscriptEvent?.Results || [];
-        
-        for (const result of results) {
-          const transcript = result.Alternatives?.[0]?.Transcript || '';
-          const isFinal = result.IsPartial === false;
-          
-          if (transcript.trim()) {
-            await sendToClient(apiClient, connectionId, {
-              transcript,
-              isFinal
-            });
-            
-            // 音声アクティビティの検出
-            if (transcript.trim()) {
-              await sendToClient(apiClient, connectionId, {
-                voiceActivity: true
-              });
-            }
+  // AbortControllerを作成
+  const abortController = new AbortController();
+  
+  try {
+    // 双方向ストリームを作成
+    const audioStream = async function* () {
+      // 音声データをストリームに送信するためのキュー
+      const audioQueue: Buffer[] = [];
+      let isStreamClosed = false;
+      
+      // このジェネレータ関数は接続の有効期間中、チャンクを生成し続ける
+      while (!isStreamClosed) {
+        // キューにデータがあればそれを返す
+        if (audioQueue.length > 0) {
+          const chunk = audioQueue.shift();
+          if (chunk) {
+            yield { AudioEvent: { AudioChunk: chunk } };
           }
+        } else {
+          // キューが空の場合は短い遅延
+          await new Promise(resolve => setTimeout(resolve, 20));
         }
-      } catch (error) {
-        console.error('Transcribe結果処理エラー:', error);
+        
+        // 中断信号があれば終了
+        if (abortController.signal.aborted) {
+          isStreamClosed = true;
+        }
       }
-    },
-    onError: async (error: any) => {
-      console.error('Transcribeストリーミングエラー:', error);
+    };
+    
+    // Transcribeストリーミング設定
+    const command = new StartStreamTranscriptionCommand({
+      LanguageCode: languageCode,
+      MediaEncoding: 'pcm',
+      MediaSampleRateHertz: 16000,
+      AudioStream: audioStream()
+    });
+    
+    // Transcribeセッションを開始
+    const transcribePromise = transcribeClient.send(command, {
+      abortSignal: abortController.signal
+    });
+    
+    // 音声データをキューに追加するための関数
+    const audioInput = {
+      write: (audioData: Buffer) => {
+        // ストリーミングキューに音声データを追加
+        if (!abortController.signal.aborted) {
+          audioStream().next({ value: { AudioEvent: { AudioChunk: audioData } } });
+          return true;
+        }
+        return false;
+      }
+    };
+    
+    // Transcribeセッションをマップに保存
+    const transcribeSession = {
+      audioInput,
+      abort: () => {
+        try {
+          abortController.abort();
+        } catch (e) {
+          console.warn('Transcribeセッション終了エラー:', e);
+        }
+      }
+    };
+    
+    activeTranscribeSessions.set(connectionId, transcribeSession);
+    
+    // 応答処理をセットアップ
+    transcribePromise.then(response => {
+      if (response.TranscriptResultStream) {
+        response.TranscriptResultStream.on('data', async (event) => {
+          try {
+            // 結果の処理
+            const results = event.TranscriptEvent?.Results || [];
+            
+            for (const result of results) {
+              const transcript = result.Alternatives?.[0]?.Transcript || '';
+              const isFinal = result.IsPartial === false;
+              
+              if (transcript.trim()) {
+                await sendToClient(apiClient, connectionId, {
+                  transcript,
+                  isFinal
+                });
+                
+                // 音声アクティビティの検出
+                await sendToClient(apiClient, connectionId, {
+                  voiceActivity: true
+                });
+              }
+            }
+          } catch (error) {
+            console.error('Transcribe結果処理エラー:', error);
+          }
+        });
+        
+        response.TranscriptResultStream.on('error', async (error) => {
+          console.error('Transcribeストリーミングエラー:', error);
+          try {
+            await sendToClient(apiClient, connectionId, {
+              error: {
+                code: 'TranscribeError',
+                message: error.message || 'Transcription service error'
+              }
+            });
+          } catch (e) {
+            console.error('エラー通知送信失敗:', e);
+          }
+        });
+      }
+    }).catch(async (error) => {
+      console.error('Transcribeセッションエラー:', error);
       try {
         await sendToClient(apiClient, connectionId, {
           error: {
@@ -225,12 +335,18 @@ function startTranscribeSession(connectionId: string, domainName: string, stage:
       } catch (e) {
         console.error('エラー通知送信失敗:', e);
       }
-    }
-  };
-  
-  // Transcribeセッションをマップに保存
-  const transcribeSession = { abort: () => {} }; // 実際のAbort Controller等をここに格納
-  activeTranscribeSessions.set(connectionId, transcribeSession);
+    });
+    
+    console.log(`Transcribeセッション開始: ${connectionId}`);
+  } catch (error) {
+    console.error('Transcribeセッション開始エラー:', error);
+    await sendToClient(apiClient, connectionId, {
+      error: {
+        code: 'TranscribeInitError',
+        message: 'Failed to initialize transcription service'
+      }
+    });
+  }
 }
 
 /**
