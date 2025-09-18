@@ -102,7 +102,7 @@ const ConversationPage: React.FC = () => {
     transcribeServiceRef.current = TranscribeService.getInstance();
     
     // 環境変数からWebSocketエンドポイントを取得
-    const websocketEndpoint = process.env.REACT_APP_TRANSCRIBE_WEBSOCKET_URL;
+    const websocketEndpoint = import.meta.env.VITE_TRANSCRIBE_WEBSOCKET_URL;
     if (websocketEndpoint) {
       console.log("Transcribe WebSocketエンドポイントを設定:", websocketEndpoint);
       transcribeServiceRef.current.setWebSocketEndpoint(websocketEndpoint);

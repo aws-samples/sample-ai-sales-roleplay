@@ -21,4 +21,10 @@ export const amplifyConfig = {
       },
     },
   },
+  // 追加: TranscribeのWebSocketエンドポイント
+  TRANSCRIBE: {
+    WEBSOCKET: {
+      endpoint: import.meta.env.VITE_TRANSCRIBE_WEBSOCKET_URL || "",
+    }
+  },
 };
