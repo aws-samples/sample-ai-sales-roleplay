@@ -126,7 +126,8 @@ export class InfrastructureStack extends cdk.Stack {
       idPoolId: auth.idPool.identityPoolId,
       selfSignUpEnabled,
       webAclId: props?.webAclId,
-      resourceNamePrefix: resourcePrefix // 環境識別子をリソース名に含める
+      resourceNamePrefix: resourcePrefix, // 環境識別子をリソース名に含める
+      transcribeWebSocketEndpoint: api.transcribeWebSocket.webSocketApiEndpoint // WebSocketエンドポイントを追加
     });
 
     const prefix = props?.envId ? `${props.envId}-` : '';
