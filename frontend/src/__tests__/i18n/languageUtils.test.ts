@@ -2,6 +2,7 @@ import {
   isRTLLanguage,
   detectBrowserLanguage,
   getPollySettingsForLanguage,
+  getTranscribeLanguage,
 } from "../../i18n/utils/languageUtils";
 
 describe("languageUtils", () => {
@@ -77,6 +78,20 @@ describe("languageUtils", () => {
         voiceId: "Takumi",
         languageCode: "ja-JP",
       });
+    });
+  });
+
+  describe("getTranscribeLanguage", () => {
+    it("日本語の正しいTranscribe言語コードを返す", () => {
+      expect(getTranscribeLanguage("ja")).toBe("ja-JP");
+    });
+
+    it("英語の正しいTranscribe言語コードを返す", () => {
+      expect(getTranscribeLanguage("en")).toBe("en-US");
+    });
+
+    it("サポートされていない言語の場合デフォルトを返す", () => {
+      expect(getTranscribeLanguage("xyz")).toBe("ja-JP");
     });
   });
 });

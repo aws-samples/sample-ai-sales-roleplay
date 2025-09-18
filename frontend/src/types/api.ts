@@ -450,42 +450,9 @@ export interface ImportResponse {
 /**
  * Web Speech API関連の型定義
  */
-export interface SpeechRecognitionResult {
-  [index: number]: {
-    transcript: string;
-  };
-}
-
-export interface SpeechRecognitionEvent {
-  results: SpeechRecognitionResult[];
-}
-
-export interface SpeechRecognitionErrorEvent {
-  error: string;
-}
-
-export interface SpeechRecognition extends EventTarget {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onstart: (() => void) | null;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-  start(): void;
-  stop(): void;
-}
-
-export interface SpeechRecognitionConstructor {
-  new (): SpeechRecognition;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  }
-}
+// Web Speech API関連の型定義は削除 - Amazon Transcribeに移行
+// 互換性のために最小限の型のみ維持
+export type SpeechRecognitionErrorType = "permission" | "no-speech" | "network" | "not-supported" | "unknown";
 
 /**
  * リアルタイム評価APIのレスポンス型定義

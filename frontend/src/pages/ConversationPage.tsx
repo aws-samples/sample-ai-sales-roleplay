@@ -20,7 +20,7 @@ import { AudioService } from "../services/AudioService";
 import { LanguageService } from "../services/LanguageService";
 import { PollyService } from "../services/PollyService";
 import { TranscribeService } from "../services/TranscribeService";
-import { getSpeechRecognitionLanguage } from "../i18n/utils/languageUtils";
+import { getTranscribeLanguage } from "../i18n/utils/languageUtils";
 import type { EmotionState } from "../types/index";
 import {
   initializeGoalStatuses,
@@ -72,7 +72,7 @@ const ConversationPage: React.FC = () => {
   const [isListening, setIsListening] = useState(false);
   const [continuousListening, setContinuousListening] = useState(false); // 常時マイク入力モード
   const [speechRecognitionError, setSpeechRecognitionError] = useState<
-    string | null
+    "permission" | "no-speech" | "network" | "not-supported" | "unknown" | null
   >(null);
   const [metricsUpdating, setMetricsUpdating] = useState(false);
   const [goals, setGoals] = useState<Goal[]>([]);
