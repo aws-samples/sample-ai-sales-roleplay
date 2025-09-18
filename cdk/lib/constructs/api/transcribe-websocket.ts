@@ -10,7 +10,6 @@ import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as path from 'path';
 
 export interface TranscribeWebSocketProps {
-  apiName: string;
   stageName: string;
   envId: string;
   userPool: cognito.UserPool;
@@ -99,7 +98,7 @@ export class TranscribeWebSocketConstruct extends Construct {
     
     // WebSocket APIの作成
     this.webSocketApi = new apigatewayv2.CfnApi(this, 'TranscribeWebSocketApi', {
-      name: `${props.apiName}-transcribe-websocket-${props.envId}`,
+      name: `transcribe-websocket-${props.envId}`,
       protocolType: 'WEBSOCKET',
       routeSelectionExpression: '$request.body.action'
     });

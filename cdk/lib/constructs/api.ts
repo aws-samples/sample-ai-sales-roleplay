@@ -243,7 +243,6 @@ export class Api extends Construct {
 
     // WebSocket API for Transcribe
     this.transcribeWebSocket = new TranscribeWebSocketConstruct(this, 'TranscribeWebSocket', {
-      apiName: props.resourceNamePrefix,
       stageName: 'prod',
       envId: props.envId,
       userPool: props.userPool!,
