@@ -14,7 +14,7 @@ import type {
   DifficultyLevel
 } from "../types/api";
 import type { CompositionEventType } from "../types/components";
-import { shouldEndSession, getSessionEndReason } from "../utils/dialogueEngine";
+import { getSessionEndReason } from "../utils/dialogueEngine";
 import { ApiService } from "../services/ApiService";
 import { AudioService } from "../services/AudioService";
 import { LanguageService } from "../services/LanguageService";
@@ -364,7 +364,7 @@ const ConversationPage: React.FC = () => {
   };
 
   // メッセージ送信
-  const sendMessage = async () => {
+  const sendMessage = useCallback(async () => {
     if (!userInput.trim() || !scenario || isProcessing) return;
 
     // 入力フィールドを無効化（API処理中）
@@ -581,7 +581,7 @@ const ConversationPage: React.FC = () => {
       },
       1000 + Math.random() * 1000,
     ); // 1-2秒の遅延でリアル感を演出
-  };
+  }, [userInput, scenario, isProcessing, messages, currentMetrics, sessionId, audioEnabled, isSpeaking, goalStatuses, goals]);
 
   /**
    * セッション終了処理
