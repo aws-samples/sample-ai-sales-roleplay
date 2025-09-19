@@ -447,12 +447,6 @@ export interface ImportResponse {
   };
 }
 
-/**
- * Web Speech API関連の型定義
- */
-// Web Speech API関連の型定義は削除 - Amazon Transcribeに移行
-// 互換性のために最小限の型のみ維持
-export type SpeechRecognitionErrorType = "permission" | "no-speech" | "network" | "not-supported" | "unknown";
 
 /**
  * リアルタイム評価APIのレスポンス型定義

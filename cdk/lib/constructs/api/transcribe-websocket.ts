@@ -4,7 +4,6 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as logs from 'aws-cdk-lib/aws-logs';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as path from 'path';
@@ -165,7 +164,7 @@ export class TranscribeWebSocketConstruct extends Construct {
     new apigatewayv2.CfnRoute(this, 'DisconnectRoute', {
       apiId: this.webSocketApi.ref,
       routeKey: '$disconnect',
-      authorizationType: 'NONE', // 切断時は認証不要
+      authorizationType: 'NONE',
       target: 'integrations/' + disconnectIntegration.ref
     });
     
@@ -173,7 +172,7 @@ export class TranscribeWebSocketConstruct extends Construct {
     new apigatewayv2.CfnRoute(this, 'DefaultRoute', {
       apiId: this.webSocketApi.ref,
       routeKey: '$default',
-      authorizationType: 'NONE', // 既に接続確立後は認証不要
+      authorizationType: 'NONE',
       target: 'integrations/' + defaultIntegration.ref
     });
     

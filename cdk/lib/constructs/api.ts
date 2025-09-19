@@ -281,9 +281,5 @@ export class Api extends Construct {
     this.databaseTables.messagesTable.grantReadWriteData(this.bedrockLambda.function);
     this.databaseTables.sessionFeedbackTable.grantReadWriteData(this.bedrockLambda.function);
 
-
-    new cdk.CfnOutput(this, "WebSocketEndpoint", {
-      value: this.transcribeWebSocket.webSocketApiEndpoint
-    })
   }
 }

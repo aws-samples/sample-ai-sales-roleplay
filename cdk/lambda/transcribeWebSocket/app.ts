@@ -464,7 +464,6 @@ async function verifyToken(token: string): Promise<any> {
     }
     
     // JWTを検証
-    // 簡易的な実装として、jwks-rsaを使用
     const client = jwksClient({
       jwksUri: url,
       cache: true,

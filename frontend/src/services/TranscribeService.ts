@@ -215,13 +215,13 @@ export class TranscribeService {
             const voiceThreshold = 0.5; // 音声判定閾値（調整可能）
             if (audioLevel > voiceThreshold) {
               this.lastVoiceActivityTime = Date.now();
-              console.log(`🎤 音声検出: レベル=${audioLevel.toFixed(2)} (閾値: ${voiceThreshold})`);
+              // console.log(`🎤 音声検出: レベル=${audioLevel.toFixed(2)} (閾値: ${voiceThreshold})`);
             } else {
               // 無音状態の詳細ログ
-              const elapsed = Date.now() - this.lastVoiceActivityTime;
-              if (elapsed > 500 && elapsed % 500 < 100) { // 500ms以上の無音時に定期的にログ
-                console.log(`🔇 無音継続: レベル=${audioLevel.toFixed(2)}, 経過=${elapsed}ms (閾値: ${this.silenceThresholdMs}ms)`);
-              }
+              // const elapsed = Date.now() - this.lastVoiceActivityTime;
+              // if (elapsed > 500 && elapsed % 500 < 100) { // 500ms以上の無音時に定期的にログ
+              //   console.log(`🔇 無音継続: レベル=${audioLevel.toFixed(2)}, 経過=${elapsed}ms (閾値: ${this.silenceThresholdMs}ms)`);
+              // }
             }
             
             // Float32ArrayをInt16Arrayに変換（PCM 16bit）
@@ -235,7 +235,7 @@ export class TranscribeService {
             const uint8Array = new Uint8Array(pcmData.buffer);
             const base64Audio = this.arrayBufferToBase64(uint8Array.buffer);
             
-            console.log(`音声データ送信: ${uint8Array.length}バイト, レベル: ${audioLevel.toFixed(2)}`);
+            // console.log(`音声データ送信: ${uint8Array.length}バイト, レベル: ${audioLevel.toFixed(2)}`);
             
             this.socket.send(JSON.stringify({
               action: 'sendAudio',
@@ -276,7 +276,7 @@ export class TranscribeService {
       clearInterval(this.silenceDetectionTimer);
     }
 
-    console.log(`無音検出タイマー開始: 閾値=${this.silenceThresholdMs}ms, チェック間隔=500ms`);
+    // console.log(`無音検出タイマー開始: 閾値=${this.silenceThresholdMs}ms, チェック間隔=500ms`);
 
     // 定期的に無音状態をチェック
     this.silenceDetectionTimer = setInterval(() => {
@@ -284,23 +284,23 @@ export class TranscribeService {
       const elapsed = now - this.lastVoiceActivityTime;
       
       // デバッグログ: 定期的に経過時間を確認
-      if (elapsed % 2000 < 500) { // 約2秒ごとにログ出力
-        console.log(`無音チェック: ${elapsed}ms経過, 閾値: ${this.silenceThresholdMs}ms`);
-      }
+      // if (elapsed % 2000 < 500) { // 約2秒ごとにログ出力
+      //   console.log(`無音チェック: ${elapsed}ms経過, 閾値: ${this.silenceThresholdMs}ms`);
+      // }
       
       // 設定された閾値より長く無音が続いた場合
       if (elapsed > this.silenceThresholdMs) {
-        console.log(`🔇 無音検出トリガー: ${elapsed}ms経過, コールバック有無: ${!!this.onSilenceDetectedCallback}`);
+        // console.log(`🔇 無音検出トリガー: ${elapsed}ms経過, コールバック有無: ${!!this.onSilenceDetectedCallback}`);
         
         if (this.onSilenceDetectedCallback) {
-          console.log(`📤 無音検出コールバック実行`);
+          // console.log(`📤 無音検出コールバック実行`);
           this.onSilenceDetectedCallback();
           
           // 無音検出後は検出を一時停止（連続検出を防止）
           this.lastVoiceActivityTime = now;
-          console.log(`⏰ 無音検出後の音声アクティビティ時刻をリセット`);
+          // console.log(`⏰ 無音検出後の音声アクティビティ時刻をリセット`);
         } else {
-          console.warn(`⚠️ 無音検出コールバックが設定されていません`);
+          // console.warn(`⚠️ 無音検出コールバックが設定されていません`);
         }
       }
     }, 500);

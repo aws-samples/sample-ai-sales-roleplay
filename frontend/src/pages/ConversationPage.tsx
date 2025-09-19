@@ -20,8 +20,6 @@ import { AudioService } from "../services/AudioService";
 import { LanguageService } from "../services/LanguageService";
 import { PollyService } from "../services/PollyService";
 import { TranscribeService } from "../services/TranscribeService";
-// テスト中のため一時的にインポートを削除 (lint error 回避)
-// import { getTranscribeLanguage } from "../i18n/utils/languageUtils";
 import type { EmotionState } from "../types/index";
 import {
   initializeGoalStatuses,
@@ -752,7 +750,7 @@ const ConversationPage: React.FC = () => {
       await transcribeServiceRef.current.startListening(
         // 文字起こしコールバック（音声認識結果の蓄積）
         (text, isFinal) => {
-          console.log(`音声認識結果: "${text}", isFinal: ${isFinal}`);
+          // console.log(`音声認識結果: "${text}", isFinal: ${isFinal}`);
           
           if (isFinal) {
             // 確定結果：既存のテキストに追加（改行または空白で区切り）
@@ -763,11 +761,11 @@ const ConversationPage: React.FC = () => {
               if (prevInput && prevInput.trim()) {
                 // 既存テキストがある場合は改行で区切って追加
                 const newInput = `${prevInput}\n${trimmedText}`;
-                console.log(`isFinal=true: 新しい入力設定 = "${newInput}"`);
+                // console.log(`isFinal=true: 新しい入力設定 = "${newInput}"`);
                 return newInput;
               } else {
                 // 既存テキストがない場合は新規設定
-                console.log(`isFinal=true: 初期入力設定 = "${trimmedText}"`);
+                // console.log(`isFinal=true: 初期入力設定 = "${trimmedText}"`);
                 return trimmedText;
               }
             });
@@ -788,13 +786,13 @@ const ConversationPage: React.FC = () => {
         },
         // 無音検出コールバック（引数化されたsendMessage関数を使用）
         () => {
-          console.log(`🔇 無音検出コールバック実行: userInputRef="${userInputRef.current}"`);
+          // console.log(`🔇 無音検出コールバック実行: userInputRef="${userInputRef.current}"`);
           if (userInputRef.current.trim()) {
-            console.log(`📤 無音検出による自動送信実行`);
+            // console.log(`📤 無音検出による自動送信実行`);
             // 引数付きでsendMessage関数を呼び出し（完全な送信処理を実行）
             sendMessage(userInputRef.current.trim());
           } else {
-            console.log(`⚠️ 無音検出: userInputが空のため送信をスキップ`);
+            // console.log(`⚠️ 無音検出: userInputが空のため送信をスキップ`);
           }
         },
         // エラーコールバック
