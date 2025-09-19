@@ -84,8 +84,6 @@ const ConversationPage: React.FC = () => {
   const transcribeServiceRef = useRef<TranscribeService | null>(null);
   // 最新のuserInputを参照するためのRef
   const userInputRef = useRef<string>("");
-  // 最新のsendMessage関数を参照するためのRef
-  const sendMessageRef = useRef<(() => Promise<void>) | null>(null);
   // ゴールの達成スコア（セッション終了時に使用）
   const [goalScore, setGoalScore] = useState<number>(0);
 

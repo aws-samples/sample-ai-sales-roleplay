@@ -10,6 +10,8 @@ jest.mock("react-i18next", () => ({
         "conversation.input.placeholder": "メッセージを入力してください...",
         "conversation.input.send": "メッセージを送信",
         "conversation.input.startVoice": "音声入力を開始",
+        "conversation.input.stopVoice": "音声入力を停止",
+        "conversation.input.continueVoice": "音声入力を継続（既存のテキストは保持されます）",
       };
       return translations[key] || key;
     },
@@ -123,8 +125,9 @@ describe("MessageInput", () => {
     const sendButton = screen.getByRole("button", { name: "メッセージを送信" });
     expect(sendButton).toBeDisabled();
 
-    const micButton = screen.getByRole("button", { name: "音声入力を開始" });
-    expect(micButton).toBeDisabled();
+    // isListening=trueの時、ボタンのラベルは「音声入力を停止」になり、停止ボタンとして有効
+    const micButton = screen.getByRole("button", { name: "音声入力を停止" });
+    expect(micButton).toBeEnabled();
   });
 
   test("キーボードイベント（Enter）が適切に処理される", () => {
