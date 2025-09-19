@@ -16,7 +16,7 @@ from aws_lambda_powertools.event_handler.exceptions import (
 import boto3.dynamodb.conditions
 
 from utils import get_user_id_from_event, sessions_table, messages_table, scenarios_table, dynamodb
-from feedback_service import generate_feedback_with_bedrock
+from feedback_service import generate_feedback_with_bedrock, save_feedback_to_dynamodb
 from realtime_scoring import calculate_realtime_scores
 
 # ロガー設定
@@ -326,6 +326,40 @@ def handle_audio_analysis_session(session_id: str, user_id: str, audio_analysis_
             "messages_count": len(messages)
         })
         
+        # 音声分析結果をDynamoDBに保存（リファレンスチェックAPI用）
+        try:
+            
+            # ゴール結果を取得
+            goal_results = create_goal_results_from_feedback(
+                feedback_data, scenario_goals, session_id
+            ) if scenario_goals else None
+            
+            # final-feedbackとしてDynamoDBに保存
+            save_success = save_feedback_to_dynamodb(
+                session_id=session_id,
+                feedback_data=feedback_data,
+                final_metrics=final_metrics,
+                messages=messages,
+                goal_data=goal_results
+            )
+            
+            if save_success:
+                logger.info("音声分析結果をDynamoDBに保存完了", extra={
+                    "session_id": session_id,
+                    "overall_score": feedback_data.get("scores", {}).get("overall")
+                })
+            else:
+                logger.warning("音声分析結果のDynamoDB保存に失敗", extra={
+                    "session_id": session_id
+                })
+                
+        except Exception as save_error:
+            logger.error("音声分析結果の保存中にエラー", extra={
+                "error": str(save_error),
+                "session_id": session_id
+            })
+            # 保存エラーでもレスポンスは返す
+        
         return response_data
         
     except Exception as e:
@@ -523,6 +557,33 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                         goal_results = create_goal_results_from_feedback(
                             feedback_data, scenario_goals, session_id
                         ) if scenario_goals else None
+                        
+                        # 通常セッションのフィードバックをDynamoDBに保存（リファレンスチェックAPI用）
+                        try:
+                            save_success = save_feedback_to_dynamodb(
+                                session_id=session_id,
+                                feedback_data=feedback_data,
+                                final_metrics=final_metrics,
+                                messages=messages,
+                                goal_data=goal_results
+                            )
+                            
+                            if save_success:
+                                logger.info("通常セッションフィードバックをDynamoDBに保存完了", extra={
+                                    "session_id": session_id,
+                                    "overall_score": feedback_data.get("scores", {}).get("overall")
+                                })
+                            else:
+                                logger.warning("通常セッションフィードバックのDynamoDB保存に失敗", extra={
+                                    "session_id": session_id
+                                })
+                                
+                        except Exception as save_error:
+                            logger.error("通常セッションフィードバックの保存中にエラー", extra={
+                                "error": str(save_error),
+                                "session_id": session_id
+                            })
+                            # 保存エラーでもレスポンスは返す
                         
                         # 通常セッション用のレスポンスデータを構築（フィードバック付き）
                         response_data = {
