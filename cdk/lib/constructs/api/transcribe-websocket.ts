@@ -56,7 +56,9 @@ export class TranscribeWebSocketConstruct extends Construct {
       handler: 'connectHandler',
       entry: path.join(__dirname, '../../../lambda/transcribeWebSocket/app.ts'),
       environment: {
-        CONNECTION_TABLE_NAME: connectionTable.tableName
+        CONNECTION_TABLE_NAME: connectionTable.tableName,
+        USER_POOL_ID: props.userPool.userPoolId,
+        USER_POOL_CLIENT_ID: props.userPoolClient.userPoolClientId
       }
     });
     
@@ -134,32 +136,6 @@ export class TranscribeWebSocketConstruct extends Construct {
       integrationUri: `arn:aws:apigateway:${cdk.Stack.of(this).region}:lambda:path/2015-03-31/functions/${defaultHandler.functionArn}/invocations`
     });
     
-    // WebSocket認証用Lambda関数
-    const authorizerFunction = new NodejsFunction(this, 'AuthorizerFunction', {
-      runtime: lambda.Runtime.NODEJS_22_X,
-      handler: 'authorizerHandler',
-      entry: path.join(__dirname, '../../../lambda/transcribeWebSocket/app.ts'),
-      environment: {
-        USER_POOL_ID: props.userPool.userPoolId,
-        USER_POOL_CLIENT_ID: props.userPoolClient.userPoolClientId
-      },
-      timeout: cdk.Duration.seconds(10)
-    });
-
-    // Cognito認証の設定（REQUEST型認証）
-    const authorizer = new apigatewayv2.CfnAuthorizer(this, 'TranscribeCognitoAuthorizer', {
-      apiId: this.webSocketApi.ref,
-      authorizerType: 'REQUEST',
-      authorizerUri: `arn:aws:apigateway:${cdk.Stack.of(this).region}:lambda:path/2015-03-31/functions/${authorizerFunction.functionArn}/invocations`,
-      name: 'transcribe-cognito-authorizer',
-      identitySource: ['route.request.querystring.token']
-    });
-
-    // Lambda関数にAPIGatewayからの呼び出し権限を付与
-    authorizerFunction.addPermission('AuthorizerInvokePermission', {
-      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
-      sourceArn: `arn:aws:execute-api:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:${this.webSocketApi.ref}/*/*`
-    });
 
     // WebSocket Lambda関数にAPIGatewayからの実行権限を付与
     connectHandler.addPermission('ConnectInvokePermission', {
@@ -177,11 +153,11 @@ export class TranscribeWebSocketConstruct extends Construct {
       sourceArn: `arn:aws:execute-api:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:${this.webSocketApi.ref}/*/*`
     });
     
-    // 接続ルートの設定 (一時的に認証を無効化)
+    // 接続ルートの設定 (認証はLambda関数内で実行)
     new apigatewayv2.CfnRoute(this, 'ConnectRoute', {
       apiId: this.webSocketApi.ref,
       routeKey: '$connect',
-      authorizationType: 'NONE', // 認証を一時的に無効化
+      authorizationType: 'NONE', // Lambda関数内で認証を実行
       target: 'integrations/' + connectIntegration.ref
     });
     

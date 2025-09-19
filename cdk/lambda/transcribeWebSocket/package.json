@@ -4,17 +4,16 @@
   "description": "WebSocket Lambda for Amazon Transcribe integration",
   "main": "app.ts",
   "dependencies": {
-    "@aws-sdk/client-transcribe-streaming": "^3.600.0",
-    "@aws-sdk/client-apigatewaymanagementapi": "^3.600.0",
-    "@aws-sdk/client-dynamodb": "^3.600.0",
-    "@aws-sdk/lib-dynamodb": "^3.600.0",
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.891.0",
+    "@aws-sdk/client-dynamodb": "^3.891.0",
+    "@aws-sdk/client-transcribe-streaming": "^3.891.0",
+    "@aws-sdk/lib-dynamodb": "^3.891.0",
     "jsonwebtoken": "^9.0.2",
-    "jwks-client": "^3.0.1",
-    "node-fetch": "^3.3.2"
+    "jwks-rsa": "^3.2.0"
   },
   "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.3",
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.5.2",
+    "typescript": "^5.9.2"
   }
 }

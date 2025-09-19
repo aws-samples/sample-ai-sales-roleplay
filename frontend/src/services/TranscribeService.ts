@@ -89,13 +89,22 @@ export class TranscribeService {
     this.closeConnection();
 
     try {
-      // 最もシンプルな接続URL (デバッグ用)
-      const simpleUrl = `${this.websocketUrl}?session=${encodeURIComponent(sessionId)}`;
-      console.log(`WebSocketのデバッグ接続を初期化: ${simpleUrl}`);
+      // AuthServiceから認証トークンを取得
+      const { AuthService } = await import('./AuthService');
+      const authService = AuthService.getInstance();
+      const token = await authService.getAuthToken();
+      
+      if (!token) {
+        throw new Error('認証トークンが取得できませんでした');
+      }
+
+      // 認証トークン付きの接続URL
+      const authenticatedUrl = `${this.websocketUrl}?session=${encodeURIComponent(sessionId)}&token=${encodeURIComponent(token)}`;
+      console.log(`WebSocket認証付き接続を初期化: ${this.websocketUrl}?session=${encodeURIComponent(sessionId)}&token=***`);
 
       return new Promise((resolve, reject) => {
         try {
-          this.socket = new WebSocket(simpleUrl);
+          this.socket = new WebSocket(authenticatedUrl);
 
           this.socket.onopen = () => {
             console.log('WebSocket接続確立成功!');

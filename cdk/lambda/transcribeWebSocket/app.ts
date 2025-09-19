@@ -1,8 +1,10 @@
-import { APIGatewayProxyEvent, APIGatewayProxyResult, Context, APIGatewayRequestAuthorizerEvent, APIGatewayAuthorizerResult } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { TranscribeStreamingClient, StartStreamTranscriptionCommand, LanguageCode } from '@aws-sdk/client-transcribe-streaming';
 import { ApiGatewayManagementApiClient, PostToConnectionCommand } from '@aws-sdk/client-apigatewaymanagementapi';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, DeleteCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import jwt from 'jsonwebtoken';
+import jwksClient from 'jwks-rsa';
 
 // 環境変数
 const TABLE_NAME = process.env.CONNECTION_TABLE_NAME || '';
@@ -24,36 +26,89 @@ const activeTranscribeSessions = new Map<string, any>();
 
 /**
  * WebSocket接続ハンドラ
- * クライアント接続時に呼び出され、接続IDとセッションIDをDynamoDBに保存
+ * クエリパラメータのトークンを検証してから接続を確立
  */
 export const connectHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-  console.log('WebSocket接続イベント:', JSON.stringify(event));
+  console.log('WebSocket接続イベント:', {
+    connectionId: event.requestContext.connectionId,
+    requestTime: event.requestContext.requestTime,
+    sourceIp: event.requestContext.identity?.sourceIp,
+    userAgent: event.requestContext.identity?.userAgent
+  });
   
   try {
     const connectionId = event.requestContext.connectionId;
     const queryParams = event.queryStringParameters || {};
     const sessionId = queryParams.session || 'unknown';
-    
-    console.log('WebSocket接続診断情報:', {
-      connectionId,
-      sessionId,
-      requestTime: event.requestContext.requestTime,
-      sourceIp: event.requestContext.identity?.sourceIp,
-      userAgent: event.requestContext.identity?.userAgent
-    });
+    const token = queryParams.token;
     
     if (!connectionId) {
-      return { statusCode: 400, body: 'Connection ID missing' };
+      console.error('Connection ID missing');
+      return { 
+        statusCode: 400, 
+        body: JSON.stringify({ 
+          error: 'Connection ID missing',
+          code: 'MISSING_CONNECTION_ID'
+        })
+      };
     }
     
-    // 接続情報をDynamoDBに保存
+    if (!token) {
+      console.error('認証トークンがありません');
+      return {
+        statusCode: 403,
+        body: JSON.stringify({
+          error: 'No token provided',
+          code: 'NO_TOKEN'
+        })
+      };
+    }
+    
+    // JWT トークンを検証
+    let decodedToken: any;
+    try {
+      decodedToken = await verifyToken(token);
+      console.log('JWT検証成功:', {
+        userId: decodedToken.sub?.substring(0, 8) + '...',
+        hasEmail: !!decodedToken.email,
+        tokenType: decodedToken.token_use
+      });
+    } catch (error: any) {
+      console.error('JWT検証失敗:', error);
+      return {
+        statusCode: 403,
+        body: JSON.stringify({
+          error: 'Invalid token',
+          code: 'INVALID_TOKEN'
+        })
+      };
+    }
+    
+    // 認証されたユーザー情報を取得
+    const userId = decodedToken.sub || 'unknown';
+    const email = decodedToken.email || '';
+    const username = decodedToken['cognito:username'] || decodedToken.email || '';
+    
+    console.log('認証されたユーザー接続:', {
+      connectionId,
+      userId,
+      email,
+      username,
+      sessionId
+    });
+    
+    // 接続情報をDynamoDBに保存（認証済みユーザー情報を含む）
     await ddbDocClient.send(new PutCommand({
       TableName: TABLE_NAME,
       Item: {
         connectionId,
         sessionId,
+        userId,
+        email,
+        username,
         ttl: Math.floor(Date.now() / 1000) + 3600, // 1時間後に自動削除
         createdAt: new Date().toISOString(),
+        lastActivity: new Date().toISOString(),
         connectionInfo: {
           headers: event.headers || {},
           queryParams: event.queryStringParameters || {},
@@ -61,27 +116,43 @@ export const connectHandler = async (event: APIGatewayProxyEvent): Promise<APIGa
             domainName: event.requestContext.domainName,
             stage: event.requestContext.stage,
             connectionId: event.requestContext.connectionId
+          },
+          authInfo: {
+            userId,
+            email,
+            username,
+            tokenVerified: true,
+            verificationTime: new Date().toISOString()
           }
         }
       }
     }));
     
-    // 接続通知は接続確立タイミングの問題により削除
-    // 実際の通信開始は最初のメッセージ受信時に確認メッセージを送信
-    console.log('WebSocket接続確立完了:', connectionId);
+    console.log('WebSocket接続確立完了:', { connectionId, userId });
     
     return { 
       statusCode: 200, 
-      body: 'Connected',
+      body: JSON.stringify({
+        message: 'Connected successfully',
+        connectionId,
+        userId
+      }),
       headers: {
-        'Access-Control-Allow-Origin': '*', // CORS対応
+        'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
         'Access-Control-Allow-Methods': 'GET,OPTIONS,POST'
       }
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('接続エラー:', error);
-    return { statusCode: 500, body: 'Connection failed' };
+    return { 
+      statusCode: 500, 
+      body: JSON.stringify({
+        error: 'Connection failed',
+        code: 'CONNECTION_ERROR',
+        message: error.message || 'Unknown error'
+      })
+    };
   }
 };
 
@@ -368,61 +439,56 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
 }
 
 /**
- * WebSocket認証ハンドラ
- * Cognitoトークンを検証してWebSocket接続を認証
+ * Cognito JWT トークン検証関数
  */
-export const authorizerHandler = async (event: APIGatewayRequestAuthorizerEvent): Promise<APIGatewayAuthorizerResult> => {
-  console.log('WebSocket認証 (現在は無効):', event);
+async function verifyToken(token: string): Promise<any> {
+  console.log('JWT検証開始: verifyToken関数');
   
-  // 全てのリクエストを許可する
-  return {
-    principalId: 'anonymous',
-    policyDocument: {
-      Version: '2012-10-17',
-      Statement: [
-        {
-          Action: 'execute-api:Invoke',
-          Effect: 'Allow',
-          Resource: event.methodArn
-        }
-      ]
-    }
-  };
-  
-  /* 本来の認証処理（一時的に無効化）
   try {
-    // 簡単な認証実装（本格的なCognito JWT検証は後で追加）
-    const token = event.queryStringParameters?.token;
+    // JWKSエンドポイントからキーを取得
+    const url = `https://cognito-idp.${REGION}.amazonaws.com/${USER_POOL_ID}/.well-known/jwks.json`;
+    const response = await fetch(url);
+    const jwks = await response.json() as { keys: any[] };
+    const keys = jwks.keys;
     
-    if (!token) {
-      console.log('認証失敗: トークンがありません');
-      throw new Error('Unauthorized');
+    // JWTヘッダーからkidを取得
+    const header = jwt.decode(token, { complete: true })?.header;
+    if (!header || !header.kid) {
+      throw new Error('Invalid token format');
     }
     
-    // 基本的なトークン検証（開発環境ではトークンの長さだけで検証）
-    if (token && token.length > 10) {
-      return {
-        principalId: 'user',
-        policyDocument: {
-          Version: '2012-10-17',
-          Statement: [
-            {
-              Action: 'execute-api:Invoke',
-              Effect: 'Allow',
-              Resource: event.methodArn
-            }
-          ]
-        }
-      };
-    } else {
-      throw new Error('Invalid token');
+    // 対応するキーを検索
+    const key = keys.find((k: any) => k.kid === header.kid);
+    if (!key) {
+      throw new Error('Key not found');
     }
-  } catch (error) {
-    console.error('認証エラー:', error);
-    throw new Error('Unauthorized');
+    
+    // JWTを検証
+    // 簡易的な実装として、jwks-rsaを使用
+    const client = jwksClient({
+      jwksUri: url,
+      cache: true,
+      cacheMaxAge: 600000,
+      cacheMaxEntries: 5
+    });
+    
+    const signingKey = await client.getSigningKey(header.kid!);
+    const publicKey = signingKey.getPublicKey();
+    
+    const decoded = jwt.verify(token, publicKey, {
+      issuer: `https://cognito-idp.${REGION}.amazonaws.com/${USER_POOL_ID}`,
+      audience: USER_POOL_CLIENT_ID,
+      algorithms: ['RS256']
+    });
+    
+    console.log('JWT検証成功');
+    return decoded;
+    
+  } catch (error: any) {
+    console.error('JWT検証エラー:', error);
+    throw new Error(`JWT verification failed: ${error.message}`);
   }
-  */
-};
+}
 
 /**
  * WebSocketクライアントにメッセージを送信
