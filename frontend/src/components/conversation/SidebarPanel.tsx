@@ -14,6 +14,8 @@ interface SidebarPanelProps {
   setAudioVolume: (volume: number) => void;
   speechRate: number;
   setSpeechRate: (rate: number) => void;
+  silenceThreshold: number;
+  setSilenceThreshold: (threshold: number) => void;
   currentMetrics: Metrics;
   prevMetrics: Metrics | null;
   metricsUpdating: boolean;
@@ -32,6 +34,8 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
   setAudioVolume,
   speechRate,
   setSpeechRate,
+  silenceThreshold,
+  setSilenceThreshold,
   currentMetrics,
   prevMetrics,
   metricsUpdating,
@@ -153,6 +157,8 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
               setAudioVolume={setAudioVolume}
               speechRate={speechRate}
               setSpeechRate={setSpeechRate}
+              silenceThreshold={silenceThreshold}
+              setSilenceThreshold={setSilenceThreshold}
             />
           </Box>
         </>

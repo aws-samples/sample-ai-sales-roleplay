@@ -8,7 +8,7 @@ import { DynamoDBDocumentClient, PutCommand, DeleteCommand, GetCommand } from '@
 const TABLE_NAME = process.env.CONNECTION_TABLE_NAME || '';
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
 const USER_POOL_CLIENT_ID = process.env.USER_POOL_CLIENT_ID || '';
-const REGION = process.env.AWS_REGION || 'ap-northeast-1';
+const REGION = process.env.AWS_REGION!; // Lambda環境では必ず設定される
 
 // DynamoDBクライアントの初期化
 const ddbClient = new DynamoDBClient({ region: REGION });
@@ -66,25 +66,9 @@ export const connectHandler = async (event: APIGatewayProxyEvent): Promise<APIGa
       }
     }));
     
-    // クライアントに接続成功を通知
-    const apiClient = new ApiGatewayManagementApiClient({
-      region: REGION,
-      endpoint: `https://${event.requestContext.domainName}/${event.requestContext.stage}`
-    });
-    try {
-      await apiClient.send(new PostToConnectionCommand({
-        ConnectionId: connectionId,
-        Data: Buffer.from(JSON.stringify({ 
-          status: 'connected',
-          message: 'WebSocket接続確立',
-          connectionId,
-          timestamp: new Date().toISOString()
-        }))
-      }));
-    } catch (e) {
-      console.warn('接続通知の送信に失敗:', e);
-      // 失敗しても処理を続行
-    }
+    // 接続通知は接続確立タイミングの問題により削除
+    // 実際の通信開始は最初のメッセージ受信時に確認メッセージを送信
+    console.log('WebSocket接続確立完了:', connectionId);
     
     return { 
       statusCode: 200, 
@@ -192,9 +176,10 @@ async function processAudioData(
     
     // TranscribeStreamingセッションが存在しなければ作成
     if (!activeTranscribeSessions.has(connectionId)) {
+      console.log(`新しいTranscribeセッションを音声データ受信時に開始: ${connectionId}`);
       await startTranscribeSession(connectionId, domainName, stage);
       // セッションの初期化には少し時間がかかるため、短い待機を挿入
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
     
     // 既存のTranscribeストリーミングセッションに音声データを送信
@@ -207,6 +192,8 @@ async function processAudioData(
       await sendToClient(apiClient, connectionId, {
         voiceActivity: true
       });
+      
+      console.log(`音声データ送信完了: ${connectionId}, データサイズ: ${audioBuffer.length}`);
     } else {
       console.warn(`有効なTranscribeセッションが見つかりません: ${connectionId}`);
       // セッションがない場合は再作成を試みる
@@ -257,29 +244,21 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
   const abortController = new AbortController();
   
   try {
-    // 双方向ストリームを作成
+    // 音声データキューの管理
+    const audioQueue: Buffer[] = [];
+    
+    // 簡素化されたオーディオストリーム
     const audioStream = async function* () {
-      // 音声データをストリームに送信するためのキュー
-      const audioQueue: Buffer[] = [];
-      let isStreamClosed = false;
-      
-      // このジェネレータ関数は接続の有効期間中、チャンクを生成し続ける
-      while (!isStreamClosed) {
+      while (!abortController.signal.aborted) {
         // キューにデータがあればそれを返す
         if (audioQueue.length > 0) {
           const chunk = audioQueue.shift();
           if (chunk) {
             yield { AudioEvent: { AudioChunk: chunk } };
           }
-        } else {
-          // キューが空の場合は短い遅延
-          await new Promise(resolve => setTimeout(resolve, 20));
         }
-        
-        // 中断信号があれば終了
-        if (abortController.signal.aborted) {
-          isStreamClosed = true;
-        }
+        // 短い待機（CPUを解放）
+        await new Promise(resolve => setTimeout(resolve, 10));
       }
     };
     
@@ -290,9 +269,6 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
       MediaSampleRateHertz: 16000,
       AudioStream: audioStream()
     });
-    
-    // 音声データキューの管理
-    const audioQueue: Buffer[] = [];
     
     // 音声データをキューに追加するための関数
     const audioInput = {

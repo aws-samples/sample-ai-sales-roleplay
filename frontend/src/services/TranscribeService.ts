@@ -10,12 +10,14 @@ export class TranscribeService {
   private socket: WebSocket | null = null;
   private mediaRecorder: MediaRecorder | null = null;
   private audioContext: AudioContext | null = null;
+  private audioProcessor: ScriptProcessorNode | null = null;
+  private mediaStream: MediaStream | null = null;
   private isRecording: boolean = false;
   private silenceDetectionTimer: ReturnType<typeof setTimeout> | null = null;
   private lastVoiceActivityTime: number = 0;
   
   // 設定パラメータ
-  private readonly silenceThresholdMs: number = 1500;  // 無音判定閾値（ミリ秒）
+  private silenceThresholdMs: number = 1500;  // 無音判定閾値（ミリ秒）
   private websocketUrl: string = '';
   
   // コールバック関数
@@ -38,6 +40,27 @@ export class TranscribeService {
   public setWebSocketEndpoint(url: string): void {
     this.websocketUrl = url;
     console.log(`WebSocketエンドポイントを設定: ${url}`);
+  }
+
+  /**
+   * 無音検出時間を設定
+   * 
+   * @param thresholdMs 無音検出時間（ミリ秒）
+   */
+  public setSilenceThreshold(thresholdMs: number): void {
+    // 範囲制限: 500ms〜5000ms
+    const clampedThreshold = Math.max(500, Math.min(5000, thresholdMs));
+    this.silenceThresholdMs = clampedThreshold;
+    console.log(`無音検出時間を設定: ${clampedThreshold}ms`);
+  }
+
+  /**
+   * 現在の無音検出時間を取得
+   * 
+   * @returns {number} 無音検出時間（ミリ秒）
+   */
+  public getSilenceThreshold(): number {
+    return this.silenceThresholdMs;
   }
 
   /**
@@ -80,17 +103,15 @@ export class TranscribeService {
           };
 
           this.socket.onmessage = (event) => {
-            console.log('WebSocketメッセージ受信:', event.data);
+            // console.log('WebSocketメッセージ受信:', event.data);
             try {
               const data = JSON.parse(event.data);
               if (data.transcript && this.onTranscriptCallback) {
                 this.onTranscriptCallback(data.transcript, data.isFinal || false);
               }
               
-              // 音声アクティビティを検出した場合、タイムスタンプを更新
-              if (data.voiceActivity === true) {
-                this.lastVoiceActivityTime = Date.now();
-              }
+              // Lambda側のvoiceActivityは無視（フロントエンド側の音声レベル判定を優先）
+              // 実際の音声レベル検出はaudioProcessor内で行う
             } catch (error) {
               console.error('WebSocketメッセージ解析エラー:', error);
             }
@@ -152,38 +173,80 @@ export class TranscribeService {
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
+          autoGainControl: true,
+          sampleRate: 16000,  // Transcribe要求に合わせて16kHzに設定
+          channelCount: 1     // モノラル
         }
       });
 
-      // MediaRecorderを設定
-      this.mediaRecorder = new MediaRecorder(stream);
-      this.mediaRecorder.addEventListener('dataavailable', async (event) => {
-        if (event.data.size > 0 && this.socket?.readyState === WebSocket.OPEN) {
+      // Web Audio APIを使用してPCM形式で処理
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: 16000
+      });
+
+      this.mediaStream = stream;
+      const source = this.audioContext.createMediaStreamSource(stream);
+      this.audioProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
+
+      this.audioProcessor.onaudioprocess = (event) => {
+        if (this.socket?.readyState === WebSocket.OPEN) {
           try {
-            // 音声データをBase64エンコードして送信
-            const buffer = await event.data.arrayBuffer();
-            const base64Audio = this.arrayBufferToBase64(buffer);
+            const inputBuffer = event.inputBuffer;
+            const inputData = inputBuffer.getChannelData(0);
+            
+            // 音声レベルを計算（RMS値）
+            let sum = 0;
+            for (let i = 0; i < inputData.length; i++) {
+              sum += inputData[i] * inputData[i];
+            }
+            const rms = Math.sqrt(sum / inputData.length);
+            const audioLevel = rms * 100; // 0-100のスケールに変換
+            
+            // 音声レベルが閾値を超えている場合のみ音声アクティビティを更新
+            const voiceThreshold = 0.5; // 音声判定閾値（調整可能）
+            if (audioLevel > voiceThreshold) {
+              this.lastVoiceActivityTime = Date.now();
+              console.log(`🎤 音声検出: レベル=${audioLevel.toFixed(2)} (閾値: ${voiceThreshold})`);
+            } else {
+              // 無音状態の詳細ログ
+              const elapsed = Date.now() - this.lastVoiceActivityTime;
+              if (elapsed > 500 && elapsed % 500 < 100) { // 500ms以上の無音時に定期的にログ
+                console.log(`🔇 無音継続: レベル=${audioLevel.toFixed(2)}, 経過=${elapsed}ms (閾値: ${this.silenceThresholdMs}ms)`);
+              }
+            }
+            
+            // Float32ArrayをInt16Arrayに変換（PCM 16bit）
+            const pcmData = new Int16Array(inputData.length);
+            for (let i = 0; i < inputData.length; i++) {
+              // -1.0から1.0の範囲を-32768から32767の範囲に変換
+              pcmData[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32767));
+            }
+
+            // Int16ArrayをUint8Arrayに変換してBase64エンコード
+            const uint8Array = new Uint8Array(pcmData.buffer);
+            const base64Audio = this.arrayBufferToBase64(uint8Array.buffer);
+            
+            console.log(`音声データ送信: ${uint8Array.length}バイト, レベル: ${audioLevel.toFixed(2)}`);
             
             this.socket.send(JSON.stringify({
               action: 'sendAudio',
               audio: base64Audio
             }));
           } catch (error) {
-            console.error('音声データ送信エラー:', error);
+            console.error('音声データ処理エラー:', error);
           }
         }
-      });
+      };
+
+      source.connect(this.audioProcessor);
+      this.audioProcessor.connect(this.audioContext.destination);
 
       // 無音検出タイマーを設定
       this.lastVoiceActivityTime = Date.now();
       this.startSilenceDetection();
 
-      // 録音開始
-      this.mediaRecorder.start(250); // 250msごとにデータを送信
       this.isRecording = true;
-
-      console.log('音声認識を開始しました');
+      console.log('音声認識を開始しました (PCM 16kHz)');
     } catch (error) {
       console.error('音声認識開始エラー:', error);
       if (this.onErrorCallback) {
@@ -204,18 +267,32 @@ export class TranscribeService {
       clearInterval(this.silenceDetectionTimer);
     }
 
+    console.log(`無音検出タイマー開始: 閾値=${this.silenceThresholdMs}ms, チェック間隔=500ms`);
+
     // 定期的に無音状態をチェック
     this.silenceDetectionTimer = setInterval(() => {
       const now = Date.now();
       const elapsed = now - this.lastVoiceActivityTime;
       
+      // デバッグログ: 定期的に経過時間を確認
+      if (elapsed % 2000 < 500) { // 約2秒ごとにログ出力
+        console.log(`無音チェック: ${elapsed}ms経過, 閾値: ${this.silenceThresholdMs}ms`);
+      }
+      
       // 設定された閾値より長く無音が続いた場合
-      if (elapsed > this.silenceThresholdMs && this.onSilenceDetectedCallback) {
-        console.log(`無音検出: ${elapsed}ms経過`);
-        this.onSilenceDetectedCallback();
+      if (elapsed > this.silenceThresholdMs) {
+        console.log(`🔇 無音検出トリガー: ${elapsed}ms経過, コールバック有無: ${!!this.onSilenceDetectedCallback}`);
         
-        // 無音検出後は検出を一時停止（連続検出を防止）
-        this.lastVoiceActivityTime = now;
+        if (this.onSilenceDetectedCallback) {
+          console.log(`📤 無音検出コールバック実行`);
+          this.onSilenceDetectedCallback();
+          
+          // 無音検出後は検出を一時停止（連続検出を防止）
+          this.lastVoiceActivityTime = now;
+          console.log(`⏰ 無音検出後の音声アクティビティ時刻をリセット`);
+        } else {
+          console.warn(`⚠️ 無音検出コールバックが設定されていません`);
+        }
       }
     }, 500);
   }
@@ -230,7 +307,27 @@ export class TranscribeService {
       this.silenceDetectionTimer = null;
     }
 
-    // MediaRecorderを停止
+    // Web Audio API リソースを停止
+    if (this.audioProcessor) {
+      try {
+        this.audioProcessor.disconnect();
+        this.audioProcessor = null;
+      } catch (e) {
+        console.warn('AudioProcessor停止エラー:', e);
+      }
+    }
+
+    // MediaStreamを停止
+    if (this.mediaStream) {
+      try {
+        this.mediaStream.getTracks().forEach(track => track.stop());
+        this.mediaStream = null;
+      } catch (e) {
+        console.warn('MediaStream停止エラー:', e);
+      }
+    }
+
+    // MediaRecorderを停止（後方互換性のため残しておく）
     if (this.mediaRecorder && this.isRecording) {
       try {
         this.mediaRecorder.stop();
@@ -242,7 +339,7 @@ export class TranscribeService {
     }
 
     this.isRecording = false;
-    console.log('音声認識を停止しました');
+    console.log('音声認識を停止しました (Web Audio API)');
   }
 
   /**
