@@ -21,6 +21,7 @@
   "devDependencies": {
     "@types/aws-lambda": "^8.10.152",
     "@types/jest": "^30.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "24.4.0",
     "aws-cdk": "2.1029.1",
     "aws-cdk-lib": "^2.214.0",
@@ -33,11 +34,11 @@
   "dependencies": {
     "@aws-amplify/auth-construct": "^1.8.1",
     "@aws-cdk/aws-lambda-python-alpha": "^2.214.0-alpha.0",
-    "@aws-sdk/client-apigatewaymanagementapi": "^3.888.0",
-    "@aws-sdk/client-dynamodb": "^3.888.0",
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.893.0",
+    "@aws-sdk/client-dynamodb": "^3.893.0",
     "@aws-sdk/client-polly": "^3.888.0",
-    "@aws-sdk/client-transcribe-streaming": "^3.891.0",
-    "@aws-sdk/lib-dynamodb": "^3.888.0",
+    "@aws-sdk/client-transcribe-streaming": "^3.893.0",
+    "@aws-sdk/lib-dynamodb": "^3.893.0",
     "@aws-sdk/s3-request-presigner": "^3.888.0",
     "@aws-solutions-constructs/aws-cloudfront-apigateway": "^2.92.2",
     "@aws-solutions-constructs/aws-cloudfront-oai-s3": "^2.92.2",
@@ -46,6 +47,8 @@
     "@cdklabs/generative-ai-cdk-constructs": "^0.1.309",
     "constructs": "^10.4.2",
     "deploy-time-build": "^0.3.46",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.2.0",
     "source-map-support": "^0.5.21"
   }
 }
