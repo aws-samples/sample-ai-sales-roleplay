@@ -154,7 +154,7 @@ const ScenarioCreatePage: React.FC = () => {
   const handleNext = () => {
     // 現在のステップのバリデーション
     let isValid = true;
-    let currentErrors = { ...validationErrors };
+    const currentErrors = { ...validationErrors };
 
     if (activeStep === 0) {
       // 基本情報のバリデーション

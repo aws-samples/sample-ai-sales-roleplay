@@ -222,6 +222,11 @@ const GoalsStep: React.FC<GoalsStepProps> = ({
           <Typography variant="subtitle1">
             {t("scenarios.fields.goals")}
           </Typography>
+          {validationErrors?.goals && (
+            <Typography color="error" variant="body2" sx={{ mb: 1 }}>
+              {t(validationErrors.goals)}
+            </Typography>
+          )}
           <Button
             startIcon={<AddIcon />}
             variant="outlined"
