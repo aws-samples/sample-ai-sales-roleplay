@@ -158,7 +158,7 @@ describe("validateNpcInfo", () => {
 
 describe("validateGoals", () => {
   it("should return no errors for valid goals", () => {
-    const objectives = ["Objective 1", "Objective 2"];
+    const objectives = ["Objective 1", "Objective 2"]; // 互換性のために残す
     const goals = [
       {
         id: "1",
@@ -171,30 +171,31 @@ describe("validateGoals", () => {
 
     const result = validateGoals(objectives, goals);
 
-    expect(result.objectives).toBeNull();
+    // objectivesのチェックは削除されたので、テストからも削除
     expect(result.goals).toBeNull();
   });
 
-  it("should validate objectives are required", () => {
-    const objectives: string[] = [];
-    const goals = [
-      {
-        id: "1",
-        description: "Goal 1",
-        isRequired: true,
-        priority: 3,
-        criteria: ["Criteria 1"],
-      },
-    ];
+  // objectivesのバリデーションが削除されたため、このテストケースは削除
+  // it("should validate objectives are required", () => {
+  //   const objectives: string[] = [];
+  //   const goals = [
+  //     {
+  //       id: "1",
+  //       description: "Goal 1",
+  //       isRequired: true,
+  //       priority: 3,
+  //       criteria: ["Criteria 1"],
+  //     },
+  //   ];
 
-    const result = validateGoals(objectives, goals);
+  //   const result = validateGoals(objectives, goals);
 
-    expect(result.objectives).toBe("scenarios.validation.objectivesRequired");
-    expect(result.goals).toBeNull();
-  });
+  //   expect(result.objectives).toBe("scenarios.validation.objectivesRequired");
+  //   expect(result.goals).toBeNull();
+  // });
 
   it("should validate goals are required", () => {
-    const objectives = ["Objective 1"];
+    const objectives = ["Objective 1"]; // 互換性のために残す
     const goals: Array<{
       id: string;
       description: string;
@@ -205,12 +206,12 @@ describe("validateGoals", () => {
 
     const result = validateGoals(objectives, goals);
 
-    expect(result.objectives).toBeNull();
+    // objectivesのチェックは削除されたので、テストからも削除
     expect(result.goals).toBe("scenarios.validation.goalsRequired");
   });
 
   it("should validate goals criteria are required", () => {
-    const objectives = ["Objective 1"];
+    const objectives = ["Objective 1"]; // 互換性のために残す
     const goals = [
       {
         id: "1",
@@ -312,6 +313,8 @@ describe("validateForm", () => {
     expect(Object.values(result.npcInfo).every((error) => error === null)).toBe(
       true,
     );
+    // goals オブジェクトのプロパティは変更されたため、一つずつチェックする代わりに
+    // goals のプロパティがすべてnullであることを確認
     expect(Object.values(result.goals).every((error) => error === null)).toBe(
       true,
     );
