@@ -20,7 +20,11 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import { GoalsStepProps, GoalFormData } from "../../../types";
 
-const GoalsStep: React.FC<GoalsStepProps> = ({ formData, updateFormData }) => {
+const GoalsStep: React.FC<GoalsStepProps> = ({ 
+  formData, 
+  updateFormData,
+  validationErrors = {}
+}) => {
   const { t } = useTranslation();
 
   // 新しいゴール編集用

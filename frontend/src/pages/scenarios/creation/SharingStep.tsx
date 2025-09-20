@@ -25,6 +25,7 @@ const SharingStep: React.FC<SharingStepProps> = ({
   formData,
   guardrailsList,
   updateFormData,
+  validationErrors = {},
 }) => {
   const { t } = useTranslation();
   const [newUser, setNewUser] = useState("");

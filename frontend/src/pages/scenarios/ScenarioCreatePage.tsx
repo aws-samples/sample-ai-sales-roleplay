@@ -52,6 +52,19 @@ const ScenarioCreatePage: React.FC = () => {
       description: string;
     }>
   >([]);
+  
+  // バリデーションエラー管理
+  const [validationErrors, setValidationErrors] = useState<{
+    basicInfo: Record<string, string | null>;
+    npcInfo: Record<string, string | null>;
+    goals: Record<string, string | null>;
+    sharing: Record<string, string | null>;
+  }>({
+    basicInfo: {},
+    npcInfo: {},
+    goals: {},
+    sharing: {},
+  });
 
   // フォームデータ
   const [formData, setFormData] = useState({
@@ -141,6 +154,7 @@ const ScenarioCreatePage: React.FC = () => {
   const handleNext = () => {
     // 現在のステップのバリデーション
     let isValid = true;
+    let currentErrors = { ...validationErrors };
 
     if (activeStep === 0) {
       // 基本情報のバリデーション
@@ -153,6 +167,7 @@ const ScenarioCreatePage: React.FC = () => {
         formData.maxTurns,
       );
       isValid = Object.values(errors).every((error) => error === null);
+      currentErrors.basicInfo = errors;
     } else if (activeStep === 1) {
       // NPC情報のバリデーション
       const errors = validateNpcInfo(
@@ -161,10 +176,12 @@ const ScenarioCreatePage: React.FC = () => {
         formData.npc.company,
       );
       isValid = Object.values(errors).every((error) => error === null);
+      currentErrors.npcInfo = errors;
     } else if (activeStep === 2) {
       // 目標のバリデーション
       const errors = validateGoals(formData.objectives, formData.goals);
       isValid = Object.values(errors).every((error) => error === null);
+      currentErrors.goals = errors;
     } else if (activeStep === 3) {
       // PDF資料ステップは特別なバリデーションは不要
       isValid = true;
@@ -176,7 +193,11 @@ const ScenarioCreatePage: React.FC = () => {
         formData.guardrail,
       );
       isValid = Object.values(errors).every((error) => error === null);
+      currentErrors.sharing = errors;
     }
+
+    // バリデーションエラーを更新
+    setValidationErrors(currentErrors);
 
     // バリデーションが成功した場合のみ次のステップへ
     if (isValid) {
@@ -283,6 +304,7 @@ const ScenarioCreatePage: React.FC = () => {
             <BasicInfoStep
               formData={formData}
               updateFormData={(data) => setFormData({ ...formData, ...data })}
+              validationErrors={validationErrors.basicInfo}
             />
           )}
           {activeStep === 1 && (
@@ -296,12 +318,14 @@ const ScenarioCreatePage: React.FC = () => {
                   ...(initialMessage !== undefined && { initialMessage }),
                 });
               }}
+              validationErrors={validationErrors.npcInfo}
             />
           )}
           {activeStep === 2 && (
             <GoalsStep
               formData={formData}
               updateFormData={(data) => setFormData({ ...formData, ...data })}
+              validationErrors={validationErrors.goals}
             />
           )}
           {activeStep === 3 && (
@@ -335,6 +359,7 @@ const ScenarioCreatePage: React.FC = () => {
                   guardrail: data.guardrail || formData.guardrail,
                 })
               }
+              validationErrors={validationErrors.sharing}
             />
           )}
           {activeStep === 5 && <PreviewStep formData={formData} />}

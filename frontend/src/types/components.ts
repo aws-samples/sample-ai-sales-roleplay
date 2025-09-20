@@ -103,6 +103,7 @@ export interface GoalsStepProps {
       goals: GoalInfo[];
     }>,
   ) => void;
+  validationErrors?: Record<string, string | null>;
 }
 
 /**
@@ -116,6 +117,7 @@ export interface NPCInfoStepProps {
   updateFormData: (
     data: Partial<NPCInfo & { initialMessage?: string }>,
   ) => void;
+  validationErrors?: Record<string, string | null>;
 }
 
 /**
@@ -144,6 +146,7 @@ export interface SharingStepProps {
       guardrail?: string;
     }>,
   ) => void;
+  validationErrors?: Record<string, string | null>;
 }
 
 /**
