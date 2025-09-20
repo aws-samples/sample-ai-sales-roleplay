@@ -861,13 +861,12 @@ const ConversationPage: React.FC = () => {
         // 例: トースト通知やアラートなど
         console.log(`ゴール達成: ${goal.description}`);
 
-        // 必須ゴールがすべて達成された場合、セッションを終了
+        // 必須ゴールがすべて達成された場合の処理
+        // ゴール達成のみでは自動終了しないように修正
+        // (ユーザーが自分でクロージングを進められるようにするため)
         if (areAllRequiredGoalsAchieved(goalStatuses, goals)) {
-          setTimeout(async () => {
-            if (!sessionEnded && messages.length > 0) {
-              await endSession(messages, currentMetrics);
-            }
-          }, 2000);
+          console.log("すべての必須ゴールが達成されました。会話を継続します。");
+          // 自動終了処理を削除し、ユーザーが会話を続けられるようにする
         }
       }
     }
