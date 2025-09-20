@@ -62,6 +62,42 @@ export class GuardrailsConstruct extends Construct {
    */
   private readonly resourceNamePrefix: string;
   
+  /**
+   * リージョンに基づいてガードレールプロファイルIDを決定する
+   * @param region AWS リージョン
+   * @returns ガードレールプロファイルID
+   */
+  private getGuardrailProfileId(region: string): string {
+    // US 地域のリージョン
+    const usRegions = ['us-east-1', 'us-east-2', 'us-west-1', 'us-west-2'];
+    
+    // EU 地域のリージョン
+    const euRegions = ['eu-central-1', 'eu-west-1', 'eu-west-3', 'eu-north-1'];
+    
+    // APAC 地域のリージョン
+    const apacRegions = [
+      'ap-south-1', 'ap-northeast-3', 'ap-northeast-2', 'ap-southeast-1',
+      'ap-southeast-2', 'ap-southeast-3', 'ap-northeast-1'
+    ];
+    
+    // AWS GovCloud (US) 地域のリージョン
+    const govcloudRegions = ['us-gov-east-1', 'us-gov-west-1'];
+    
+    if (usRegions.includes(region)) {
+      return 'us.guardrail.v1:0';
+    } else if (euRegions.includes(region)) {
+      return 'eu.guardrail.v1:0';
+    } else if (apacRegions.includes(region)) {
+      return 'apac.guardrail.v1:0';
+    } else if (govcloudRegions.includes(region)) {
+      return 'us-gov.guardrail.v1:0';
+    } else {
+      // デフォルトとして US プロファイルを使用するが、警告を出力
+      console.warn(`警告: リージョン ${region} に対応するガードレールプロファイルが見つかりません。デフォルトとして us.guardrail.v1:0 を使用します。`);
+      return 'us.guardrail.v1:0';
+    }
+  }
+  
   constructor(scope: Construct, id: string, props: GuardrailsConstructProps = {}) {
     super(scope, id);
     
@@ -180,7 +216,7 @@ export class GuardrailsConstruct extends Construct {
 
       // クロスリージョン
       crossRegionConfig: {
-        guardrailProfileArn: `arn:aws:bedrock:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:guardrail-profile/us.guardrail.v1:0`
+        guardrailProfileArn: `arn:aws:bedrock:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:guardrail-profile/${this.getGuardrailProfileId(cdk.Stack.of(this).region)}`
       },
 
       // Tag
