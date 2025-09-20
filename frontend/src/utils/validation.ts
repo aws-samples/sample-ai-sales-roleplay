@@ -109,7 +109,7 @@ export const validateNpcInfo = (
 };
 
 export const validateGoals = (
-  objectives: string[],
+  objectives: string[], // 互換性のために残すが使用しない
   goals: Array<{
     id: string;
     description: string;
@@ -119,14 +119,8 @@ export const validateGoals = (
   }>,
 ) => {
   const errors = {
-    objectives: null as string | null,
     goals: null as string | null,
   };
-
-  // 目標のバリデーション
-  if (objectives.length === 0) {
-    errors.objectives = "scenarios.validation.objectivesRequired";
-  }
 
   // ゴールのバリデーション
   if (goals.length === 0) {

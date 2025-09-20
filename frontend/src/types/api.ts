@@ -3,6 +3,34 @@
  */
 
 /**
+ * Transcribe WebSocket関連の型定義
+ */
+export interface TranscribeMessageEvent {
+  transcript?: string;
+  isFinal?: boolean;
+  voiceActivity?: boolean;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
+export interface TranscribeRequest {
+  action: 'sendAudio';
+  audio: string; // Base64エンコードされた音声データ
+}
+
+export interface TranscribeResponse {
+  transcript?: string;
+  isFinal?: boolean;
+  voiceActivity?: boolean;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
+/**
  * 難易度レベルの型
  */
 export type DifficultyLevel = "easy" | "normal" | "hard" | "expert";
@@ -419,45 +447,6 @@ export interface ImportResponse {
   };
 }
 
-/**
- * Web Speech API関連の型定義
- */
-export interface SpeechRecognitionResult {
-  [index: number]: {
-    transcript: string;
-  };
-}
-
-export interface SpeechRecognitionEvent {
-  results: SpeechRecognitionResult[];
-}
-
-export interface SpeechRecognitionErrorEvent {
-  error: string;
-}
-
-export interface SpeechRecognition extends EventTarget {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onstart: (() => void) | null;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-  start(): void;
-  stop(): void;
-}
-
-export interface SpeechRecognitionConstructor {
-  new (): SpeechRecognition;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  }
-}
 
 /**
  * リアルタイム評価APIのレスポンス型定義

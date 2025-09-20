@@ -66,8 +66,7 @@ const ScenarioEditPage: React.FC = () => {
       description: "",
     },
 
-    // 目標・メトリクス
-    objectives: [] as string[],
+    // メトリクス
     initialMetrics: {
       angerLevel: 1,
       trustLevel: 3,
@@ -142,7 +141,6 @@ const ScenarioEditPage: React.FC = () => {
               "",
           },
 
-          objectives: scenarioData.objectives || [],
           initialMetrics: {
             angerLevel: Number(scenarioData.initialMetrics?.angerLevel) || 1,
             trustLevel: Number(scenarioData.initialMetrics?.trustLevel) || 3,
@@ -287,7 +285,6 @@ const ScenarioEditPage: React.FC = () => {
         category: formData.category,
         maxTurns: formData.maxTurns,
         npc: formData.npc,
-        objectives: formData.objectives,
         initialMetrics: formData.initialMetrics,
         goals: formData.goals,
         pdfFiles: formData.pdfFiles?.length > 0 ? formData.pdfFiles : undefined,

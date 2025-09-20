@@ -28,6 +28,10 @@ export class AudioService {
   private audioVolume: number = 1.0;
   private currentSynthesisTasks: Map<string, AbortController> = new Map();
   private pollyService: PollyService;
+  
+  // イベントリスナーの追加
+  private playbackCompleteListeners: Map<string, Set<() => void>> = new Map();
+  private globalPlaybackListeners: Set<(messageId: string) => void> = new Set();
 
   /**
    * コンストラクタ - シングルトンパターン
@@ -270,20 +274,68 @@ export class AudioService {
 
     nextAudio.audio.onended = () => {
       // 再生終了したら次の音声へ
+      const completedMessageId = nextAudio.id;
       this.audioQueue.shift();
+      
+      // キューが空になった場合（このメッセージの再生が完了した場合）、リスナーに通知
+      if (this.audioQueue.length === 0 || this.audioQueue[0].id !== completedMessageId) {
+        // 特定のメッセージに対するリスナーを実行
+        const listeners = this.playbackCompleteListeners.get(completedMessageId);
+        if (listeners) {
+          console.log(`メッセージID ${completedMessageId} の再生完了リスナーを実行`);
+          listeners.forEach(listener => listener());
+        }
+        
+        // グローバルリスナーを実行
+        this.globalPlaybackListeners.forEach(listener => listener(completedMessageId));
+        
+        // リスナーを削除（一回限りのイベント）
+        this.playbackCompleteListeners.delete(completedMessageId);
+      }
+      
       this.playNextAudio();
     };
 
     nextAudio.audio.onerror = (error) => {
       console.error("音声再生エラー:", error);
+      const errorMessageId = nextAudio.id;
       this.audioQueue.shift();
+      
+      // エラー時にもリスナーに通知
+      const listeners = this.playbackCompleteListeners.get(errorMessageId);
+      if (listeners) {
+        console.log(`メッセージID ${errorMessageId} の再生エラー - リスナーを実行`);
+        listeners.forEach(listener => listener());
+      }
+      
+      // グローバルリスナーを実行
+      this.globalPlaybackListeners.forEach(listener => listener(errorMessageId));
+      
+      // リスナーを削除（一回限りのイベント）
+      this.playbackCompleteListeners.delete(errorMessageId);
+      
       this.playNextAudio();
     };
 
     // 再生開始
     nextAudio.audio.play().catch((error) => {
       console.error("音声再生開始エラー:", error);
+      const failedMessageId = nextAudio.id;
       this.audioQueue.shift();
+      
+      // 再生開始失敗時にもリスナーに通知
+      const listeners = this.playbackCompleteListeners.get(failedMessageId);
+      if (listeners) {
+        console.log(`メッセージID ${failedMessageId} の再生開始失敗 - リスナーを実行`);
+        listeners.forEach(listener => listener());
+      }
+      
+      // グローバルリスナーを実行
+      this.globalPlaybackListeners.forEach(listener => listener(failedMessageId));
+      
+      // リスナーを削除（一回限りのイベント）
+      this.playbackCompleteListeners.delete(failedMessageId);
+      
       this.playNextAudio();
     });
   }
@@ -310,6 +362,19 @@ export class AudioService {
       this.audioQueue[0].audio.pause();
       this.audioQueue.shift();
       this.isPlaying = false;
+      
+      // リスナーに通知
+      const listeners = this.playbackCompleteListeners.get(messageId);
+      if (listeners) {
+        console.log(`メッセージID ${messageId} の再生キャンセル - リスナーを実行`);
+        listeners.forEach(listener => listener());
+      }
+      
+      // グローバルリスナーにも通知
+      this.globalPlaybackListeners.forEach(listener => listener(messageId));
+      
+      // リスナーを削除（一回限りのイベント）
+      this.playbackCompleteListeners.delete(messageId);
     }
 
     // 残りのキューからも削除
@@ -334,6 +399,10 @@ export class AudioService {
       controller.abort();
     });
     this.currentSynthesisTasks.clear();
+    
+    // 再生中のメッセージIDを記録（リスナー通知用）
+    const activeMessageIds = new Set<string>();
+    this.audioQueue.forEach(item => activeMessageIds.add(item.id));
 
     // 再生中の音声を停止
     if (this.audioQueue.length > 0) {
@@ -343,6 +412,22 @@ export class AudioService {
     // キューをクリア
     this.audioQueue = [];
     this.isPlaying = false;
+    
+    // すべてのメッセージIDに対応するリスナーに通知
+    activeMessageIds.forEach(messageId => {
+      const listeners = this.playbackCompleteListeners.get(messageId);
+      if (listeners) {
+        console.log(`メッセージID ${messageId} の再生中断 - リスナーを実行`);
+        listeners.forEach(listener => listener());
+      }
+      
+      // グローバルリスナーにも通知
+      this.globalPlaybackListeners.forEach(listener => listener(messageId));
+      
+      // リスナーを削除（一回限りのイベント）
+      this.playbackCompleteListeners.delete(messageId);
+    });
+    
     console.log("すべての音声再生を停止しました");
   }
 
@@ -366,5 +451,56 @@ export class AudioService {
    */
   public getVolume(): number {
     return this.audioVolume;
+  }
+  
+  /**
+   * 特定のメッセージIDの音声再生完了時に実行されるリスナーを追加
+   * 
+   * @param messageId 監視するメッセージID
+   * @param callback 再生完了時に実行するコールバック関数
+   */
+  public addPlaybackCompleteListener(messageId: string, callback: () => void): void {
+    if (!this.playbackCompleteListeners.has(messageId)) {
+      this.playbackCompleteListeners.set(messageId, new Set());
+    }
+    this.playbackCompleteListeners.get(messageId)?.add(callback);
+    console.log(`メッセージID ${messageId} の再生完了リスナーを追加しました`);
+  }
+  
+  /**
+   * 特定のメッセージIDの音声再生完了リスナーを削除
+   * 
+   * @param messageId 対象のメッセージID
+   * @param callback 削除するコールバック関数（省略した場合はすべてのリスナーを削除）
+   */
+  public removePlaybackCompleteListener(messageId: string, callback?: () => void): void {
+    if (!this.playbackCompleteListeners.has(messageId)) return;
+    
+    if (callback) {
+      this.playbackCompleteListeners.get(messageId)?.delete(callback);
+    } else {
+      this.playbackCompleteListeners.delete(messageId);
+    }
+    console.log(`メッセージID ${messageId} の再生完了リスナーを削除しました`);
+  }
+  
+  /**
+   * すべての音声再生完了イベントを監視するグローバルリスナーを追加
+   * 
+   * @param callback 再生完了時に実行するコールバック関数（メッセージIDが引数として渡される）
+   */
+  public addGlobalPlaybackListener(callback: (messageId: string) => void): void {
+    this.globalPlaybackListeners.add(callback);
+    console.log("グローバル再生完了リスナーを追加しました");
+  }
+  
+  /**
+   * グローバル再生完了リスナーを削除
+   * 
+   * @param callback 削除するコールバック関数
+   */
+  public removeGlobalPlaybackListener(callback: (messageId: string) => void): void {
+    this.globalPlaybackListeners.delete(callback);
+    console.log("グローバル再生完了リスナーを削除しました");
   }
 }

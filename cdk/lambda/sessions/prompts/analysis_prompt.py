@@ -8,7 +8,7 @@ ANALYSIS_PROMPT_JA = """あなたはセールストレーニング用AIシステ
 ## 分析対象データ
 - メトリクス: 怒り={anger_value}/10, 信頼={trust_value}/10, 進捗={progress_value}/10
 - 会話履歴:
-{conversation_text}{goal_analysis_section}
+{conversation_text}
 
 ## 出力形式
 以下の内容をJSON形式で出力してください:
@@ -109,7 +109,7 @@ ANALYSIS_PROMPT_EN = """You are the analysis engine of an AI system for sales tr
 ## Data for Analysis
 - Metrics: Anger={anger_value}/10, Trust={trust_value}/10, Progress={progress_value}/10
 - Conversation History:
-{conversation_text}{goal_analysis_section}
+{conversation_text}
 
 ## Output Format
 Please output the following content in JSON format:

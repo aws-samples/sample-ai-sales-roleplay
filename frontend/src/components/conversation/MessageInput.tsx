@@ -16,6 +16,7 @@ interface MessageInputProps {
   handleKeyDown: (event: React.KeyboardEvent) => void;
   sessionStarted: boolean;
   sessionEnded: boolean;
+  continuousListening?: boolean; // 常時マイク入力モードフラグ
 }
 
 /**
@@ -33,6 +34,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   handleKeyDown,
   sessionStarted,
   sessionEnded,
+  continuousListening = false,
 }) => {
   const { t } = useTranslation();
 
@@ -41,9 +43,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
   }
 
   // マイクボタンのツールチップテキスト
-  const micTooltip = userInput
-    ? t("conversation.input.continueVoice") // "音声入力を継続（既存のテキストは保持されます）"
-    : t("conversation.input.startVoice"); // "音声入力を開始"
+  const micTooltip = isListening
+    ? t("conversation.input.stopVoice") // "音声入力を停止"
+    : userInput
+      ? t("conversation.input.continueVoice") // "音声入力を継続（既存のテキストは保持されます）"
+      : t("conversation.input.startVoice"); // "音声入力を開始"
 
   return (
     <>
@@ -84,14 +88,38 @@ const MessageInput: React.FC<MessageInputProps> = ({
           <Tooltip title={micTooltip} placement="top">
             <span>
               <Button
-                variant="outlined"
+                variant={isListening ? "contained" : "outlined"}
                 onClick={startSpeechRecognition}
-                disabled={isProcessing || isListening}
-                sx={{ minWidth: "auto", px: 3, flex: 1 }}
-                color="secondary"
+                disabled={isProcessing}
+                sx={{
+                  minWidth: "auto",
+                  px: 3,
+                  flex: 1,
+                  position: 'relative'
+                }}
+                color={isListening ? "primary" : "secondary"}
                 aria-label={micTooltip}
               >
                 <MicIcon />
+                {continuousListening && isListening && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: '50%',
+                      border: '2px solid',
+                      borderColor: 'primary.main',
+                      opacity: 0.5,
+                      animation: 'pulse 1.5s infinite',
+                      '@keyframes pulse': {
+                        '0%': { transform: 'scale(1)', opacity: 0.7 },
+                        '50%': { transform: 'scale(1.1)', opacity: 0.4 },
+                        '100%': { transform: 'scale(1)', opacity: 0.7 },
+                      },
+                    }}
+                  />
+                )}
               </Button>
             </span>
           </Tooltip>

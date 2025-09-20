@@ -45,7 +45,6 @@ export interface ScenarioFormData {
   initialMessage?: string;
   maxTurns?: number;
   npc: NPCInfo;
-  objectives: string[];
   initialMetrics: MetricsInfo;
   goals: GoalInfo[];
   visibility: VisibilityType;

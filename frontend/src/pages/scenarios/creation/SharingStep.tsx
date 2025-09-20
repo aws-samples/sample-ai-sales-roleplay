@@ -25,6 +25,7 @@ const SharingStep: React.FC<SharingStepProps> = ({
   formData,
   guardrailsList,
   updateFormData,
+  validationErrors = {},
 }) => {
   const { t } = useTranslation();
   const [newUser, setNewUser] = useState("");
@@ -96,7 +97,7 @@ const SharingStep: React.FC<SharingStepProps> = ({
           {t("scenarios.fields.visibility")}
         </Typography>
 
-        <FormControl component="fieldset">
+        <FormControl component="fieldset" error={Boolean(validationErrors?.sharedWithUsers)}>
           <RadioGroup
             name="visibility"
             value={formData.visibility}
@@ -203,7 +204,7 @@ const SharingStep: React.FC<SharingStepProps> = ({
           {t("scenarios.create.guardrailDescription")}
         </Typography>
 
-        <FormControl fullWidth margin="normal">
+        <FormControl fullWidth margin="normal" error={Boolean(validationErrors?.guardrail)}>
           <InputLabel>{t("scenarios.fields.selectGuardrail")}</InputLabel>
           <Select
             value={guardrailValue}

@@ -3,7 +3,6 @@ import { Box, Tabs, Tab, IconButton, Tooltip } from "@mui/material";
 import { ChevronLeft, ChevronRight } from "@mui/icons-material";
 import AudioSettingsPanel from "./AudioSettingsPanel";
 import MetricsPanel from "./MetricsPanel";
-import ObjectivesPanel from "./ObjectivesPanel";
 import GoalsPanel from "./GoalsPanel";
 import { Metrics, Goal, GoalStatus } from "../../types/index";
 import { useTranslation } from "react-i18next";
@@ -15,11 +14,12 @@ interface SidebarPanelProps {
   setAudioVolume: (volume: number) => void;
   speechRate: number;
   setSpeechRate: (rate: number) => void;
+  silenceThreshold: number;
+  setSilenceThreshold: (threshold: number) => void;
   currentMetrics: Metrics;
   prevMetrics: Metrics | null;
   metricsUpdating: boolean;
 
-  objectives: string[];
   goals: Goal[];
   goalStatuses: GoalStatus[];
 }
@@ -34,10 +34,11 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
   setAudioVolume,
   speechRate,
   setSpeechRate,
+  silenceThreshold,
+  setSilenceThreshold,
   currentMetrics,
   prevMetrics,
   metricsUpdating,
-  objectives,
   goals,
   goalStatuses,
 }) => {
@@ -120,11 +121,6 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
               aria-controls="metrics-panel"
             />
             <Tab
-              label={t("sidebar.tabs.objectives")}
-              id="objectives-tab"
-              aria-controls="objectives-panel"
-            />
-            <Tab
               label={t("sidebar.tabs.goals")}
               id="goals-tab"
               aria-controls="goals-panel"
@@ -146,14 +142,6 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
 
           <Box
             hidden={tabValue !== 1}
-            id="objectives-panel"
-            aria-labelledby="objectives-tab"
-          >
-            <ObjectivesPanel objectives={objectives} />
-          </Box>
-
-          <Box
-            hidden={tabValue !== 2}
             id="goals-panel"
             aria-labelledby="goals-tab"
           >
@@ -169,6 +157,8 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
               setAudioVolume={setAudioVolume}
               speechRate={speechRate}
               setSpeechRate={setSpeechRate}
+              silenceThreshold={silenceThreshold}
+              setSilenceThreshold={setSilenceThreshold}
             />
           </Box>
         </>
@@ -193,25 +183,13 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
             </IconButton>
           </Tooltip>
 
-          <Tooltip title={t("sidebar.tabs.objectives")} placement="right">
+          <Tooltip title={t("sidebar.tabs.goals")} placement="right">
             <IconButton
               onClick={() => {
                 setTabValue(1);
                 setCollapsed(false);
               }}
               color={tabValue === 1 ? "primary" : "default"}
-            >
-              🎯
-            </IconButton>
-          </Tooltip>
-
-          <Tooltip title={t("sidebar.tabs.goals")} placement="right">
-            <IconButton
-              onClick={() => {
-                setTabValue(2);
-                setCollapsed(false);
-              }}
-              color={tabValue === 2 ? "primary" : "default"}
             >
               🏆
             </IconButton>

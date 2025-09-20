@@ -17,11 +17,6 @@ export const languageToPollyCodeMapping: Record<string, string> = {
 /**
  * 言語コードとSpeech Recognition APIのlanguageCodeのマッピング
  */
-export const languageToSpeechRecognitionMapping: Record<string, string> = {
-  ja: "ja-JP",
-  en: "en-US",
-};
-
 /**
  * 言語コードと表示名のマッピング
  */
@@ -66,6 +61,12 @@ export const getPollySettingsForLanguage = (languageCode: string) => {
 /**
  * 言語コードからSpeech Recognition用のlanguageCodeを取得
  */
-export const getSpeechRecognitionLanguage = (languageCode: string): string => {
-  return languageToSpeechRecognitionMapping[languageCode] || "ja-JP";
+// Transcribe用の言語コードマッピング
+export const getTranscribeLanguage = (languageCode: string): string => {
+  // Amazon Transcribeは言語コードが異なる形式
+  const mapping: Record<string, string> = {
+    ja: "ja-JP",
+    en: "en-US",
+  };
+  return mapping[languageCode] || "ja-JP";
 };

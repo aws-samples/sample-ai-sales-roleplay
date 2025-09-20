@@ -93,7 +93,6 @@ export interface SelectOption {
  */
 export interface GoalsStepProps {
   formData: {
-    objectives: string[];
     initialMetrics: MetricsInfo;
     goals: GoalInfo[];
   };
@@ -104,6 +103,7 @@ export interface GoalsStepProps {
       goals: GoalInfo[];
     }>,
   ) => void;
+  validationErrors?: Record<string, string | null>;
 }
 
 /**
@@ -117,6 +117,7 @@ export interface NPCInfoStepProps {
   updateFormData: (
     data: Partial<NPCInfo & { initialMessage?: string }>,
   ) => void;
+  validationErrors?: Record<string, string | null>;
 }
 
 /**
@@ -145,6 +146,7 @@ export interface SharingStepProps {
       guardrail?: string;
     }>,
   ) => void;
+  validationErrors?: Record<string, string | null>;
 }
 
 /**

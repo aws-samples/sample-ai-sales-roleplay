@@ -21,6 +21,8 @@ interface AudioSettingsPanelProps {
   setAudioVolume: (volume: number) => void;
   speechRate: number;
   setSpeechRate: (rate: number) => void;
+  silenceThreshold: number;
+  setSilenceThreshold: (threshold: number) => void;
 }
 
 /**
@@ -34,6 +36,8 @@ const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({
   setAudioVolume,
   speechRate,
   setSpeechRate,
+  silenceThreshold,
+  setSilenceThreshold,
 }) => {
   const { t, i18n } = useTranslation();
   const [ready, setReady] = useState<boolean>(i18n.isInitialized);
@@ -60,8 +64,11 @@ const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({
       "conversation.audioSettings.outputOff": "音声出力 OFF",
       "conversation.audioSettings.volume": `音量: ${audioVolume}%`,
       "conversation.audioSettings.speechRate": `読み上げ速度: ${speechRate.toFixed(1)}x`,
+      "conversation.audioSettings.silenceThreshold": `無音検出時間: ${(silenceThreshold / 1000).toFixed(1)}秒`,
       "conversation.audioSettings.npcResponseNote":
         "※ NPCの応答が音声で再生されます",
+      "conversation.audioSettings.silenceNote":
+        "※ この時間無音が続くと自動送信されます",
     };
     return defaults[key] || key;
   };
@@ -149,6 +156,39 @@ const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({
             </Box>
           </>
         )}
+
+        {/* 無音検出時間設定 - 音声出力ON/OFFに関係なく常に表示 */}
+        <Box mt={2}>
+          <Typography variant="body2" gutterBottom>
+            {translate("conversation.audioSettings.silenceThreshold", {
+              threshold: (silenceThreshold / 1000).toFixed(1),
+            })}
+          </Typography>
+          <Slider
+            value={silenceThreshold}
+            onChange={(_, value) => setSilenceThreshold(value as number)}
+            aria-labelledby="silence-threshold-slider"
+            step={100}
+            marks={[
+              { value: 500, label: "0.5秒" },
+              { value: 1000, label: "1.0秒" },
+              { value: 1500, label: "1.5秒" },
+              { value: 3000, label: "3.0秒" },
+              { value: 5000, label: "5.0秒" },
+            ]}
+            min={500}
+            max={5000}
+            valueLabelDisplay="auto"
+            valueLabelFormat={(value) => `${(value / 1000).toFixed(1)}秒`}
+          />
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "block", mt: 0.5 }}
+          >
+            {translate("conversation.audioSettings.silenceNote")}
+          </Typography>
+        </Box>
 
         <Typography
           variant="caption"

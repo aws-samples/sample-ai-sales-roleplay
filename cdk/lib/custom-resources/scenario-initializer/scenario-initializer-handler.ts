@@ -110,7 +110,7 @@ export async function handler(event: CloudFormationEvent): Promise<void> {
                 category: scenario.category || scenario.industry || '', // カテゴリ優先、なければ産業をカテゴリとして使用
                 guardrail: scenario.guardrail || null,
                 language: scenario.language || 'ja', // 言語設定（デフォルトは日本語）
-                objectives: scenario.objectives || [],
+
                 initialMessage: scenario.initialMessage,
                 maxTurns: scenario.maxTurns || 0, // デフォルト値は0
                 npc: {
@@ -134,6 +134,7 @@ export async function handler(event: CloudFormationEvent): Promise<void> {
                   criteria: goal.criteria || [],
                   isRequired: goal.isRequired || false
                 })),
+
                 visibility: scenario.visibility || 'public', // デフォルトは公開
                 createdBy: scenario.createdBy || 'system', // システムによって作成されたデータ
                 sharedWithUsers: scenario.sharedWithUsers || [], // 共有ユーザーリスト

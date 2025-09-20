@@ -102,7 +102,9 @@
       "outputOff": "Audio Output OFF",
       "volume": "Volume: {{volume}}%",
       "speechRate": "Speech Rate: {{rate}}x",
-      "npcResponseNote": "※ NPC responses will be played as audio"
+      "silenceThreshold": "Silence Detection: {{threshold}}s",
+      "npcResponseNote": "※ NPC responses will be played as audio",
+      "silenceNote": "※ Auto-send after this duration of silence"
     },
     "npcRole": "{{role}}",
     "endConversation": "End Conversation",
@@ -203,6 +205,13 @@
     "profileAuth": "Profile"
   },
   "scenarios": {
+    "priority": {
+      "highest": "Highest",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "lowest": "Lowest"
+    },
     "title": "Scenario List",
     "subtitle": "Select a scenario to practice. Each scenario has different difficulty levels and NPC characters.",
     "beginner": "Beginner",

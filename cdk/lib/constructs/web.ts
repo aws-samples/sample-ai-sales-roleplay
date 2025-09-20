@@ -13,6 +13,7 @@ export interface WebProps {
   selfSignUpEnabled: boolean;
   webAclId?: string;
   resourceNamePrefix?: string; // リソース名のプレフィックス
+  transcribeWebSocketEndpoint: string; // Transcribe WebSocketエンドポイント
 }
 
 export class Web extends Construct {
@@ -28,6 +29,7 @@ export class Web extends Construct {
       removalPolicy: RemovalPolicy.DESTROY,
       objectOwnership: s3.ObjectOwnership.OBJECT_WRITER,
       enforceSSL: true,
+      versioned: false,
     };
 
     const { cloudFrontWebDistribution, s3BucketInterface } = new CloudFrontToS3(
@@ -91,6 +93,7 @@ export class Web extends Construct {
         VITE_COGNITO_USER_POOL_CLIENT_ID: props.userPoolClientId,
         VITE_COGNITO_IDENTITY_POOL_ID: props.idPoolId,
         VITE_APP_SELF_SIGN_UP_ENABLED: props.selfSignUpEnabled.toString(),
+        VITE_TRANSCRIBE_WEBSOCKET_URL: props.transcribeWebSocketEndpoint,
       },
     });
 

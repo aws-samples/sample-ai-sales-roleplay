@@ -131,7 +131,9 @@
       "outputOff": "音声出力 OFF",
       "volume": "音量: {{volume}}%",
       "speechRate": "読み上げ速度: {{rate}}x",
-      "npcResponseNote": "※ NPCの応答が音声で再生されます"
+      "silenceThreshold": "無音検出時間: {{threshold}}秒",
+      "npcResponseNote": "※ NPCの応答が音声で再生されます",
+      "silenceNote": "※ この時間無音が続くと自動送信されます"
     },
     "npcRole": "{{role}}",
     "endConversation": "商談終了",
@@ -232,6 +234,13 @@
     "profileAuth": "プロフィール"
   },
   "scenarios": {
+    "priority": {
+      "highest": "最高",
+      "high": "高",
+      "medium": "中",
+      "low": "低",
+      "lowest": "最低"
+    },
     "title": "シナリオ一覧",
     "subtitle": "練習したいシナリオを選択してください。各シナリオには異なる難易度とNPCキャラクターが設定されています。",
     "beginner": "初級",

@@ -15,6 +15,7 @@ import { NPCInfoStepProps } from "../../../types";
 const NPCInfoStep: React.FC<NPCInfoStepProps> = ({
   formData,
   updateFormData,
+  validationErrors = {},
 }) => {
   const { t } = useTranslation();
   const [newPersonality, setNewPersonality] = useState("");
@@ -65,8 +66,9 @@ const NPCInfoStep: React.FC<NPCInfoStepProps> = ({
           name="name"
           value={formData.npc.name}
           onChange={handleChange}
-          helperText={t("scenarios.create.npcNameHelp")}
+          helperText={validationErrors.name ? t(validationErrors.name) : t("scenarios.create.npcNameHelp")}
           margin="normal"
+          error={Boolean(validationErrors.name)}
         />
 
         {/* 役職 */}
@@ -77,8 +79,9 @@ const NPCInfoStep: React.FC<NPCInfoStepProps> = ({
           name="role"
           value={formData.npc.role}
           onChange={handleChange}
-          helperText={t("scenarios.create.npcRoleHelp")}
+          helperText={validationErrors.role ? t(validationErrors.role) : t("scenarios.create.npcRoleHelp")}
           margin="normal"
+          error={Boolean(validationErrors.role)}
         />
 
         {/* 会社名 */}
@@ -89,8 +92,9 @@ const NPCInfoStep: React.FC<NPCInfoStepProps> = ({
           name="company"
           value={formData.npc.company}
           onChange={handleChange}
-          helperText={t("scenarios.create.npcCompanyHelp")}
+          helperText={validationErrors.company ? t(validationErrors.company) : t("scenarios.create.npcCompanyHelp")}
           margin="normal"
+          error={Boolean(validationErrors.company)}
         />
 
         {/* 性格特性 */}

@@ -126,7 +126,8 @@ export class InfrastructureStack extends cdk.Stack {
       idPoolId: auth.idPool.identityPoolId,
       selfSignUpEnabled,
       webAclId: props?.webAclId,
-      resourceNamePrefix: resourcePrefix // 環境識別子をリソース名に含める
+      resourceNamePrefix: resourcePrefix, // 環境識別子をリソース名に含める
+      transcribeWebSocketEndpoint: api.transcribeWebSocket.webSocketApiEndpoint // WebSocketエンドポイントを追加
     });
 
     const prefix = props?.envId ? `${props.envId}-` : '';
@@ -148,6 +149,12 @@ export class InfrastructureStack extends cdk.Stack {
       value: api.api.api.url,
       description: 'API Gateway Endpoint URL',
       exportName: `${prefix}ApiEndpoint`
+    });
+    
+    new cdk.CfnOutput(this, 'TranscribeWebSocketEndpoint', {
+      value: api.transcribeWebSocket.webSocketApiEndpoint,
+      description: 'WebSocket API Endpoint for Transcribe integration',
+      exportName: `${prefix}TranscribeWebSocketEndpoint`
     });
 
     new cdk.CfnOutput(this, 'CloudFrontURL', {
