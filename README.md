@@ -77,11 +77,15 @@ chmod +x bin.sh
 # セルフサインアップ機能を無効化
 ./bin.sh --disable-self-register
 
-# 別のBedrockリージョンを使用
-./bin.sh --bedrock-region us-west-2
+# 別のリージョンを使用
+export AWS_DEFAULT_REGION=ap-northeast-1
+./bin.sh
+
+# 個別モデル指定
+./bin.sh --conversation-model "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
 
 # 詳細なカスタマイズ
-./bin.sh --cdk-json-override '{"context":{"allowedSignUpEmailDomains":["example.com"]}}'
+./bin.sh --cdk-json-override '{"context":{"default":{"allowedSignUpEmailDomains":["example.com"]}}}'
 ```
 
 4. **デプロイ完了後、表示されるURLからアプリケーションにアクセスできます**
@@ -109,6 +113,9 @@ npm install
 [AI営業ロールプレイの環境構築](./cdk/README.md) を参照
 
 ## ドキュメント
+
+### デプロイ・設定
+- [bin.sh デプロイスクリプト リファレンス](docs/deployment/bin-sh-reference.md)
 
 ### 機能仕様
 - [シナリオ作成ガイド](docs/scenario-creation.md)
