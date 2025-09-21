@@ -21,6 +21,8 @@ memo.md
 cdk/.env.dev
 cdk/.env.prod
 cdk/.env.staging
+cdk/.env.devApNorthEast1
 cdk/cdk.context.json
 scripts
 memory-bank
+
