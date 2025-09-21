@@ -21,12 +21,30 @@
       "selfSignUpEnabled": true,
       "allowedSignUpEmailDomains": null,
       "bedrockModels": {
-        "conversation": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        "scoring": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        "feedback": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-        "guardrail": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        "video": "us.amazon.nova-lite-v1:0",
-        "referenceCheck": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        "us-regions": {
+          "conversation": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "scoring": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "feedback": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+          "guardrail": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "video": "us.amazon.nova-lite-v1:0",
+          "referenceCheck": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        },
+        "ap-regions": {
+          "conversation": "amazon.titan-text-express-v1:0",
+          "scoring": "amazon.titan-text-express-v1:0",
+          "feedback": "amazon.titan-text-express-v1:0",
+          "guardrail": "amazon.titan-text-express-v1:0",
+          "video": "apac.amazon.nova-lite-v1:0",
+          "referenceCheck": "amazon.titan-text-express-v1:0"
+        },
+        "eu-regions": {
+          "conversation": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "scoring": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "feedback": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "guardrail": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "video": "eu.amazon.nova-lite-v1:0",
+          "referenceCheck": "eu.anthropic.claude-3-haiku-20240307-v1:0"
+        }
       },
       "allowedIpV4AddressRanges": null,
       "allowedIpV6AddressRanges": null,
@@ -36,12 +54,30 @@
       "selfSignUpEnabled": true,
       "allowedSignUpEmailDomains": null,
       "bedrockModels": {
-        "conversation": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        "scoring": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        "feedback": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-        "guardrail": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        "video": "us.amazon.nova-lite-v1:0",
-        "referenceCheck": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        "us-regions": {
+          "conversation": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "scoring": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "feedback": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+          "guardrail": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "video": "us.amazon.nova-lite-v1:0",
+          "referenceCheck": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        },
+        "ap-regions": {
+          "conversation": "amazon.titan-text-express-v1:0",
+          "scoring": "amazon.titan-text-express-v1:0",
+          "feedback": "amazon.titan-text-express-v1:0",
+          "guardrail": "amazon.titan-text-express-v1:0",
+          "video": "apac.amazon.nova-lite-v1:0",
+          "referenceCheck": "amazon.titan-text-express-v1:0"
+        },
+        "eu-regions": {
+          "conversation": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "scoring": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "feedback": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "guardrail": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "video": "eu.amazon.nova-lite-v1:0",
+          "referenceCheck": "eu.anthropic.claude-3-haiku-20240307-v1:0"
+        }
       },
       "allowedIpV4AddressRanges": null,
       "allowedIpV6AddressRanges": null,
@@ -66,12 +102,30 @@
       "selfSignUpEnabled": true,
       "allowedSignUpEmailDomains": null,
       "bedrockModels": {
-        "conversation": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        "scoring": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        "feedback": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-        "guardrail": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        "video": "us.amazon.nova-lite-v1:0",
-        "referenceCheck": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        "us-regions": {
+          "conversation": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "scoring": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "feedback": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+          "guardrail": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "video": "us.amazon.nova-lite-v1:0",
+          "referenceCheck": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        },
+        "ap-regions": {
+          "conversation": "amazon.titan-text-express-v1:0",
+          "scoring": "amazon.titan-text-express-v1:0",
+          "feedback": "amazon.titan-text-express-v1:0",
+          "guardrail": "amazon.titan-text-express-v1:0",
+          "video": "apac.amazon.nova-lite-v1:0",
+          "referenceCheck": "amazon.titan-text-express-v1:0"
+        },
+        "eu-regions": {
+          "conversation": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "scoring": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "feedback": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "guardrail": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "video": "eu.amazon.nova-lite-v1:0",
+          "referenceCheck": "eu.anthropic.claude-3-haiku-20240307-v1:0"
+        }
       },
       "allowedIpV4AddressRanges": null,
       "allowedIpV6AddressRanges": null,
@@ -81,12 +135,30 @@
       "selfSignUpEnabled": true,
       "allowedSignUpEmailDomains": null,
       "bedrockModels": {
-        "conversation": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        "scoring": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        "feedback": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-        "guardrail": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        "video": "us.amazon.nova-lite-v1:0",
-        "referenceCheck": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        "us-regions": {
+          "conversation": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "scoring": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "feedback": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+          "guardrail": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "video": "us.amazon.nova-lite-v1:0",
+          "referenceCheck": "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        },
+        "ap-regions": {
+          "conversation": "amazon.titan-text-express-v1:0",
+          "scoring": "amazon.titan-text-express-v1:0",
+          "feedback": "amazon.titan-text-express-v1:0",
+          "guardrail": "amazon.titan-text-express-v1:0",
+          "video": "apac.amazon.nova-lite-v1:0",
+          "referenceCheck": "amazon.titan-text-express-v1:0"
+        },
+        "eu-regions": {
+          "conversation": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "scoring": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "feedback": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "guardrail": "eu.anthropic.claude-3-haiku-20240307-v1:0",
+          "video": "eu.amazon.nova-lite-v1:0",
+          "referenceCheck": "eu.anthropic.claude-3-haiku-20240307-v1:0"
+        }
       },
       "allowedIpV4AddressRanges": null,
       "allowedIpV6AddressRanges": null,
