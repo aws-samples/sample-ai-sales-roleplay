@@ -47,6 +47,21 @@
       "allowedIpV6AddressRanges": null,
       "allowedCountryCodes": null
     },
+    "env:devApNorthEast1": {
+      "selfSignUpEnabled": true,
+      "allowedSignUpEmailDomains": null,
+      "bedrockModels": {
+        "conversation": "apac.anthropic.claude-3-haiku-20240307-v1:0",
+        "scoring": "apac.anthropic.claude-3-haiku-20240307-v1:0",
+        "feedback": "apac.anthropic.claude-3-7-sonnet-20250219-v1:0",
+        "guardrail": "apac.anthropic.claude-3-haiku-20240307-v1:0",
+        "video": "apac.amazon.nova-lite-v1:0",
+        "referenceCheck": "apac.anthropic.claude-3-7-sonnet-20250219-v1:0"
+      },
+      "allowedIpV4AddressRanges": null,
+      "allowedIpV6AddressRanges": null,
+      "allowedCountryCodes": null
+    },
     "env:staging": {
       "selfSignUpEnabled": true,
       "allowedSignUpEmailDomains": null,

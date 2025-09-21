@@ -11,12 +11,15 @@
     "nag-check": "cdk synth && echo 'CDK Nag check completed'",
     "build": "tsc",
     "deploy:dev": "env $(cat .env.dev | xargs) cdk deploy --all --require-approval never --context env=dev",
+    "deploy:devApNorthEast1": "env $(cat .env.devApNorthEast1 | xargs) cdk deploy --all --require-approval never --context env=devApNorthEast1",
     "deploy:staging": "env $(cat .env.staging | xargs) cdk deploy --all --require-approval never --context env=staging",
     "deploy:prod": "env $(cat .env.prod | xargs) cdk deploy --all --require-approval never --context env=prod",
     "synth:dev": "env $(cat .env.dev | xargs) cdk synth --context env=dev",
+    "synth:devApNorthEast1": "env $(cat .env.devApNorthEast1 | xargs) cdk synth --context env=devApNorthEast1",
     "synth:staging": "env $(cat .env.staging | xargs) cdk synth --context env=staging",
     "synth:prod": "env $(cat .env.prod | xargs) cdk synth --context env=prod",
-    "destroy:dev": "env $(cat .env.dev | xargs) cdk destroy --all --require-approval never --context env=dev"
+    "destroy:dev": "env $(cat .env.dev | xargs) cdk destroy --all --require-approval never --context env=dev",
+    "destroy:devApNorthEast1": "env $(cat .env.devApNorthEast1 | xargs) cdk destroy --all --require-approval never --context env=devApNorthEast1"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.152",
