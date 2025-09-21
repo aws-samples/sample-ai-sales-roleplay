@@ -16,10 +16,12 @@ echo ""
 
 # デフォルトのパラメータ
 ALLOW_SELF_REGISTER="true"
-BEDROCK_REGION="us-east-1"
 CDK_JSON_OVERRIDE="{}"
 REPO_URL="https://github.com/aws-samples/sample-ai-sales-roleplay.git"
 VERSION="main"
+
+# AWS_DEFAULT_REGIONの設定（フォールバック付き）
+AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 
 # 個別モデル指定パラメータ
 CONVERSATION_MODEL=""
@@ -33,7 +35,6 @@ REFERENCE_CHECK_MODEL=""
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --disable-self-register) ALLOW_SELF_REGISTER="false" ;;
-        --bedrock-region) BEDROCK_REGION="$2"; shift ;;
         --cdk-json-override) CDK_JSON_OVERRIDE="$2"; shift ;;
         --repo-url) REPO_URL="$2"; shift ;;
         --version) VERSION="$2"; shift ;;
@@ -48,10 +49,14 @@ while [[ "$#" -gt 0 ]]; do
             echo ""
             echo "一般オプション:"
             echo "  --disable-self-register      セルフサインアップを無効化"
-            echo "  --bedrock-region REGION      Bedrockリージョンを指定 (デフォルト: us-east-1)"
             echo "  --repo-url URL               GitHubリポジトリURLを指定"
             echo "  --version VERSION            デプロイするブランチ/タグを指定 (デフォルト: main)"
             echo "  --cdk-json-override JSON     CDK設定のJSONオーバーライド"
+            echo ""
+            echo "リージョン設定:"
+            echo "  デプロイ先リージョンは AWS_DEFAULT_REGION 環境変数で指定してください。"
+            echo "  未設定の場合は us-east-1 が使用されます。"
+            echo "  例: export AWS_DEFAULT_REGION=ap-northeast-1"
             echo ""
             echo "個別モデル指定オプション:"
             echo "  --conversation-model MODEL   対話用モデルを指定"
@@ -76,7 +81,7 @@ done
 
 echo "以下の設定でデプロイを開始します:"
 echo "- セルフサインアップ: $ALLOW_SELF_REGISTER"
-echo "- Bedrockリージョン: $BEDROCK_REGION"
+echo "- デプロイリージョン: $AWS_DEFAULT_REGION"
 echo "- リポジトリURL: $REPO_URL"
 echo "- バージョン/ブランチ: $VERSION"
 
@@ -156,7 +161,7 @@ generate_model_override_json() {
     
     # bedrockModelsの部分的オーバーライドを構築
     if [[ -n "$CONVERSATION_MODEL" || -n "$SCORING_MODEL" || -n "$FEEDBACK_MODEL" || -n "$GUARDRAIL_MODEL" || -n "$VIDEO_MODEL" || -n "$REFERENCE_CHECK_MODEL" ]]; then
-        local region_type=$(determine_region_type "$BEDROCK_REGION")
+        local region_type=$(determine_region_type "$AWS_DEFAULT_REGION")
         
         # リージョンタイプに対応したモデル設定の基本構造を作成
         model_override=$(jq -n --arg region_type "$region_type" '{
@@ -216,7 +221,7 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_IAM \
   --parameter-overrides \
     AllowSelfRegister=$ALLOW_SELF_REGISTER \
-    BedrockRegion="$BEDROCK_REGION" \
+    BedrockRegion="$AWS_DEFAULT_REGION" \
     CdkJsonOverride="$CDK_JSON_OVERRIDE" \
     RepoUrl="$REPO_URL" \
     Version="$VERSION"

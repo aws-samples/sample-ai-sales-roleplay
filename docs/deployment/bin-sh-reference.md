@@ -11,6 +11,17 @@ chmod +x bin.sh
 ./bin.sh
 ```
 
+### リージョン指定（重要）
+
+デプロイ先リージョンは `AWS_DEFAULT_REGION` 環境変数で指定します：
+
+```bash
+export AWS_DEFAULT_REGION=ap-northeast-1
+./bin.sh
+```
+
+環境変数が未設定の場合は `us-east-1` が使用されます。
+
 ## 全パラメータ一覧
 
 ### 一般オプション
@@ -18,7 +29,6 @@ chmod +x bin.sh
 | パラメータ | 説明 | デフォルト値 | 必須 |
 |-----------|------|--------------|------|
 | `--disable-self-register` | セルフサインアップ機能を無効化 | `true`（有効） | いいえ |
-| `--bedrock-region REGION` | Bedrock サービスを利用するリージョンを指定 | `us-east-1` | いいえ |
 | `--repo-url URL` | GitHub リポジトリ URL を指定 | 公式リポジトリ | いいえ |
 | `--version VERSION` | デプロイするブランチ/タグを指定 | `main` | いいえ |
 | `--cdk-json-override JSON` | CDK 設定の JSON オーバーライド | `{}` | いいえ |
@@ -59,7 +69,7 @@ chmod +x bin.sh
 
 ### 基本デプロイ
 
-最もシンプルなデプロイ（すべてデフォルト設定を使用）：
+最もシンプルなデプロイ（US East 1 リージョン、すべてデフォルト設定）：
 
 ```bash
 ./bin.sh
@@ -70,7 +80,8 @@ chmod +x bin.sh
 アジア太平洋リージョンでデプロイ：
 
 ```bash
-./bin.sh --bedrock-region ap-northeast-1
+export AWS_DEFAULT_REGION=ap-northeast-1
+./bin.sh
 ```
 
 ### セルフサインアップ無効化
@@ -86,8 +97,8 @@ chmod +x bin.sh
 特定の機能に高性能モデルを指定：
 
 ```bash
-./bin.sh --bedrock-region us-east-1 \
-         --conversation-model "us.anthropic.claude-3-5-sonnet-20241022-v2:0" \
+export AWS_DEFAULT_REGION=us-east-1
+./bin.sh --conversation-model "us.anthropic.claude-3-5-sonnet-20241022-v2:0" \
          --feedback-model "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 ```
 
@@ -114,38 +125,40 @@ CDK 設定を直接オーバーライド：
 }'
 ```
 
+### 複数リージョンでのデプロイ
+
+異なるリージョンに同時にデプロイする場合：
+
+```bash
+# US East リージョンにデプロイ
+export AWS_DEFAULT_REGION=us-east-1
+./bin.sh
+
+# Asia Pacific リージョンにデプロイ（別のターミナルで）
+export AWS_DEFAULT_REGION=ap-northeast-1  
+./bin.sh
+```
+
 ## 利用可能なモデル
 
 ### Anthropic Claude モデル
 
-| モデル ID | 特徴 | 推奨用途 |
-|----------|------|----------|
-| `us.anthropic.claude-3-5-haiku-20241022-v1:0` | 高速・低コスト | 対話、スコアリング、ガードレール |
-| `us.anthropic.claude-3-5-sonnet-20241022-v2:0` | バランス型・高品質 | 対話（高品質が必要な場合） |
-| `us.anthropic.claude-3-7-sonnet-20250219-v1:0` | 最高品質・高コスト | フィードバック、リファレンスチェック |
+| モデル ID | 特徴 | 推奨用途 | 対応リージョン |
+|----------|------|----------|----------------|
+| `us.anthropic.claude-3-5-haiku-20241022-v1:0` | 高速・低コスト | 対話、スコアリング、ガードレール | US |
+| `us.anthropic.claude-3-5-sonnet-20241022-v2:0` | バランス型・高品質 | 対話（高品質が必要な場合） | US |
+| `us.anthropic.claude-3-7-sonnet-20250219-v1:0` | 最高品質・高コスト | フィードバック、リファレンスチェック | US, AP, EU |
+| `apac.anthropic.claude-3-haiku-20240307-v1:0` | 高速・低コスト | 対話、スコアリング、ガードレール | AP |
+| `eu.anthropic.claude-3-haiku-20240307-v1:0` | 高速・低コスト | 対話、スコアリング、ガードレール | EU |
 
 ### Amazon Nova モデル
 
-| モデル ID | 特徴 | 推奨用途 |
-|----------|------|----------|
-| `us.amazon.nova-lite-v1:0` | 軽量・マルチモーダル | 動画分析（基本） |
-| `us.amazon.nova-pro-v1:0` | 高性能・マルチモーダル | 動画分析（高精度） |
-
-**注意**: リージョンごとに利用可能なモデルが異なります。上記は US リージョンの例です。
-
-## バリデーション機能
-
-### モデル ID 形式チェック
-
-スクリプトは、指定されたモデル ID が以下の形式に従っているかチェックします：
-
-```
-region.provider.model-name:version
-```
-
-例: `us.anthropic.claude-3-5-haiku-20241022-v1:0`
-
-形式が正しくない場合は警告が表示され、続行するかユーザーに確認します。
+| モデル ID | 特徴 | 推奨用途 | 対応リージョン |
+|----------|------|----------|----------------|
+| `us.amazon.nova-lite-v1:0` | 軽量・マルチモーダル | 動画分析（基本） | US |
+| `us.amazon.nova-pro-v1:0` | 高性能・マルチモーダル | 動画分析（高精度） | US |
+| `apac.amazon.nova-lite-v1:0` | 軽量・マルチモーダル | 動画分析（基本） | AP |
+| `eu.amazon.nova-lite-v1:0` | 軽量・マルチモーダル | 動画分析（基本） | EU |
 
 ## セキュリティ考慮事項
 
@@ -168,3 +181,5 @@ IP アドレス制限や地理的制限を設定する場合は、`--cdk-json-ov
   }
 }'
 ```
+
+
