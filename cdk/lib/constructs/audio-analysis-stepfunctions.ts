@@ -119,7 +119,7 @@ export class AudioAnalysisStepFunctionsConstruct extends Construct {
 
     // Step Functions実行ロール
     const stateMachineRole = new iam.Role(this, 'AudioAnalysisStateMachineRole', {
-      roleName: `${resourcePrefix}AudioAnalysisStateMachineRole`,
+      // roleName: `${resourcePrefix}AudioAnalysisStateMachineRole`,
       assumedBy: new iam.ServicePrincipal('states.amazonaws.com'),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaRole'),
