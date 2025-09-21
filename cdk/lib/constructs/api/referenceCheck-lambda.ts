@@ -6,22 +6,7 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { Construct } from 'constructs';
 import * as path from 'path';
-
-
-export interface BedrockModelsConfig {
-  /** 会話生成用モデル */
-  conversation: string;
-  /** リアルタイムスコアリング用モデル */
-  scoring: string;
-  /** フィードバック生成用モデル */
-  feedback: string;
-  /** Guardrail評価用モデル */
-  guardrail: string;
-  /** video評価用モデル */
-  video: string;
-  /** referenceCheck用モデル */
-  referenceCheck: string;
-}
+import { BedrockModelsConfig } from '../../types/bedrock-models';
 
 /**
  * リファレンスチェック管理Lambda関数のConstructプロパティ

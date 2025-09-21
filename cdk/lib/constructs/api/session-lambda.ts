@@ -4,20 +4,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { PythonFunction } from '@aws-cdk/aws-lambda-python-alpha';
 import * as path from 'path';
-
-/** Bedrockモデル設定 */
-export interface BedrockModelsConfig {
-  /** 会話生成用モデル */
-  conversation: string;
-  /** リアルタイムスコアリング用モデル */
-  scoring: string;
-  /** フィードバック生成用モデル */
-  feedback: string;
-  /** Guardrail評価用モデル */
-  guardrail: string;
-  /** video評価用モデル */
-  video: string;
-}
+import { BedrockModelsConfig } from '../../types/bedrock-models';
 
 /**
  * セッション管理Lambda関数を作成するConstructのプロパティ

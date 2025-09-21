@@ -11,6 +11,8 @@ import { GuardrailsConstruct } from './constructs/guardrails';
 import { PdfStorageConstruct } from './constructs/storage/pdf-storage';
 import { Polly } from './constructs/polly';
 import { VectorKB } from './constructs/knowledgebase';
+import { BedrockModelsConfig } from './types/bedrock-models';
+
 /**
  * メインインフラストラクチャスタック
  * 
@@ -23,6 +25,7 @@ export interface InfrastructureStackProps extends cdk.StackProps {
   allowedCountryCodes: string[] | null;
   envName?: string;
   envId?: string; // 環境識別子
+  bedrockModels: BedrockModelsConfig; // フラット化済みBedrockモデル設定
 }
 
 export class InfrastructureStack extends cdk.Stack {
@@ -95,6 +98,7 @@ export class InfrastructureStack extends cdk.Stack {
       guardrails: guardrails, // Guardrailsを渡す
       pdfStorageBucket: pdfStorage.bucket,
       knowledgeBaseId: kb.knowledgeBase.knowledgeBaseId, // Knowledge Base ID
+      bedrockModels: props!.bedrockModels, // propsから渡されたフラット化済みBedrockモデル設定を使用
     });
 
     if (

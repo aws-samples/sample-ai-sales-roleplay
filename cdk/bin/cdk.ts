@@ -78,6 +78,7 @@ const infrastructureStack = new InfrastructureStack(app, infrastructureStackName
   allowedCountryCodes,
   crossRegionReferences: true,
   envId, // 環境IDを追加
+  bedrockModels: context.bedrockModels, // フラット化済みBedrockモデル設定を渡す
 });
 
 // データ初期化スタックを作成
@@ -94,4 +95,3 @@ const dataInitializerStack = new DataInitializerStack(app, dataInitializerStackN
 
 // データ初期化スタックがインフラストラクチャスタックに依存するように設定
 dataInitializerStack.addDependency(infrastructureStack);
-

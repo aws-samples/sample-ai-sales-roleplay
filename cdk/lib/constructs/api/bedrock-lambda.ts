@@ -5,21 +5,11 @@ import { PythonFunction } from '@aws-cdk/aws-lambda-python-alpha';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as path from 'path';
+import { BedrockModelsConfig } from '../../types/bedrock-models';
 
 /**
  * BedrockLambdaConstructのプロパティ
  */
-/** Bedrockモデル設定 */
-export interface BedrockModelsConfig {
-  /** 会話生成用モデル */
-  conversation?: string;
-  /** リアルタイムスコアリング用モデル */
-  scoring?: string;
-  /** フィードバック生成用モデル */
-  feedback?: string;
-  /** Guardrail評価用モデル */
-  guardrail?: string;
-}
 
 export interface BedrockLambdaConstructProps {
   /** セッションテーブル名 */
@@ -81,10 +71,10 @@ export class BedrockLambdaConstruct extends Construct {
         ...(props.sessionsTableName ? { SESSIONS_TABLE: props.sessionsTableName } : {}),
         ...(props.messagesTableName ? { MESSAGES_TABLE: props.messagesTableName } : {}),
         // 各用途別モデルIDを設定
-        BEDROCK_MODEL_CONVERSATION: props.bedrockModels?.conversation || 'amazon.nova-lite-v1:0',
-        BEDROCK_MODEL_SCORING: props.bedrockModels?.scoring || 'amazon.nova-micro-v1:0',
-        BEDROCK_MODEL_FEEDBACK: props.bedrockModels?.feedback || 'amazon.nova-pro-v1:0',
-        BEDROCK_MODEL_GUARDRAIL: props.bedrockModels?.guardrail || 'amazon.nova-lite-v1:0'
+        BEDROCK_MODEL_CONVERSATION: props.bedrockModels.conversation,
+        BEDROCK_MODEL_SCORING: props.bedrockModels.scoring,
+        BEDROCK_MODEL_FEEDBACK: props.bedrockModels.feedback,
+        BEDROCK_MODEL_GUARDRAIL: props.bedrockModels.guardrail
       },
     });
   }

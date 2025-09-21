@@ -21,6 +21,7 @@ import { TranscribeWebSocketConstruct } from './api/transcribe-websocket';
 
 // DatabaseTablesをインポート
 import { DatabaseTables } from './storage/database-tables';
+import { BedrockModelsConfig } from '../types/bedrock-models';
 
 import { GuardrailsConstruct } from './guardrails';
 import { AudioAnalysisStepFunctionsConstruct } from './audio-analysis-stepfunctions';
@@ -34,6 +35,7 @@ export interface BackendApiProps {
   knowledgeBaseId: string; // Knowledge Base ID
   databaseTables: DatabaseTables; // 必須：DynamoDBテーブル
   pdfStorageBucket: s3.IBucket; // PDF資料保存用S3バケット
+  bedrockModels: BedrockModelsConfig; // Bedrockモデル設定（フラット化済み）
 }
 
 export class Api extends Construct {
@@ -87,19 +89,6 @@ export class Api extends Construct {
   constructor(scope: Construct, id: string, props: BackendApiProps) {
     super(scope, id);
 
-    // 環境に応じたコンテキスト設定の取得
-    const envId = props?.envId || 'dev';
-    const envContextKey = `env:${envId}`;
-    const envConfig = this.node.tryGetContext(envContextKey) || {};
-    const defaultConfig = this.node.tryGetContext('default') || {};
-
-    // 環境設定とデフォルト設定をマージ
-    const config = {
-      ...defaultConfig,
-      ...envConfig
-    };
-
-    // セッション履歴用DynamoDBテーブル
     // データベーステーブルを保存
     this.databaseTables = props.databaseTables;
 
@@ -112,8 +101,9 @@ export class Api extends Construct {
     this.videoStorage = new VideoStorageConstruct(this, 'VideoStorage', {
       resourceNamePrefix: props.resourceNamePrefix
     });
-    // Amazon Bedrock 用モデル設定を取得
-    const bedrockModels = config.bedrockModels
+
+    // プロップスから渡されたBedrockモデル設定を使用（フラット化済み）
+    const bedrockModels = props.bedrockModels;
 
     // セッション管理Lambda関数
     this.sessionLambda = new SessionLambdaConstruct(this, 'SessionLambda', {
