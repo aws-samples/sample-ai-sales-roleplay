@@ -98,9 +98,6 @@ export class ScoringLambdaConstruct extends Construct {
     const guardrailsFilePath = path.join(path.dirname(path.dirname(path.dirname(__dirname))), 'data', 'guardrails.json');
     const guardrailsData = JSON.parse(fs.readFileSync(guardrailsFilePath, 'utf8'));
 
-    // デフォルトのGuardrail ID
-    const defaultGuardrail = 'general-compliance';
-
     // Guardrailごとの環境変数を準備
     const guardrailsEnvVars: Record<string, string> = {};
 
@@ -110,17 +107,16 @@ export class ScoringLambdaConstruct extends Construct {
 
     // 各GuardrailのARN変数をセット
     guardrailsData.guardrails.forEach((guardrail: any) => {
-      const id = guardrail.id;
       const name = guardrail.name;
 
       // 一時的なARN（実際のARNはGuardrailsConstructから取得される）
-      this.guardrailArns[id] = `arn:aws:bedrock:${region}:${account}:guardrail/${name}`;
-      this.guardrailVersions[id] = '1';
+      this.guardrailArns[name] = `arn:aws:bedrock:${region}:${account}:guardrail/${name}`;
+      this.guardrailVersions[name] = '1';
 
       // 環境変数に設定（ハイフンをアンダースコアに置換してLambda環境変数の命名規則に準拠）
-      const normalizedId = id.replace(/-/g, '_').toUpperCase();
-      guardrailsEnvVars[`GUARDRAIL_${normalizedId}_ARN`] = this.guardrailArns[id];
-      guardrailsEnvVars[`GUARDRAIL_${normalizedId}_VERSION`] = this.guardrailVersions[id];
+      const normalizedName = name.replace(/-/g, '_').toUpperCase();
+      guardrailsEnvVars[`GUARDRAIL_${normalizedName}_ARN`] = this.guardrailArns[name];
+      guardrailsEnvVars[`GUARDRAIL_${normalizedName}_VERSION`] = this.guardrailVersions[name];
     });
 
     // Python Lambda関数の作成

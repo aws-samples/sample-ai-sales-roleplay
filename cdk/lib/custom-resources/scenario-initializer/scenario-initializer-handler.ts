@@ -1,5 +1,5 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, BatchWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, BatchWriteCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -32,6 +32,61 @@ interface CloudFormationResponse {
 }
 
 /**
+ * システム管理シナリオ（createdBy = 'system'）のみを削除する
+ */
+async function deleteSystemScenarios(tableName: string): Promise<void> {
+  console.log('Deleting existing system scenarios...');
+  
+  try {
+    // createdBy = 'system' のアイテムを取得
+    const scanParams = {
+      TableName: tableName,
+      FilterExpression: 'createdBy = :system',
+      ExpressionAttributeValues: {
+        ':system': 'system'
+      },
+      ProjectionExpression: 'scenarioId' // 削除に必要な主キーのみ取得
+    };
+    
+    const scanCommand = new ScanCommand(scanParams);
+    const result = await dynamoDB.send(scanCommand);
+    
+    if (!result.Items || result.Items.length === 0) {
+      console.log('No system scenarios found to delete');
+      return;
+    }
+    
+    console.log(`Found ${result.Items.length} system scenarios to delete`);
+    
+    // バッチで削除処理
+    const batchSize = 25; // DynamoDBの制限
+    for (let i = 0; i < result.Items.length; i += batchSize) {
+      const batch = result.Items.slice(i, i + batchSize);
+      const deleteParams = {
+        RequestItems: {
+          [tableName]: batch.map((item: any) => ({
+            DeleteRequest: {
+              Key: {
+                scenarioId: item.scenarioId
+              }
+            }
+          }))
+        }
+      };
+      
+      console.log(`Deleting batch ${Math.floor(i / batchSize) + 1} with ${batch.length} items`);
+      const deleteCommand = new BatchWriteCommand(deleteParams);
+      await dynamoDB.send(deleteCommand);
+    }
+    
+    console.log('Successfully deleted all system scenarios');
+  } catch (error) {
+    console.error('Error deleting system scenarios:', error);
+    throw error;
+  }
+}
+
+/**
  * CloudFormationのカスタムリソース応答を送信する
  */
 async function sendResponse(event: CloudFormationEvent, status: 'SUCCESS' | 'FAILED', data?: Record<string, any>, reason?: string): Promise<void> {
@@ -57,7 +112,7 @@ export async function handler(event: CloudFormationEvent): Promise<void> {
   
   try {
     // Create または Update イベントの場合にシナリオデータを登録/更新
-    console.log("event.RequestType: ", event.RequestType)
+    console.log(`Processing ${event.RequestType} event for scenario initialization`);
     if (event.RequestType === 'Create' || event.RequestType === 'Update') {
       const tableName = event.ResourceProperties.TableName;
       const useDirectFileLoading = event.ResourceProperties.UseDirectFileLoading === 'true' || event.ResourceProperties.UseDirectFileLoading === true;
@@ -161,6 +216,11 @@ export async function handler(event: CloudFormationEvent): Promise<void> {
         console.log('No scenario data provided, skipping initialization');
       } else {
         console.log(`${event.RequestType === 'Create' ? 'Initializing' : 'Updating'} ${scenarioData.length} scenarios to ${tableName}`);
+        
+        // Update処理の場合は、先に既存のシステム管理シナリオを削除
+        if (event.RequestType === 'Update') {
+          await deleteSystemScenarios(tableName);
+        }
         
         // データを一括で登録するためのバッチ処理
         const batchSize = 25; // DynamoDBの制限に合わせる

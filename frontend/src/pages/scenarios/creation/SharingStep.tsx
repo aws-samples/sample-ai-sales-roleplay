@@ -212,7 +212,7 @@ const SharingStep: React.FC<SharingStepProps> = ({
             onChange={handleGuardrailChange}
           >
             {guardrailsList.map((guardrail) => {
-              const displayName = guardrail.name.split("-").slice(1).join("-");
+              const displayName = guardrail.name;
               return (
                 <MenuItem key={guardrail.id} value={displayName}>
                   {displayName}

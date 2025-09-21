@@ -6,6 +6,8 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as path from 'path';
 import * as cr from 'aws-cdk-lib/custom-resources';
+import * as crypto from 'crypto';
+import * as fs from 'fs';
 
 /**
  * シナリオデータをDynamoDBに初期化するためのConstructのプロパティ
@@ -72,8 +74,13 @@ export class ScenarioInitializer extends Construct {
       },
     });
 
-    // Lambdaに必要なIAMポリシーを付与
-    props.scenariosTable.grantWriteData(initializerFunction);
+    // Lambdaに必要なIAMポリシーを付与（読み取り権限も追加 - Update時のScan処理で必要）
+    props.scenariosTable.grantReadWriteData(initializerFunction);
+
+    // scenarios.jsonファイルのハッシュを計算して変更検知に使用
+    const scenariosFilePath = path.join(__dirname, '../../../data/scenarios.json');
+    const scenariosContent = fs.readFileSync(scenariosFilePath, 'utf8');
+    const scenariosHash = crypto.createHash('sha256').update(scenariosContent).digest('hex');
 
     // カスタムリソースを使用してLambdaを呼び出し、シナリオデータを初期化
     new cr.AwsCustomResource(this, 'Resource', {
@@ -93,6 +100,7 @@ export class ScenarioInitializer extends Construct {
             ResourceProperties: {
               TableName: props.scenariosTable.tableName,
               UseDirectFileLoading: true,
+              ScenariosHash: scenariosHash,
             }
           }),
         },
@@ -109,6 +117,7 @@ export class ScenarioInitializer extends Construct {
             ResourceProperties: {
               TableName: props.scenariosTable.tableName,
               UseDirectFileLoading: true,
+              ScenariosHash: scenariosHash,
             }
           }),
         },

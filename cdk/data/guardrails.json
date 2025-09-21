@@ -1,7 +1,6 @@
 {
   "guardrails": [
     {
-      "id": "tech-compliance",
       "name": "TechnologyCompliance",
       "description": "Technology sales compliance standards for cloud migration and IT solutions",
       "wordFilters": {
@@ -61,7 +60,6 @@
       ]
     },
     {
-      "id": "general-compliance",
       "name": "GeneralCompliance",
       "description": "一般的な営業コンプライアンス基準",
       "wordFilters": {
@@ -118,7 +116,6 @@
       ]
     },
     {
-      "id": "finance-compliance",
       "name": "FinanceCompliance",
       "description": "金融商品販売における特別なコンプライアンス基準",
       "wordFilters": {
@@ -165,7 +162,6 @@
       ]
     },
     {
-      "id": "medical-compliance",
       "name": "MedicalCompliance",
       "description": "医療・健康関連商品販売における特別なコンプライアンス基準",
       "wordFilters": {

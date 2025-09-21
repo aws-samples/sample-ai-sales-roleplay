@@ -495,6 +495,33 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                 elif data_type == 'realtime-metrics':
                     realtime_metrics.append(item)
             
+            # コンプライアンス違反データを抽出
+            compliance_violations = []
+            for metric in realtime_metrics:
+                compliance_data = metric.get('complianceData', {})
+                violations = compliance_data.get('violations', [])
+                for violation in violations:
+                    # データ構造を型定義に合わせて変換
+                    compliance_violation = {
+                        'rule_id': violation.get('rule_id', ''),
+                        'rule_name': violation.get('rule_name', ''),
+                        'severity': violation.get('severity', 'low'),
+                        'message': violation.get('message', ''),
+                        'context': violation.get('context', ''),
+                        'confidence': float(violation.get('confidence', '0')),
+                        # i18n対応フィールド
+                        'rule_name_key': violation.get('rule_name_key'),
+                        'rule_name_params': violation.get('rule_name_params'),
+                        'message_key': violation.get('message_key'),
+                        'message_params': violation.get('message_params')
+                    }
+                    compliance_violations.append(compliance_violation)
+            
+            logger.info("コンプライアンス違反データ抽出完了", extra={
+                "session_id": session_id,
+                "violations_count": len(compliance_violations)
+            })
+            
             # フィードバックが存在しない場合は新規生成
             if not final_feedback and realtime_metrics:
                 logger.info("通常セッション用フィードバック生成開始", extra={
@@ -596,7 +623,7 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                             "feedback": feedback_data,
                             "finalMetrics": final_metrics,
                             "feedbackCreatedAt": latest_realtime_metric.get("createdAt"),
-                            "complianceViolations": [],
+                            "complianceViolations": compliance_violations,
                             "goalResults": goal_results
                         }
                         
@@ -614,7 +641,7 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                             "messages": messages,
                             "realtimeMetrics": realtime_metrics,
                             "finalMetrics": final_metrics,
-                            "complianceViolations": []
+                            "complianceViolations": compliance_violations
                         }
                 else:
                     # リアルタイムメトリクスがない場合
@@ -636,7 +663,7 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                     "sessionInfo": session_info,
                     "messages": messages,
                     "realtimeMetrics": realtime_metrics,
-                    "complianceViolations": []
+                    "complianceViolations": compliance_violations
                 }
                 
                 if final_feedback:

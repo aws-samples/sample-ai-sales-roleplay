@@ -28,14 +28,14 @@ jest.mock("react-i18next", () => ({
 const mockApiService = {
   getGuardrails: jest.fn().mockResolvedValue([
     {
-      arn: "arn:aws:bedrock:us-east-1:123456789012:guardrail/general-compliance",
-      id: "general-compliance",
+      arn: "arn:aws:bedrock:us-east-1:123456789012:guardrail/GeneralCompliance",
+      id: "GeneralCompliance",
       name: "General Compliance",
       description: "General compliance rules",
     },
     {
-      arn: "arn:aws:bedrock:us-east-1:123456789012:guardrail/finance-compliance",
-      id: "finance-compliance",
+      arn: "arn:aws:bedrock:us-east-1:123456789012:guardrail/FinanceCompliance",
+      id: "FinanceCompliance",
       name: "Finance Compliance",
       description: "Finance compliance rules",
     },
@@ -65,14 +65,14 @@ describe("ScenarioCreatePage Component", () => {
     // モックの再設定
     mockApiService.getGuardrails.mockResolvedValue([
       {
-        arn: "arn:aws:bedrock:us-east-1:123456789012:guardrail/general-compliance",
-        id: "general-compliance",
+        arn: "arn:aws:bedrock:us-east-1:123456789012:guardrail/GeneralCompliance",
+        id: "GeneralCompliance",
         name: "General Compliance",
         description: "General compliance rules",
       },
       {
-        arn: "arn:aws:bedrock:us-east-1:123456789012:guardrail/finance-compliance",
-        id: "finance-compliance",
+        arn: "arn:aws:bedrock:us-east-1:123456789012:guardrail/FinanceCompliance",
+        id: "FinanceCompliance",
         name: "Finance Compliance",
         description: "Finance compliance rules",
       },

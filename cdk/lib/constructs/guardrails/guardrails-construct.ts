@@ -9,12 +9,6 @@ import * as bedrock from 'aws-cdk-lib/aws-bedrock';
  */
 export interface GuardrailsConstructProps {
   /**
-   * デプロイ対象のGuardrailsデータを含むJSONファイルへのパス
-   * @default 'cdk/data/guardrails.json'
-   */
-  guardrailsConfigPath?: string;
-  
-  /**
    * リソース名のプレフィックス（環境識別子）
    * 環境ごとに一意なGuardrail名を生成するために使用
    */
@@ -25,11 +19,6 @@ export interface GuardrailsConstructProps {
  * Guardrailリソース情報を表すインターフェース
  */
 export interface GuardrailResource {
-  /**
-   * GuardrailのID
-   */
-  id: string;
-  
   /**
    * Lambda環境変数用に正規化されたID（ハイフンをアンダースコアに変換）
    */
@@ -52,8 +41,7 @@ export interface GuardrailResource {
 export class GuardrailsConstruct extends Construct {
   /**
    * デプロイされたGuardrailsのマップ
-   * キー: guardrailId, 値: GuardrailResource
-   * 注：guardrailIdにハイフンが含まれる場合、Lambda環境変数用に正規化されたIDも保持する
+   * キー: guardrailName, 値: GuardrailResource
    */
   public readonly guardrails: Record<string, GuardrailResource>;
   
@@ -102,7 +90,6 @@ export class GuardrailsConstruct extends Construct {
     super(scope, id);
     
     // デフォルト値の設定
-    const guardrailsConfigPath = props.guardrailsConfigPath || 'cdk/data/guardrails.json';
     this.resourceNamePrefix = props.resourceNamePrefix || '';
     
     // Guardrail設定ファイルの読み込み
@@ -114,47 +101,40 @@ export class GuardrailsConstruct extends Construct {
     
     // 設定ファイルから各Guardrailをデプロイ
     for (const guardrailConfig of guardrailsConfig.guardrails) {
-      const guardrailId = guardrailConfig.id;
-      const guardrail = guardrailConfig.name;
-      
-      // 環境プレフィックスを適用したGuardrail名を生成
-      const prefixedguardrail = this.resourceNamePrefix ? `${this.resourceNamePrefix}${guardrail}` : guardrail;
+      const guardrailName = guardrailConfig.name;
       
       // CDK公式のCfnGuardrailを使用してGuardrailをデプロイ
       const guardrailResource = this.deployGuardrail(
-        guardrailId,
-        prefixedguardrail, 
+        guardrailName,
         guardrailConfig
       );
       
       // デプロイされたGuardrailリソース情報を保存
-      this.guardrails[guardrailId] = guardrailResource;
+      this.guardrails[guardrailName] = guardrailResource;
       
       // 作成されたGuardrailのARNとバージョンを出力
-      new cdk.CfnOutput(this, `${guardrailId}GuardrailArn`, {
+      new cdk.CfnOutput(this, `${guardrailName}GuardrailArn`, {
         value: guardrailResource.arn,
-        description: `ARN of the ${guardrail} guardrail`,
-        exportName: `${this.node.addr}-${guardrailId}-guardrail-arn`
+        description: `ARN of the ${guardrailName} guardrail`,
+        exportName: `${this.node.addr}-${guardrailName}-guardrail-arn`
       });
       
-      new cdk.CfnOutput(this, `${guardrailId}GuardrailVersionOutput`, {
+      new cdk.CfnOutput(this, `${guardrailName}GuardrailVersionOutput`, {
         value: guardrailResource.version,
-        description: `Version of the ${guardrail} guardrail`,
-        exportName: `${this.node.addr}-${guardrailId}-guardrail-version`
+        description: `Version of the ${guardrailName} guardrail`,
+        exportName: `${this.node.addr}-${guardrailName}-guardrail-version`
       });
     }
   }
   
   /**
    * CDK公式のCfnGuardrailを使用してGuardrailをデプロイ
-   * @param guardrailId Guardrail ID
-   * @param guardrail Guardrail名
+   * @param guardrailName Guardrail名
    * @param guardrailConfig Guardrail設定
    * @returns デプロイされたGuardrailリソース情報
    */
   private deployGuardrail(
-    guardrailId: string,
-    guardrail: string,
+    guardrailName: string,
     guardrailConfig: any
   ): GuardrailResource {
     // トピックポリシーの設定
@@ -164,9 +144,9 @@ export class GuardrailsConstruct extends Construct {
     const wordPolicyConfig = this.createWordPolicyConfig(guardrailConfig);
     
     // CDK公式のCfnGuardrailを作成
-    const cfnGuardrail = new bedrock.CfnGuardrail(this, `${guardrailId}Guardrail`, {
-      name: guardrail,
-      description: guardrailConfig.description || `${guardrail}のガードレール`,
+    const cfnGuardrail = new bedrock.CfnGuardrail(this, `${guardrailName}Guardrail`, {
+      name: guardrailName,
+      description: guardrailConfig.description || `${guardrailName}のガードレール`,
       blockedInputMessaging: "コンプライアンス違反が検出されました。表現を見直してください。",
       blockedOutputsMessaging: "コンプライアンス違反が検出されました。表現を見直してください。",
       
@@ -229,7 +209,7 @@ export class GuardrailsConstruct extends Construct {
     });
     
     // CfnGuardrailVersionを作成してバージョンを管理
-    const cfnGuardrailVersion = new bedrock.CfnGuardrailVersion(this, `${guardrailId}GuardrailVersion`, {
+    const cfnGuardrailVersion = new bedrock.CfnGuardrailVersion(this, `${guardrailName}GuardrailVersion`, {
       guardrailIdentifier: cfnGuardrail.attrGuardrailId,
       description: "compliance check"
     });
@@ -242,30 +222,29 @@ export class GuardrailsConstruct extends Construct {
     const guardrailVersion = cfnGuardrailVersion.attrVersion;
     
     // ハイフンをアンダースコアに変換してLambda環境変数に適した形式にする
-    const normalizedId = guardrailId.replace(/-/g, '_');
+    const normalizedId = guardrailName.replace(/-/g, '_');
     
     // Parameter Storeにガードレール情報を保存（環境プレフィックスを適用）
     const baseParameterPrefix = '/aisalesroleplay/guardrails';
     const parameterPrefix = this.resourceNamePrefix ? `${baseParameterPrefix}/${this.resourceNamePrefix}` : baseParameterPrefix;
     
     // ARNのパラメータを作成
-    new cdk.aws_ssm.StringParameter(this, `${guardrailId}ArnParameter`, {
-      parameterName: `${parameterPrefix}/${guardrailId}/arn`,
+    new cdk.aws_ssm.StringParameter(this, `${guardrailName}ArnParameter`, {
+      parameterName: `${parameterPrefix}/${guardrailName}/arn`,
       stringValue: guardrailArn,
-      description: `ARN of the ${guardrail} guardrail for ${this.resourceNamePrefix || 'default'} environment`,
+      description: `ARN of the ${guardrailName} guardrail for ${this.resourceNamePrefix || 'default'} environment`,
       tier: cdk.aws_ssm.ParameterTier.STANDARD
     });
     
     // バージョンのパラメータを作成
-    new cdk.aws_ssm.StringParameter(this, `${guardrailId}VersionParameter`, {
-      parameterName: `${parameterPrefix}/${guardrailId}/version`,
+    new cdk.aws_ssm.StringParameter(this, `${guardrailName}VersionParameter`, {
+      parameterName: `${parameterPrefix}/${guardrailName}/version`,
       stringValue: guardrailVersion,
-      description: `Version of the ${guardrail} guardrail for ${this.resourceNamePrefix || 'default'} environment`,
+      description: `Version of the ${guardrailName} guardrail for ${this.resourceNamePrefix || 'default'} environment`,
       tier: cdk.aws_ssm.ParameterTier.STANDARD
     });
     
     return {
-      id: guardrailId,
       normalizedId: normalizedId,
       arn: guardrailArn,
       version: guardrailVersion

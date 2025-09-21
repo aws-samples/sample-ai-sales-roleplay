@@ -206,7 +206,7 @@
       "difficulty": "normal",
       "industry": "Technology",
       "category": "Technology",
-      "guardrail": "tech-compliance",
+      "guardrail": "TechCompliance",
       "language": "en",
       "initialMessage": "Hello. I'm Michael Chen, IT Director at Horizon Manufacturing Inc. Thank you for taking the time to meet with me today. I'm interested in hearing about your cloud migration services, but I have several concerns about security, potential downtime, and the overall ROI of such a significant change to our infrastructure.",
       "npc": {
@@ -384,7 +384,7 @@
       "difficulty": "normal",
       "industry": "金融",
       "category": "金融",
-      "guardrail": "finance-compliance",
+      "guardrail": "FinanceCompliance",
       "initialMessage": "こんにちは。中村精密工業の中村です。御社の資産運用プランについて話を聞きたいと思っています。うちは中小企業ですが、預金だけでは将来が不安で、安全性を重視しながらも少しは運用したいと考えているんです。",
       "npc": {
         "id": "affluent-business-owner",
@@ -612,7 +612,7 @@
       "difficulty": "hard",
       "industry": "製造業",
       "category": "製造業",
-      "guardrail": "general-compliance",
+      "guardrail": "GeneralCompliance",
       "initialMessage": "お待たせしました。老舗商事の山田です。うちは創業100年を超える会社でしてね、これまでのやり方を変えることには正直抵抗があるんですよ。若手社員からはデジタル化の要望も出ていますが、急には進められないと思っているんです。今日はその辺りをご相談したくて。",
       "npc": {
         "id": "conservative-cfo",
@@ -829,7 +829,7 @@
       "difficulty": "normal",
       "industry": "IT",
       "category": "IT",
-      "guardrail": "general-compliance",
+      "guardrail": "GeneralCompliance",
       "initialMessage": "はい、日本製造システムの木村です。お待たせしました。システム刷新のヒアリングということでしたね。私は技術に詳しくないので、専門用語はなるべく避けていただけると助かります。現場の業務がどう改善されるかが一番知りたいポイントです。",
       "npc": {
         "id": "business-department-head",
@@ -985,7 +985,7 @@
       "difficulty": "normal",
       "industry": "医療",
       "category": "医療",
-      "guardrail": "medical-compliance",
+      "guardrail": "MedicalCompliance",
       "initialMessage": "こんにちは、中央メディカルセンターの鈴木です。当院ではスタッフの疲弊が深刻で、業務効率化が急務なんです。ただ、患者の安全性が何よりも優先されるべきで、そこは絶対に妥協できません。今回はそのバランスが取れたシステムについて相談したくて。",
       "npc": {
         "id": "healthcare-manager",

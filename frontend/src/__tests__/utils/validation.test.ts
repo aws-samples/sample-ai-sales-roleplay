@@ -230,14 +230,14 @@ describe("validateGoals", () => {
 
 describe("validateSharing", () => {
   it("should return no errors for valid public sharing", () => {
-    const result = validateSharing("public", [], "general-compliance");
+    const result = validateSharing("public", [], "GeneralCompliance");
 
     expect(result.sharedWithUsers).toBeNull();
     expect(result.guardrail).toBeNull();
   });
 
   it("should return no errors for valid private sharing", () => {
-    const result = validateSharing("private", [], "general-compliance");
+    const result = validateSharing("private", [], "GeneralCompliance");
 
     expect(result.sharedWithUsers).toBeNull();
     expect(result.guardrail).toBeNull();
@@ -247,7 +247,7 @@ describe("validateSharing", () => {
     const result = validateSharing(
       "shared",
       ["user1", "user2"],
-      "general-compliance",
+      "GeneralCompliance",
     );
 
     expect(result.sharedWithUsers).toBeNull();
@@ -255,7 +255,7 @@ describe("validateSharing", () => {
   });
 
   it("should validate shared users are required for shared visibility", () => {
-    const result = validateSharing("shared", [], "general-compliance");
+    const result = validateSharing("shared", [], "GeneralCompliance");
 
     expect(result.sharedWithUsers).toBe(
       "scenarios.validation.sharedUsersRequired",
@@ -301,7 +301,7 @@ describe("validateForm", () => {
       ],
       visibility: "private" as "public" | "private" | "shared",
       sharedWithUsers: [],
-      guardrail: "general-compliance",
+      guardrail: "GeneralCompliance",
     };
 
     const result = validateForm(formData);
@@ -354,7 +354,7 @@ describe("validateForm", () => {
       language: "ja",
       visibility: "private" as "public" | "private" | "shared",
       sharedWithUsers: [],
-      guardrail: "general-compliance",
+      guardrail: "GeneralCompliance",
     };
 
     const result = validateForm(formData);

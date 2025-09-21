@@ -194,7 +194,7 @@ def load_scenario_guardrail(scenario_id: Optional[str] = None, language: Optiona
     シナリオIDに基づいて適切なGuardrailを選択します。
     1. DynamoDBからシナリオデータを取得し、guardrailフィールドを確認
     2. シナリオデータにguardrailフィールドがあれば、それを使用
-    3. なければデフォルトの"general-compliance"を使用
+    3. なければデフォルトの"GeneralCompliance"を使用
     4. Parameter Storeからガードレール情報を取得
     
     Args:
@@ -209,7 +209,7 @@ def load_scenario_guardrail(scenario_id: Optional[str] = None, language: Optiona
     """
     try:
         # デフォルトのGuardrail ID
-        default_guardrail_id = "general-compliance"
+        default_guardrail_id = "GeneralCompliance"
         
         # シナリオIDがない場合はデフォルトを使用
         if not scenario_id:

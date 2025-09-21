@@ -10,7 +10,7 @@ export interface DataInitializerStackProps extends cdk.StackProps {
   /**
    * 環境名
    */
-  envName?: string;
+  envName: string;
 
   /**
    * リソース名プレフィックス
@@ -31,9 +31,6 @@ export interface DataInitializerStackProps extends cdk.StackProps {
 export class DataInitializerStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: DataInitializerStackProps) {
     super(scope, id, props);
-
-    // 環境名（デフォルトは 'dev'）
-    const envName = props.envName || 'dev';
 
     // シナリオテーブルの取得
     // 提供されたテーブルを優先し、なければテーブル名から参照
