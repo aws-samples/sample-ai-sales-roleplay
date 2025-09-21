@@ -8,7 +8,7 @@ import { DataInitializerStack } from '../lib/data-initializer-stack';
 const app = new cdk.App();
 
 // 環境の取得 (ENV環境変数またはコンテキストから)
-const envId = process.env.ENV || app.node.tryGetContext('env') || 'dev';
+const envId = process.env.ENV || app.node.tryGetContext('env') || 'default';
 
 // 環境に応じたコンテキスト設定の取得
 const envContextKey = `env:${envId}`;
