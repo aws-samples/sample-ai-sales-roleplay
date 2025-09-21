@@ -115,6 +115,8 @@ Resources:
             Value: !Ref AllowSelfRegister
           - Name: BEDROCK_REGION
             Value: !Ref BedrockRegion
+          - Name: CDK_DEFAULT_REGION
+            Value: !Ref BedrockRegion
           - Name: CDK_JSON_OVERRIDE
             Value: !Ref CdkJsonOverride
           - Name: REPO_URL
