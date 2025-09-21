@@ -27,9 +27,9 @@ export class VectorKB extends Construct {
     // });
 
     // ナレッジベースを作成（循環依存を避けるため依存関係は設定しない）
-    this.knowledgeBase = new bedrock.VectorKnowledgeBase(this, `${props.resourceNamePrefix}KnowledgeBase`, {
+    this.knowledgeBase = new bedrock.VectorKnowledgeBase(this, 'KnowledgeBase', {
       embeddingsModel: embeddingModel,
-      name: `${props.resourceNamePrefix}ai-sales-roleplay`,
+      // name: `${props.resourceNamePrefix}ai-sales-roleplay`,
     });
 
     // OpenSearch Serverless Collection の冗長構成を無効化
