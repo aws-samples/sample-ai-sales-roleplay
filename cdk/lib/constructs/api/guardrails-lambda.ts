@@ -7,13 +7,21 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as path from 'path';
 
 /**
+ * GuardrailsLambdaConstructのプロパティ
+ */
+export interface GuardrailsLambdaConstructProps {
+  /** 環境識別子 */
+  envId: string;
+}
+
+/**
  * Guardrails APIと連携するLambda関数を作成するConstruct
  */
 export class GuardrailsLambdaConstruct extends Construct {
   /** Lambda関数 */
   public readonly function: PythonFunction;
 
-  constructor(scope: Construct, id: string) {
+  constructor(scope: Construct, id: string, props: GuardrailsLambdaConstructProps) {
     super(scope, id);
 
     // Lambda実行ロールの作成
@@ -50,8 +58,7 @@ export class GuardrailsLambdaConstruct extends Construct {
       logRetention: logs.RetentionDays.ONE_WEEK,  // CloudWatchログの保持期間
       environment: {
         // 環境変数の設定
-        ENVIRONMENT_PREFIX: cdk.Stack.of(this).stackName.includes('Prod') ? 'prod' :
-          cdk.Stack.of(this).stackName.includes('Staging') ? 'staging' : 'dev',
+        ENVIRONMENT_PREFIX: props.envId,
         POWERTOOLS_LOG_LEVEL: "DEBUG",
         AWS_MAX_ATTEMPTS: "10",
       },

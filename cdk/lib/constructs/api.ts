@@ -196,7 +196,9 @@ export class Api extends Construct {
     });
 
     // ガードレールLambda関数を作成
-    this.guardrailsLambda = new GuardrailsLambdaConstruct(this, 'GuardrailsLambda');
+    this.guardrailsLambda = new GuardrailsLambdaConstruct(this, 'GuardrailsLambda', {
+      envId: props.envId
+    });
 
     // リファレンスチェックLambda関数を作成
     this.referenceCheckLambda = new ReferenceCheckLambdaConstruct(this, 'ReferenceCheckLambda', {
