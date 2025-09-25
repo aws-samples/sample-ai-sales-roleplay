@@ -358,7 +358,7 @@ export class ApiService {
     compliance?: ComplianceCheck; // コンプライアンスチェック結果を追加
   }> {
     try {
-      // リクエストボディを作成
+      // リクエストボディを作成（循環参照対策）
       const requestBody = {
         message,
         previousMessages: previousMessages.map((msg) => ({
@@ -373,10 +373,31 @@ export class ApiService {
         })),
         // セッションIDを含める
         ...(sessionId ? { sessionId } : {}),
-        // ゴール達成状況が指定されていれば含める
-        ...(goalStatuses ? { goalStatuses } : {}),
-        // ゴール定義が指定されていれば含める
-        ...(goals ? { goals } : {}),
+        // ゴール達成状況が指定されていれば含める（循環参照対策）
+        ...(goalStatuses ? { 
+          goalStatuses: goalStatuses.map(status => ({
+            goalId: status.goalId,
+            progress: typeof status.progress === "number" ? status.progress : 0,
+            achieved: Boolean(status.achieved),
+            ...(status.achievedAt ? {
+              achievedAt: status.achievedAt instanceof Date 
+                ? status.achievedAt.toISOString() 
+                : typeof status.achievedAt === "string" 
+                  ? status.achievedAt 
+                  : undefined
+            } : {})
+          }))
+        } : {}),
+        // ゴール定義が指定されていれば含める（循環参照対策）
+        ...(goals ? { 
+          goals: goals.map(goal => ({
+            id: goal.id,
+            description: goal.description || "",
+            priority: typeof goal.priority === "number" ? goal.priority : 3,
+            criteria: Array.isArray(goal.criteria) ? goal.criteria : [],
+            isRequired: Boolean(goal.isRequired)
+          }))
+        } : {}),
         // シナリオIDを含める（コンプライアンスチェック用）
         ...(scenarioId ? { scenarioId } : {}),
         // 言語設定を含める（多言語対応用）
