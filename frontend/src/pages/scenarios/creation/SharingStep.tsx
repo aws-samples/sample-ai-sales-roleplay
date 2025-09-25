@@ -211,10 +211,14 @@ const SharingStep: React.FC<SharingStepProps> = ({
         <FormControl fullWidth margin="normal" error={Boolean(validationErrors?.guardrail)}>
           <InputLabel>{t("scenarios.fields.selectGuardrail")}</InputLabel>
           <Select
-            value={displayValue}
+            value={guardrailValue}
             label={t("scenarios.fields.selectGuardrail")}
             onChange={handleGuardrailChange}
             displayEmpty
+            renderValue={(selected) => {
+              // 選択された値のプレフィックスを除去して表示
+              return selected ? getDisplayName(selected as string) : "";
+            }}
           >
             {guardrailsList.map((guardrail) => {
               const fullName = guardrail.name;
