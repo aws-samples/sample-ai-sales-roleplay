@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import {
   Box,
   Typography,
@@ -42,8 +42,6 @@ const SharingStep: React.FC<SharingStepProps> = ({
     return hyphenIndex !== -1 ? fullName.substring(hyphenIndex + 1) : fullName;
   };
 
-  // 表示値を取得（選択されたガードレールの表示名）
-  const displayValue = guardrailValue ? getDisplayName(guardrailValue) : "";
 
   // 公開設定の変更ハンドラー
   const handleVisibilityChange = (
