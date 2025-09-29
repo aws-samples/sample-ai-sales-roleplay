@@ -48,7 +48,13 @@
       },
       "allowedIpV4AddressRanges": null,
       "allowedIpV6AddressRanges": null,
-      "allowedCountryCodes": null
+      "allowedCountryCodes": null,
+      "costAllocationTags": {
+        "Environment": "default",
+        "Project": "AISalesRoleplay",
+        "CostCenter": "Training",
+        "Owner": "AITeam"
+      }
     },
     "env:dev": {
       "selfSignUpEnabled": true,
@@ -81,7 +87,13 @@
       },
       "allowedIpV4AddressRanges": null,
       "allowedIpV6AddressRanges": null,
-      "allowedCountryCodes": null
+      "allowedCountryCodes": null,
+      "costAllocationTags": {
+        "Environment": "development",
+        "Project": "AISalesRoleplay",
+        "CostCenter": "Training-Dev",
+        "Owner": "AITeam-Dev"
+      }
     },
     "env:staging": {
       "selfSignUpEnabled": true,
@@ -114,7 +126,13 @@
       },
       "allowedIpV4AddressRanges": null,
       "allowedIpV6AddressRanges": null,
-      "allowedCountryCodes": null
+      "allowedCountryCodes": null,
+      "costAllocationTags": {
+        "Environment": "staging",
+        "Project": "AISalesRoleplay",
+        "CostCenter": "Training-Staging",
+        "Owner": "AITeam-QA"
+      }
     },
     "env:prod": {
       "selfSignUpEnabled": true,
@@ -147,7 +165,13 @@
       },
       "allowedIpV4AddressRanges": null,
       "allowedIpV6AddressRanges": null,
-      "allowedCountryCodes": null
+      "allowedCountryCodes": null,
+      "costAllocationTags": {
+        "Environment": "production",
+        "Project": "AISalesRoleplay",
+        "CostCenter": "Training-Production",
+        "Owner": "AITeam-Production"
+      }
     },
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
     "@aws-cdk/core:checkSecretUsage": true,
