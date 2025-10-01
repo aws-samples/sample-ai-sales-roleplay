@@ -148,7 +148,13 @@ export AWS_DEFAULT_REGION=ap-northeast-1
 | `us.anthropic.claude-3-5-haiku-20241022-v1:0` | 高速・低コスト | 対話、スコアリング、ガードレール | US |
 | `us.anthropic.claude-3-5-sonnet-20241022-v2:0` | バランス型・高品質 | 対話（高品質が必要な場合） | US |
 | `us.anthropic.claude-3-7-sonnet-20250219-v1:0` | 最高品質・高コスト | フィードバック、リファレンスチェック | US, AP, EU |
+| `us.anthropic.claude-sonnet-4-20250514-v1:0` | 次世代高性能 | フィードバック、リファレンスチェック | US |
+| `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | 最新最高性能 | フィードバック、リファレンスチェック | US |
+| `global.anthropic.claude-sonnet-4-5-20250929-v1:0` | 最新最高性能 | フィードバック、リファレンスチェック | Global |
+| `jp.anthropic.claude-sonnet-4-5-20250929-v1:0` | 最新最高性能 | フィードバック、リファレンスチェック | Japan |
+| `apac.anthropic.claude-sonnet-4-20250514-v1:0` | 次世代高性能 | フィードバック、リファレンスチェック | AP |
 | `apac.anthropic.claude-3-haiku-20240307-v1:0` | 高速・低コスト | 対話、スコアリング、ガードレール | AP |
+| `eu.anthropic.claude-sonnet-4-20250514-v1:0` | 次世代高性能 | フィードバック、リファレンスチェック | EU |
 | `eu.anthropic.claude-3-haiku-20240307-v1:0` | 高速・低コスト | 対話、スコアリング、ガードレール | EU |
 
 ### Amazon Nova モデル
@@ -181,5 +187,3 @@ IP アドレス制限や地理的制限を設定する場合は、`--cdk-json-ov
   }
 }'
 ```
-
-
