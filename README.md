@@ -33,7 +33,7 @@
 **バックエンド**
 - AWS CDK（インフラストラクチャ）
 - AWS Lambda (Python 3.13) + API Gateway
-- Amazon Bedrock (Claude 3.5 Haiku)
+- Amazon Bedrock (Claude 3.5 Haiku, Claude Sonnet 4.5)
 - Amazon Polly（音声合成）
 - Amazon Bedrock Guardrails（コンプライアンスチェック）
 - DynamoDB + RDS PostgreSQL

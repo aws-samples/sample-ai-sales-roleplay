@@ -70,6 +70,10 @@ while [[ "$#" -gt 0 ]]; do
             echo "  us.anthropic.claude-3-5-haiku-20241022-v1:0"
             echo "  us.anthropic.claude-3-5-sonnet-20241022-v2:0"
             echo "  us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+            echo "  us.anthropic.claude-sonnet-4-20250514-v1:0"
+            echo "  us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+            echo "  global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+            echo "  jp.anthropic.claude-sonnet-4-5-20250929-v1:0"
             echo "  us.amazon.nova-lite-v1:0"
             echo "  us.amazon.nova-pro-v1:0"
             exit 0
