@@ -405,7 +405,9 @@ const ConversationPage: React.FC = () => {
     setTimeout(
       async () => {
         console.log("=== ConversationPage: NPC応答生成開始 ===");
-        console.log("userInput:", userInput.trim());
+        // 安全なプリミティブ型に変換して循環参照を避ける
+        const cleanMessageText = messageText ? String(messageText) : "";
+        console.log("userInput:", cleanMessageText);
         console.log("currentMetrics:", currentMetrics);
         console.log("scenario.npc:", scenario.npc);
 
@@ -416,21 +418,41 @@ const ConversationPage: React.FC = () => {
           // フロントエンドで生成されたセッションIDを使用
           const currentSessionId = sessionId;
 
+          // 純粋なオブジェクトを作成してAPI呼び出し
+          const cleanMetrics = {
+            angerLevel: Number(currentMetrics.angerLevel) || 1,
+            trustLevel: Number(currentMetrics.trustLevel) || 1,
+            progressLevel: Number(currentMetrics.progressLevel) || 1,
+          };
+          
+          // メッセージ配列をディープコピーし、純粋なデータ構造にする
+          const cleanMessages = updatedMessages.map(msg => ({
+            id: String(msg.id),
+            sender: String(msg.sender),
+            content: String(msg.content),
+            timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : new Date().toISOString()
+          }));
+          
+          // NPCオブジェクトをディープコピー
+          const cleanNpc = {
+            name: String(scenario.npc.name),
+            role: String(scenario.npc.role),
+            company: String(scenario.npc.company),
+            personality: Array.isArray(scenario.npc.personality) ? 
+              scenario.npc.personality.map(p => String(p)) : []
+          };
+
           // /bedrock/conversation エンドポイントからメトリクス出力を廃止したため、デフォルトのメトリクスを使用
           const result = await apiService.chatWithNPC(
-            messageText, // 引数化されたmessageTextを使用
-            scenario.npc,
-            updatedMessages,
-            currentSessionId,
-            messageId,
+            cleanMessageText, // 安全な文字列に変換済み
+            cleanNpc, // 安全なプリミティブ型に変換済み
+            cleanMessages, // 安全なプリミティブ型に変換済み
+            String(currentSessionId),
+            String(messageId),
             // 感情パラメータを追加
-            {
-              angerLevel: currentMetrics.angerLevel,
-              trustLevel: currentMetrics.trustLevel,
-              progressLevel: currentMetrics.progressLevel,
-            },
+            cleanMetrics,
             // シナリオIDを追加
-            scenario.id,
+            String(scenario.id),
           );
 
           const { response } = result;
@@ -499,14 +521,42 @@ const ConversationPage: React.FC = () => {
                 "activeSessionId:",
                 activeSessionId,
               );
+              // 安全な文字列に変換
+              const cleanMessageText = messageText ? String(messageText) : "";
+              
+              // メッセージ配列を純粋なデータ構造に変換
+              const cleanMessages = finalMessages.map(msg => ({
+                id: String(msg.id || ""),
+                sender: String(msg.sender || ""),
+                content: String(msg.content || ""),
+                timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : 
+                  (typeof msg.timestamp === 'string' ? msg.timestamp : new Date().toISOString())
+              }));
+              
+              // ゴール状態を純粋なデータ構造に変換
+              const cleanGoalStatuses = Array.isArray(goalStatuses) ? 
+                goalStatuses.map(status => ({
+                  goalId: String(status.goalId || ""),
+                  achieved: Boolean(status.achieved),
+                  description: String(status.description || "")
+                })) : [];
+              
+              // ゴールを純粋なデータ構造に変換
+              const cleanGoals = Array.isArray(goals) ? 
+                goals.map(goal => ({
+                  id: String(goal.id || ""),
+                  description: String(goal.description || ""),
+                  isRequired: Boolean(goal.isRequired)
+                })) : [];
+
               const evaluationResult = await apiService.getRealtimeEvaluation(
-                messageText, // 引数化されたmessageTextを使用
-                finalMessages,
-                activeSessionId, // 正しいセッションIDを使用
-                goalStatuses,
-                goals,
-                scenario.id, // シナリオIDを追加
-                scenario.language, // シナリオの言語設定を追加
+                cleanMessageText,
+                cleanMessages,
+                String(activeSessionId), // 安全な文字列に変換
+                cleanGoalStatuses,
+                cleanGoals,
+                String(scenario.id), // 安全な文字列に変換
+                String(scenario.language || "ja"), // 安全な文字列に変換
               );
 
               // コンプライアンスチェック結果の確認
