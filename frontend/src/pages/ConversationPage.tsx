@@ -836,23 +836,26 @@ const ConversationPage: React.FC = () => {
               const trimmedText = text.trim();
               if (!trimmedText) return prevInput;
               
-              // 重要な修正: 現在のテキストが途中結果から来ている場合は、それを置換する
-              // この処理により、途中結果と最終結果が重複することを防止
-              let previousTextWithoutTemp = prevInput;
+              // 重要な修正: 現在のテキストが途中結果から来ている場合は、それを完全に置き換える
+              // これにより、途中結果と最終結果が混在することを防止する
               
-              // 途中結果と確定結果の類似度を確認して、途中結果を削除
-              const lines = prevInput.split('\n');
-              if (lines.length > 0) {
-                const lastLine = lines[lines.length - 1];
-                
-                // 最後の行が現在の確定テキストの一部を含んでいる場合
-                if (lastLine && 
-                    (trimmedText.includes(lastLine) || 
-                     lastLine.includes(trimmedText.substring(0, Math.min(trimmedText.length, lastLine.length * 0.8))))) {
-                  console.log(`途中結果を検出して削除: "${lastLine}"`);
-                  // 途中結果を削除し、確定結果のみを使用
-                  previousTextWithoutTemp = lines.slice(0, lines.length - 1).join('\n');
-                }
+              // 途中認識結果をすべて削除し、確定結果のみを使用
+              // ログから分析: 途中結果は最終結果に含まれるが、最終結果とは若干異なる場合がある
+              // そのため、途中結果はすべて破棄して最終結果のみを信頼する
+              console.log(`確定結果受信: "${trimmedText}"`);
+              
+              // 以前の確定行だけを保持し、途中認識結果は破棄する
+              let previousConfirmedText = "";
+              const lines = prevInput.split('\n').filter(line => line.trim());
+              
+              // 空でないラインが1行のみの場合、途中認識結果と判断
+              if (lines.length <= 1) {
+                console.log(`途中認識結果を完全に置換: "${prevInput}"`);
+                previousConfirmedText = "";
+              } else {
+                // 複数行ある場合、最後の行を途中認識結果と判断して削除
+                previousConfirmedText = lines.slice(0, -1).join('\n');
+                console.log(`途中認識結果を削除: "${lines[lines.length - 1]}"、確定テキスト: "${previousConfirmedText}"`);
               }
               
               // テキスト整形 - 文の重複を検出して削除
@@ -888,16 +891,14 @@ const ConversationPage: React.FC = () => {
               }
               
               // 既存の文と完全重複チェック
-              if (previousTextWithoutTemp && previousTextWithoutTemp.includes(cleanedText)) {
+              if (previousConfirmedText && previousConfirmedText.includes(cleanedText)) {
                 console.log(`重複テキスト検出: "${cleanedText}" は既に含まれています`);
                 return prevInput; // 変更なし
               }
               
               // 最終的なテキスト構築
-              if (previousTextWithoutTemp && previousTextWithoutTemp.trim()) {
-                const newInput = previousTextWithoutTemp 
-                  ? `${previousTextWithoutTemp}\n${cleanedText}`
-                  : cleanedText;
+              if (previousConfirmedText && previousConfirmedText.trim()) {
+                const newInput = `${previousConfirmedText}\n${cleanedText}`;
                 console.log(`isFinal=true: 新しい入力設定 = "${newInput}"`);
                 return newInput;
               } else {
@@ -907,7 +908,7 @@ const ConversationPage: React.FC = () => {
               }
             });
           } else {
-            // 途中結果処理：確定部分は維持し、未確定部分だけ更新
+            // 途中結果処理：完全に新しいアプローチ - 途中認識は別トラックとして扱う
             setUserInput((prevInput) => {
               // 一時的な認識結果
               const currentRecognition = text.trim();
@@ -931,22 +932,24 @@ const ConversationPage: React.FC = () => {
                 }
               }
               
-              // 重複テキストと同一なら更新しない
-              if (prevInput === tempText) {
-                return prevInput;
+              // 重要な修正: 途中認識は確定行と完全に分離する
+              // prevInputから確定行を抽出
+              const lines = prevInput.split('\n').filter(line => line.trim());
+              
+              // 確定行がない場合は単純に途中認識を表示
+              if (lines.length === 0) {
+                return tempText;
               }
               
-              // 確定済みテキストと現在の途中認識を分離
-              const lines = prevInput.split('\n');
-              const confirmedLines = lines.filter(line => 
-                // 途中認識が確定ラインを含まない場合のみ確定と判断
-                !tempText.includes(line)
-              );
+              // 最後の行が途中認識の場合は、その行だけを置き換える
+              // 確定行が複数ある場合は、最後の行以外を「確定行」と判断
+              const confirmedLines = lines.length > 1 ? lines.slice(0, -1) : [];
               
-              // 確定済みテキストに途中認識を追加
+              // 確定行 + 途中認識を返す
               if (confirmedLines.length > 0) {
                 return `${confirmedLines.join('\n')}\n${tempText}`;
               } else {
+                // 確定行なし、途中認識のみ
                 return tempText;
               }
             });
