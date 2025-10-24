@@ -836,28 +836,59 @@ const ConversationPage: React.FC = () => {
               const trimmedText = text.trim();
               if (!trimmedText) return prevInput;
               
-              // 重複テキストチェック - 同じ文章が含まれていたら追加しない
-              if (prevInput.includes(trimmedText)) {
-                console.log(`重複テキスト検出: "${trimmedText}" は既に含まれています`);
+              // テキスト整形 - 重複フレーズのパターンを検出して削除
+              let cleanedText = trimmedText;
+              // 同じ文章が繰り返されているパターンを検出
+              const sentences = trimmedText.split(/[。.？?！!]/);
+              if (sentences.length >= 2) {
+                // 文単位で重複を検出する
+                for (let i = 0; i < sentences.length - 1; i++) {
+                  const currentSentence = sentences[i].trim();
+                  if (currentSentence && sentences.filter(s => s.trim() === currentSentence).length > 1) {
+                    console.log(`文単位の重複を検出: "${currentSentence}"`);
+                    // 重複した文は1つだけ残す処理を行う
+                    cleanedText = sentences.filter((s, index, self) => 
+                      index === self.findIndex(t => t.trim() === s.trim()) && s.trim()
+                    ).join('。') + '。';
+                    console.log(`クリーニング後のテキスト: "${cleanedText}"`);
+                    break;
+                  }
+                }
+              }
+              
+              // 既存の入力と重複チェック
+              if (prevInput.includes(cleanedText)) {
+                console.log(`重複テキスト検出: "${cleanedText}" は既に含まれています`);
                 return prevInput;
               }
               
               if (prevInput && prevInput.trim()) {
                 // 既存テキストがある場合は改行で区切って追加
-                const newInput = `${prevInput}\n${trimmedText}`;
+                const newInput = `${prevInput}\n${cleanedText}`;
                 console.log(`isFinal=true: 新しい入力設定 = "${newInput}"`);
                 return newInput;
               } else {
                 // 既存テキストがない場合は新規設定
-                console.log(`isFinal=true: 初期入力設定 = "${trimmedText}"`);
-                return trimmedText;
+                console.log(`isFinal=true: 初期入力設定 = "${cleanedText}"`);
+                return cleanedText;
               }
             });
           } else {
             // 途中結果：現在の認識結果のみを表示（蓄積しない）
             setUserInput((prevInput) => {
               // 途中結果でも重複チェックを行う
-              const currentRecognition = text.trim();
+              let currentRecognition = text.trim();
+              
+              // フレーズ重複パターンを検出して修正
+              const phrases = currentRecognition.split(/\s+/);
+              if (phrases.length > 1) {
+                const firstHalf = phrases.slice(0, Math.ceil(phrases.length / 2)).join(' ');
+                const secondHalf = phrases.slice(Math.ceil(phrases.length / 2)).join(' ');
+                if (firstHalf === secondHalf) {
+                  console.log(`途中認識でフレーズ重複を検出: "${firstHalf}" が2回繰り返されています`);
+                  currentRecognition = firstHalf;
+                }
+              }
               
               // 重複テキストチェック - 同じ文章が含まれている場合
               if (prevInput === currentRecognition) {
