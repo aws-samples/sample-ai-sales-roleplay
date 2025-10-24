@@ -116,7 +116,8 @@ export class TranscribeService {
             try {
               const data = JSON.parse(event.data);
               if (data.transcript && this.onTranscriptCallback) {
-                this.onTranscriptCallback(data.transcript, data.isFinal || false);
+                // isPartial: true=途中認識、false=最終確定（AWS Transcribe APIの標準に準拠）
+                this.onTranscriptCallback(data.transcript, data.isPartial || false);
               }
               
               // Lambda側のvoiceActivityは無視（フロントエンド側の音声レベル判定を優先）
@@ -155,12 +156,12 @@ export class TranscribeService {
   /**
    * 音声認識を開始
    *
-   * @param onTranscript テキスト認識時のコールバック
+   * @param onTranscript テキスト認識時のコールバック（text: 認識テキスト, isPartial: true=途中認識/false=最終確定）
    * @param onSilence 無音検出時のコールバック
    * @param onError エラー発生時のコールバック
    */
   public async startListening(
-    onTranscript: (text: string, isFinal: boolean) => void,
+    onTranscript: (text: string, isPartial: boolean) => void,
     onSilence?: () => void,
     onError?: (error: Error) => void
   ): Promise<void> {
