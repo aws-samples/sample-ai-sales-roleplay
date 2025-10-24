@@ -32,6 +32,7 @@ NPC_BASE_PROMPT_TEMPLATE = {
 役職: {npc_role}
 会社: {npc_company}
 性格: {personality_text}
+背景: {npc_description}
 
 ## emotion_state
 {emotion_state}
@@ -53,6 +54,7 @@ Name: {npc_name}
 Role: {npc_role}
 Company: {npc_company}
 Personality: {personality_text}
+Background: {npc_description}
 
 ## emotion_state
 {emotion_state}
@@ -194,5 +196,6 @@ DEFAULT_NPC_INFO = {
     "name": "田中太郎",
     "role": "購買担当者",
     "company": "株式会社ABC",
-    "personality": ["厳しい", "効率重視", "合理的"]
+    "personality": ["厳しい", "効率重視", "合理的"],
+    "description": "30代のビジネスマン。製造業の購買部門で働いている。"
 }

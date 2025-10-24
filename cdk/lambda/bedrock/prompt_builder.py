@@ -61,11 +61,12 @@ class PromptBuilder:
         
         Args:
             user_message (str): ユーザーのメッセージ
-            npc_info (Dict[str, Any]): NPC情報（name, role, company, personality）
+            npc_info (Dict[str, Any]): NPC情報（name, role, company, personality, description）
                 - name (str): NPCの名前
                 - role (str): NPCの役職
                 - company (str): NPCの会社名
                 - personality (List[str]): 性格特性のリスト（例：["厳しい", "効率重視"]）
+                - description (str): NPCの詳細な背景説明（年齢、状況など）
             previous_messages (List[Dict[str, Any]], optional): 過去の会話履歴
                 - sender (str): メッセージの送信者 ("user" または "npc")
                 - content (str): メッセージの内容
@@ -100,6 +101,9 @@ class PromptBuilder:
         separator = ", " if lang == "en" else "、"
         personality_text = separator.join(personality_traits)
         
+        # NPCの詳細説明を取得（ない場合は空文字）
+        npc_description = npc_info.get('description', '')
+        
         # ルールの構築（シナリオ別・性格別ルール含む）
         conversation_rules = self._build_conversation_rules(
             personality_traits, lang
@@ -129,6 +133,7 @@ class PromptBuilder:
             npc_role=npc_info['role'],
             npc_company=npc_info['company'],
             personality_text=personality_text,
+            npc_description=npc_description,
             conversation_rules=conversation_rules,
             emotion_state=emotion_text,
             conversation_history=conversation_history,
