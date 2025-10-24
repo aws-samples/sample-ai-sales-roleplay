@@ -851,13 +851,7 @@ const ConversationPage: React.FC = () => {
             // 現在の入力値を一時変数に保存
             const currentInput = userInputRef.current.trim();
             
-            // 確実に音声認識を停止してから送信処理を実行（認識テキスト消失を防止）
-            if (transcribeServiceRef.current) {
-              transcribeServiceRef.current.stopListening();
-              setIsListening(false);
-              setContinuousListening(false);
-            }
-            
+            // 音声認識を停止せずに、メッセージ送信のみ行う
             // 引数付きでsendMessage関数を呼び出し（完全な送信処理を実行）
             sendMessage(currentInput);
           } else {
