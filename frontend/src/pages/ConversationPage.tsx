@@ -49,6 +49,8 @@ const ConversationPage: React.FC = () => {
   // 状態管理
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  // メッセージ履歴を参照として保持し、非同期更新の問題を回避
+  const messagesRef = useRef<Message[]>([]);
   const [currentMetrics, setCurrentMetrics] = useState<Metrics>({
     angerLevel: 0,
     trustLevel: 0,
@@ -341,7 +343,10 @@ const ConversationPage: React.FC = () => {
         metrics: currentMetrics,
       };
 
-      setMessages([initialMessage]);
+      // messagesRefも同時に更新して一貫性を保つ（バグ修正）
+      const initialMessages = [initialMessage];
+      messagesRef.current = initialMessages;
+      setMessages(initialMessages);
       setCurrentEmotion("neutral");
     }, 100); // 100ms遅延させる
 
@@ -393,9 +398,12 @@ const ConversationPage: React.FC = () => {
       timestamp: new Date(),
     };
 
-    // 現在のメッセージ配列を直接コピーして新しいメッセージを追加（バグ修正）
-    const currentMessagesSnapshot = [...messages]; // 現在の状態をスナップショット
-    const updatedMessages = [...currentMessagesSnapshot, userMessage];
+    // リファレンスを使用して確実に最新のメッセージ履歴を維持（バグ修正）
+    const currentMessages = messagesRef.current;
+    const updatedMessages = [...currentMessages, userMessage];
+    
+    // 両方更新して確実に同期を保つ
+    messagesRef.current = updatedMessages;
     setMessages(updatedMessages);
     
     // 入力クリアの前にuserInputRefも更新して同期を確保
@@ -430,12 +438,13 @@ const ConversationPage: React.FC = () => {
             progressLevel: Number(currentMetrics.progressLevel) || 1,
           };
           
-          // 現在のメッセージ状態から最新のメッセージ履歴を取得（バグ修正）
-          // messages状態から直接取得するのではなく、updatedMessagesを使用
-          const currentMessagesSnapshot = [...updatedMessages];
+          // messagesRef経由で確実に最新のメッセージ履歴を取得（バグ修正）
+          const currentMessages = messagesRef.current;
+          
+          console.log(`API呼び出し時のメッセージ数: ${currentMessages.length}`);
           
           // メッセージ配列をディープコピーし、純粋なデータ構造にする
-          const cleanMessages = currentMessagesSnapshot.map(msg => ({
+          const cleanMessages = currentMessages.map(msg => ({
             id: String(msg.id),
             sender: String(msg.sender),
             content: String(msg.content),
@@ -488,7 +497,12 @@ const ConversationPage: React.FC = () => {
           // 話している状態を開始
           setIsSpeaking(true);
 
-          const finalMessages = [...updatedMessages, npcMessage];
+          // messagesRefから最新の状態を取得（バグ修正）
+          const currentMessagesState = messagesRef.current;
+          const finalMessages = [...currentMessagesState, npcMessage];
+          
+          // 両方同時に更新して一貫性を保つ
+          messagesRef.current = finalMessages;
           setMessages(finalMessages);
           setCurrentMetrics(newMetrics);
 
@@ -852,7 +866,7 @@ const ConversationPage: React.FC = () => {
         () => {
           console.log(`🔇 無音検出コールバック実行: userInputRef="${userInputRef.current}"`);
           if (userInputRef.current.trim()) {
-            console.log(`📤 無音検出による自動送信実行 - 現在のメッセージ数: ${messages.length}`);
+            console.log(`📤 無音検出による自動送信実行 - 現在のメッセージ数: ${messagesRef.current.length}`);
             
             // 現在の入力値を一時変数に保存
             const currentInput = userInputRef.current.trim();
@@ -868,7 +882,7 @@ const ConversationPage: React.FC = () => {
             // 引数付きでsendMessage関数を呼び出し（完全な送信処理を実行）
             sendMessage(currentInput);
             
-            console.log(`📤 メッセージ送信後 - 現在のメッセージ数: ${messages.length}`);
+            console.log(`📤 メッセージ送信後 - 現在のメッセージ数: ${messagesRef.current.length}`);
           } else {
             console.log(`⚠️ 無音検出: userInputが空のため送信をスキップ`);
           }
@@ -890,7 +904,7 @@ const ConversationPage: React.FC = () => {
       setSpeechRecognitionError("not-supported");
       setIsListening(false);
     }
-  }, [isListening, sessionId, sendMessage, messages.length]);
+  }, [isListening, sessionId, sendMessage]);
 
   // 音声認識を停止し、テキスト入力モードに切り替え
   const switchToTextInput = useCallback(() => {
