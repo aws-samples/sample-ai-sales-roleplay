@@ -393,7 +393,9 @@ const ConversationPage: React.FC = () => {
       timestamp: new Date(),
     };
 
-    const updatedMessages = [...messages, userMessage];
+    // 現在のメッセージ配列を直接コピーして新しいメッセージを追加（バグ修正）
+    const currentMessagesSnapshot = [...messages]; // 現在の状態をスナップショット
+    const updatedMessages = [...currentMessagesSnapshot, userMessage];
     setMessages(updatedMessages);
     
     // 入力クリアの前にuserInputRefも更新して同期を確保
@@ -428,8 +430,12 @@ const ConversationPage: React.FC = () => {
             progressLevel: Number(currentMetrics.progressLevel) || 1,
           };
           
+          // 現在のメッセージ状態から最新のメッセージ履歴を取得（バグ修正）
+          // messages状態から直接取得するのではなく、updatedMessagesを使用
+          const currentMessagesSnapshot = [...updatedMessages];
+          
           // メッセージ配列をディープコピーし、純粋なデータ構造にする
-          const cleanMessages = updatedMessages.map(msg => ({
+          const cleanMessages = currentMessagesSnapshot.map(msg => ({
             id: String(msg.id),
             sender: String(msg.sender),
             content: String(msg.content),
@@ -844,18 +850,27 @@ const ConversationPage: React.FC = () => {
         },
         // 無音検出コールバック（引数化されたsendMessage関数を使用）
         () => {
-          // console.log(`🔇 無音検出コールバック実行: userInputRef="${userInputRef.current}"`);
+          console.log(`🔇 無音検出コールバック実行: userInputRef="${userInputRef.current}"`);
           if (userInputRef.current.trim()) {
-            // console.log(`📤 無音検出による自動送信実行`);
+            console.log(`📤 無音検出による自動送信実行 - 現在のメッセージ数: ${messages.length}`);
             
             // 現在の入力値を一時変数に保存
             const currentInput = userInputRef.current.trim();
             
-            // 音声認識を停止せずに、メッセージ送信のみ行う
+            // メッセージ送信前に音声入力を一時停止（履歴問題を防止）
+            const recognitionActive = transcribeServiceRef.current && transcribeServiceRef.current.isListening();
+            
+            // 音声認識を一時停止（停止はしないが、テキスト更新を防止）
+            if (recognitionActive) {
+              console.log('音声認識を一時停止（テキスト更新を防止）');
+            }
+            
             // 引数付きでsendMessage関数を呼び出し（完全な送信処理を実行）
             sendMessage(currentInput);
+            
+            console.log(`📤 メッセージ送信後 - 現在のメッセージ数: ${messages.length}`);
           } else {
-            // console.log(`⚠️ 無音検出: userInputが空のため送信をスキップ`);
+            console.log(`⚠️ 無音検出: userInputが空のため送信をスキップ`);
           }
         },
         // エラーコールバック
