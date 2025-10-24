@@ -7,7 +7,7 @@
  */
 export interface TranscribeMessageEvent {
   transcript?: string;
-  isFinal?: boolean;
+  isPartial?: boolean; // true=途中認識、false=最終確定（AWS Transcribe APIの標準に準拠）
   voiceActivity?: boolean;
   error?: {
     code: string;
@@ -22,7 +22,7 @@ export interface TranscribeRequest {
 
 export interface TranscribeResponse {
   transcript?: string;
-  isFinal?: boolean;
+  isPartial?: boolean; // true=途中認識、false=最終確定（AWS Transcribe APIの標準に準拠）
   voiceActivity?: boolean;
   error?: {
     code: string;
