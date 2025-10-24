@@ -669,7 +669,7 @@ const ConversationPage: React.FC = () => {
       },
       1000 + Math.random() * 1000,
     ); // 1-2秒の遅延でリアル感を演出
-  }, [userInput, scenario, isProcessing, messages, currentMetrics, sessionId, audioEnabled, isSpeaking, goalStatuses, goals]);
+  }, [userInput, scenario, isProcessing, currentMetrics, sessionId, audioEnabled, isSpeaking, goalStatuses, goals]);
 
   /**
    * セッション終了処理
@@ -963,7 +963,7 @@ const ConversationPage: React.FC = () => {
         }
       }
     }
-  }, [goalStatuses, goals, messages, currentMetrics, sessionEnded, endSession]);
+  }, [goalStatuses, goals, currentMetrics, sessionEnded, endSession]);
 
   if (!scenario) {
     return null;
