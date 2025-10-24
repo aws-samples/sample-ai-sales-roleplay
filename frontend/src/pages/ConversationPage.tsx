@@ -890,7 +890,7 @@ const ConversationPage: React.FC = () => {
       setSpeechRecognitionError("not-supported");
       setIsListening(false);
     }
-  }, [isListening, sessionId, sendMessage]);
+  }, [isListening, sessionId, sendMessage, messages.length]);
 
   // 音声認識を停止し、テキスト入力モードに切り替え
   const switchToTextInput = useCallback(() => {
