@@ -58,6 +58,10 @@ const ConversationPage: React.FC = () => {
   });
   const [prevMetrics, setPrevMetrics] = useState<Metrics | null>(null);
   const [userInput, setUserInput] = useState("");
+  // 音声認識の確定済みテキストを保持（複数セッション間での累積用）
+  const [confirmedTranscripts, setConfirmedTranscripts] = useState<string[]>([]);
+  // 現在の音声認識セッション内の途中認識テキスト
+  const [currentPartialTranscript, setCurrentPartialTranscript] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
   // セッション開始後、コンポーネントの再マウントを防止するためのRef
@@ -123,6 +127,10 @@ const ConversationPage: React.FC = () => {
       if (transcribeServiceRef.current) {
         transcribeServiceRef.current.dispose();
       }
+      
+      // 音声認識関連の状態もクリアする
+      setConfirmedTranscripts([]);
+      setCurrentPartialTranscript("");
     };
   }, []);
 
@@ -381,6 +389,39 @@ const ConversationPage: React.FC = () => {
     }
   };
 
+  /**
+   * 音声認識テキストの正規化（重複除去など）
+   */
+  const normalizeTranscriptText = useCallback((text: string): string => {
+    if (!text) return "";
+    let cleanedText = text.trim();
+    
+    // 文単位の重複除去
+    const sentences = cleanedText.split(/[。.？?！!\n]/).map(s => s.trim()).filter(s => s);
+    if (sentences.length >= 2) {
+      const uniqueSentences = [...new Set(sentences)];
+      if (uniqueSentences.length < sentences.length) {
+        cleanedText = uniqueSentences.join('。') + '。';
+      }
+    }
+    
+    // フレーズの重複除去
+    const words = cleanedText.split(/\s+/);
+    if (words.length >= 2) {
+      const halfIndex = Math.ceil(words.length / 2);
+      const firstHalf = words.slice(0, halfIndex).join(' ');
+      const secondHalf = words.slice(halfIndex).join(' ');
+      
+      if (firstHalf === secondHalf || 
+          (firstHalf.length > 3 && secondHalf.includes(firstHalf)) ||
+          (secondHalf.length > 3 && firstHalf.includes(secondHalf))) {
+        cleanedText = firstHalf;
+      }
+    }
+    
+    return cleanedText;
+  }, []);
+
   // メッセージ送信
   const sendMessage = useCallback(async (inputText?: string) => {
     // 引数で渡されたテキストまたは現在のuserInputを使用
@@ -409,6 +450,10 @@ const ConversationPage: React.FC = () => {
     // 入力クリアの前にuserInputRefも更新して同期を確保
     userInputRef.current = "";
     setUserInput("");
+    
+    // 音声認識の状態もリセット
+    setConfirmedTranscripts([]);
+    setCurrentPartialTranscript("");
 
     // メッセージ送信時に一時的に感情状態を更新
     // ユーザーが入力している間は中立的な状態にする
@@ -804,6 +849,11 @@ const ConversationPage: React.FC = () => {
       // 現在入力中のテキストがあれば送信
       if (userInputRef.current.trim()) {
         sendMessage(userInputRef.current.trim());
+        // sendMessage内で状態がクリアされるので、ここでは不要
+      } else {
+        // テキストがない場合は音声認識状態だけクリア
+        setConfirmedTranscripts([]);
+        setCurrentPartialTranscript("");
       }
       return;
     }
@@ -828,92 +878,58 @@ const ConversationPage: React.FC = () => {
       await transcribeServiceRef.current.startListening(
         // 文字起こしコールバック
         (text, isFinal) => {
+          // デバッグログ（開発環境でのみ出力）
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`音声認識: "${text.trim()}", isFinal: ${isFinal}`);
+          }
+          
           if (isFinal) {
             // 最終確定結果を処理
-            setUserInput((prevInput) => {
-              const trimmedText = text.trim();
-              if (!trimmedText) return prevInput;
-              
-              // 途中認識結果と確定結果の分離
-              const lines = prevInput.split('\n').filter(line => line.trim());
-              // 最後の行は途中認識の可能性があるため、確定行は複数行ある場合のみ抽出
-              const previousConfirmedText = lines.length <= 1 ? "" : lines.slice(0, -1).join('\n');
-              
-              // テキスト正規化 - 重複の検出と除去
-              let cleanedText = trimmedText;
-              
-              // 文単位の重複除去
-              const sentences = trimmedText.split(/[。.？?！!\n]/).map(s => s.trim()).filter(s => s);
-              if (sentences.length >= 2) {
-                const uniqueSentences = [...new Set(sentences)];
-                if (uniqueSentences.length < sentences.length) {
-                  cleanedText = uniqueSentences.join('。') + '。';
-                }
+            const trimmedText = text.trim();
+            if (!trimmedText) return;
+            
+            // テキスト正規化を実行
+            const cleanedText = normalizeTranscriptText(trimmedText);
+            if (!cleanedText) return;
+            
+            // 確定テキストを履歴に追加（重複チェック付き）
+            setConfirmedTranscripts((prev) => {
+              // 既に同じテキストが含まれていないか確認
+              if (!prev.includes(cleanedText)) {
+                return [...prev, cleanedText];
               }
+              return prev;
+            });
+            
+            // 部分認識をクリア
+            setCurrentPartialTranscript("");
+            
+            // ユーザー入力を更新（全確定テキストを連結）
+            setUserInput((prev) => {
+              const allConfirmedTexts = [...confirmedTranscripts, cleanedText];
+              const combinedText = allConfirmedTexts.join("\n");
               
-              // フレーズの重複除去
-              const words = cleanedText.split(/\s+/);
-              if (words.length >= 2) {
-                const halfIndex = Math.ceil(words.length / 2);
-                const firstHalf = words.slice(0, halfIndex).join(' ');
-                const secondHalf = words.slice(halfIndex).join(' ');
-                
-                if (firstHalf === secondHalf || 
-                    (firstHalf.length > 3 && secondHalf.includes(firstHalf)) ||
-                    (secondHalf.length > 3 && firstHalf.includes(secondHalf))) {
-                  cleanedText = firstHalf;
-                }
-              }
-              
-              // 重要な修正: 重複チェックを無効化し、常に新しいテキストを追加する
-              // これにより、無音検出前の複数の文章が保持される
-              // 以前の重複チェックロジックを削除:
-              
-              // 最終テキスト構築
-              if (previousConfirmedText) {
-                return `${previousConfirmedText}\n${cleanedText}`;
-              } else {
-                return cleanedText;
-              }
+              // userInputRefも同期更新
+              userInputRef.current = combinedText;
+              return combinedText;
             });
           } else {
             // 途中認識結果の処理
-            setUserInput((prevInput) => {
-              const currentRecognition = text.trim();
-              if (!currentRecognition) return prevInput;
+            const currentPartial = text.trim();
+            if (!currentPartial) return;
+            
+            // 現在の部分認識を保存
+            setCurrentPartialTranscript(currentPartial);
+            
+            // ユーザー入力を更新（確定テキスト + 途中認識）
+            setUserInput(() => {
+              const confirmedPart = confirmedTranscripts.join("\n");
+              const separator = confirmedPart && currentPartial ? "\n" : "";
+              const combinedText = confirmedPart + separator + currentPartial;
               
-              // フレーズ重複の検出と修正
-              let tempText = currentRecognition;
-              const words = tempText.split(/\s+/);
-              if (words.length >= 2) {
-                const halfIndex = Math.ceil(words.length / 2);
-                const firstHalf = words.slice(0, halfIndex).join(' ');
-                const secondHalf = words.slice(halfIndex).join(' ');
-                
-                if (firstHalf === secondHalf || 
-                    (firstHalf.length > 3 && secondHalf.includes(firstHalf)) ||
-                    (secondHalf.length > 3 && firstHalf.includes(secondHalf))) {
-                  tempText = firstHalf;
-                }
-              }
-              
-              // 確定行と途中認識を分離
-              const lines = prevInput.split('\n').filter(line => line.trim());
-              
-              // 確定行がない場合は途中認識のみ表示
-              if (lines.length === 0) {
-                return tempText;
-              }
-              
-              // 確定行が複数ある場合は、最後の行以外を確定行として保持
-              const confirmedLines = lines.length > 1 ? lines.slice(0, -1) : [];
-              
-              // 確定行 + 途中認識を返す
-              if (confirmedLines.length > 0) {
-                return `${confirmedLines.join('\n')}\n${tempText}`;
-              } else {
-                return tempText;
-              }
+              // userInputRefも同期更新
+              userInputRef.current = combinedText;
+              return combinedText;
             });
           }
         },
@@ -971,7 +987,17 @@ const ConversationPage: React.FC = () => {
     if (transcribeServiceRef.current && transcribeServiceRef.current.isListening()) {
       transcribeServiceRef.current.stopListening();
     }
-  }, []);
+    
+    // 部分認識をクリア（確定済みテキストは保持）
+    setCurrentPartialTranscript("");
+    
+    // ユーザー入力を確定済みテキストのみに更新
+    if (confirmedTranscripts.length > 0) {
+      const confirmedText = confirmedTranscripts.join("\n");
+      setUserInput(confirmedText);
+      userInputRef.current = confirmedText;
+    }
+  }, [confirmedTranscripts]);
 
   // 感情状態変化のハンドラー
   const handleEmotionChange = useCallback((emotion: EmotionState) => {
