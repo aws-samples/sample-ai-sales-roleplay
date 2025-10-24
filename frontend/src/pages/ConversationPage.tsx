@@ -395,6 +395,9 @@ const ConversationPage: React.FC = () => {
 
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
+    
+    // 入力クリアの前にuserInputRefも更新して同期を確保
+    userInputRef.current = "";
     setUserInput("");
 
     // メッセージ送信時に一時的に感情状態を更新
@@ -777,6 +780,11 @@ const ConversationPage: React.FC = () => {
       transcribeServiceRef.current.stopListening();
       setIsListening(false);
       setContinuousListening(false);
+      
+      // 現在入力中のテキストがあれば送信
+      if (userInputRef.current.trim()) {
+        sendMessage(userInputRef.current.trim());
+      }
       return;
     }
 
@@ -839,8 +847,19 @@ const ConversationPage: React.FC = () => {
           // console.log(`🔇 無音検出コールバック実行: userInputRef="${userInputRef.current}"`);
           if (userInputRef.current.trim()) {
             // console.log(`📤 無音検出による自動送信実行`);
+            
+            // 現在の入力値を一時変数に保存
+            const currentInput = userInputRef.current.trim();
+            
+            // 確実に音声認識を停止してから送信処理を実行（認識テキスト消失を防止）
+            if (transcribeServiceRef.current) {
+              transcribeServiceRef.current.stopListening();
+              setIsListening(false);
+              setContinuousListening(false);
+            }
+            
             // 引数付きでsendMessage関数を呼び出し（完全な送信処理を実行）
-            sendMessage(userInputRef.current.trim());
+            sendMessage(currentInput);
           } else {
             // console.log(`⚠️ 無音検出: userInputが空のため送信をスキップ`);
           }
