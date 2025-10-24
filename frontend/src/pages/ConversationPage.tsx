@@ -831,32 +831,48 @@ const ConversationPage: React.FC = () => {
           // console.log(`音声認識結果: "${text}", isFinal: ${isFinal}`);
           
           if (isFinal) {
-            // 確定結果：既存のテキストに追加（改行または空白で区切り）
+            // 重複テキスト問題修正: テキストが重複しているかを確認
             setUserInput((prevInput) => {
               const trimmedText = text.trim();
               if (!trimmedText) return prevInput;
               
+              // 重複テキストチェック - 同じ文章が含まれていたら追加しない
+              if (prevInput.includes(trimmedText)) {
+                console.log(`重複テキスト検出: "${trimmedText}" は既に含まれています`);
+                return prevInput;
+              }
+              
               if (prevInput && prevInput.trim()) {
                 // 既存テキストがある場合は改行で区切って追加
                 const newInput = `${prevInput}\n${trimmedText}`;
-                // console.log(`isFinal=true: 新しい入力設定 = "${newInput}"`);
+                console.log(`isFinal=true: 新しい入力設定 = "${newInput}"`);
                 return newInput;
               } else {
                 // 既存テキストがない場合は新規設定
-                // console.log(`isFinal=true: 初期入力設定 = "${trimmedText}"`);
+                console.log(`isFinal=true: 初期入力設定 = "${trimmedText}"`);
                 return trimmedText;
               }
             });
           } else {
             // 途中結果：現在の認識結果のみを表示（蓄積しない）
             setUserInput((prevInput) => {
-              const existingLines = prevInput.split('\n');
-              const confirmedLines = existingLines.slice(0, -1); // 最後の行以外は確定済み
+              // 途中結果でも重複チェックを行う
               const currentRecognition = text.trim();
               
+              // 重複テキストチェック - 同じ文章が含まれている場合
+              if (prevInput === currentRecognition) {
+                console.log(`途中認識で重複検出: "${currentRecognition}"`);
+                return prevInput;
+              }
+              
+              const existingLines = prevInput.split('\n');
+              const confirmedLines = existingLines.slice(0, -1); // 最後の行以外は確定済み
+              
               if (confirmedLines.length > 0) {
+                // 既に確定した行がある場合、最後の行を現在の認識結果に置き換え
                 return `${confirmedLines.join('\n')}\n${currentRecognition}`;
               } else {
+                // 確定行がない場合は、現在の認識結果のみ表示
                 return currentRecognition;
               }
             });
