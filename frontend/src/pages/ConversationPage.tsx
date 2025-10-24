@@ -58,10 +58,8 @@ const ConversationPage: React.FC = () => {
   });
   const [prevMetrics, setPrevMetrics] = useState<Metrics | null>(null);
   const [userInput, setUserInput] = useState("");
-  // 音声認識の確定済みテキストを保持（複数セッション間での累積用）
+  // 音声認識の確定済みテキストを保持
   const [confirmedTranscripts, setConfirmedTranscripts] = useState<string[]>([]);
-  // 途中認識（isPartial=true）のテキストを保持する配列
-  const [partialTranscripts, setPartialTranscripts] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
   // セッション開始後、コンポーネントの再マウントを防止するためのRef
@@ -452,7 +450,6 @@ const ConversationPage: React.FC = () => {
     
     // 音声認識の状態もリセット
     setConfirmedTranscripts([]);
-    setPartialTranscripts([]);
 
     // メッセージ送信時に一時的に感情状態を更新
     // ユーザーが入力している間は中立的な状態にする
@@ -852,7 +849,6 @@ const ConversationPage: React.FC = () => {
       } else {
         // テキストがない場合は音声認識状態だけクリア
         setConfirmedTranscripts([]);
-        setPartialTranscripts([]);
       }
       return;
     }
@@ -883,49 +879,30 @@ const ConversationPage: React.FC = () => {
           }
           
           if (!isPartial) {
-            // 最終確定結果を処理
+            // 最終確定時の処理（無音検出後に来る場合は既に送信済みのためスキップされる）
             const trimmedText = text.trim();
             if (!trimmedText) return;
             
-            // テキスト正規化を実行
             const cleanedText = normalizeTranscriptText(trimmedText);
             if (!cleanedText) return;
             
-            // 途中認識テキストと確定テキストを統合
             setConfirmedTranscripts((prev) => {
-              // 重複チェック
-              if (prev.includes(cleanedText)) {
-                // 途中認識だけクリア
-                setPartialTranscripts([]);
-                return prev;
-              }
+              if (prev.includes(cleanedText)) return prev;
               
-              // 途中認識があれば、それも確定済みに追加
-              const textsToAdd = partialTranscripts.length > 0 
-                ? [...partialTranscripts, cleanedText] 
-                : [cleanedText];
+              const newConfirmed = [...prev, cleanedText];
+              const combinedText = newConfirmed.join("\n");
               
-              const newConfirmedTexts = [...prev, ...textsToAdd];
-              
-              // 途中認識をクリア
-              setPartialTranscripts([]);
-              
-              // userInputを更新
-              const combinedText = newConfirmedTexts.join("\n");
               setUserInput(combinedText);
               userInputRef.current = combinedText;
               
-              return newConfirmedTexts;
+              return newConfirmed;
             });
           } else {
-            // 途中認識結果の処理 - Transcribeは累積的にテキストを返す
+            // 途中認識時の処理 - Transcribeは累積的にテキストを返す
             const currentPartial = text.trim();
             if (!currentPartial) return;
             
-            // 途中認識をそのまま表示（Transcribeが既に累積して返すため）
-            setPartialTranscripts([currentPartial]);
-            
-            // 確定済みテキストと組み合わせて表示
+            // 確定済みテキストと途中認識を組み合わせて表示
             const combinedText = confirmedTranscripts.length > 0 
               ? confirmedTranscripts.join("\n") + "\n" + currentPartial
               : currentPartial;
@@ -976,7 +953,7 @@ const ConversationPage: React.FC = () => {
       setSpeechRecognitionError("not-supported");
       setIsListening(false);
     }
-  }, [isListening, sessionId, sendMessage, confirmedTranscripts, partialTranscripts, normalizeTranscriptText]);
+  }, [isListening, sessionId, sendMessage, confirmedTranscripts, normalizeTranscriptText]);
 
   // 音声認識を停止し、テキスト入力モードに切り替え
   const switchToTextInput = useCallback(() => {
