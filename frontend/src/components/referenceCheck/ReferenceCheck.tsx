@@ -5,6 +5,7 @@ import ReferenceCheckResults from "./ReferenceCheckResults";
 
 interface ReferenceCheckProps {
   sessionId: string;
+  language?: string;
   isVisible?: boolean;
 }
 
@@ -13,10 +14,11 @@ interface ReferenceCheckProps {
  */
 const ReferenceCheck: React.FC<ReferenceCheckProps> = ({
   sessionId,
+  language = "ja",
   isVisible = true,
 }) => {
   const { data, isLoading, isAnalyzing, error, issuesCount } =
-    useReferenceCheck(sessionId, isVisible);
+    useReferenceCheck(sessionId, language, isVisible);
 
   // コンポーネントが非表示の場合は何も表示しない
   if (!isVisible) {

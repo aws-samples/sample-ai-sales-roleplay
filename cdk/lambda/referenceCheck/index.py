@@ -497,13 +497,16 @@ def get_reference_check(sessionId: str):
     - sessionId: セッションID
 
     クエリパラメータ:
+    - language: 言語設定 ("ja" または "en")
 
     レスポンス:
     - リファレンスチェック結果（メッセージごとに実行し、結果を集約）
     """
 
     try:
-        logger.info(f"リファレンスチェックを開始: sessionId={sessionId}")
+        # クエリパラメータから言語設定を取得
+        language = app.current_event.query_string_parameters.get("language", "ja") if app.current_event.query_string_parameters else "ja"
+        logger.info(f"リファレンスチェックを開始: sessionId={sessionId}, language={language}")
 
         # 既存のリファレンスチェック結果をチェック
         existing_result = get_existing_reference_check(sessionId)
@@ -580,7 +583,7 @@ def get_reference_check(sessionId: str):
             try:
 
                 result: QueryKnowledgeBaseOutput = call_agent(
-                    user_message, full_context, scenario_id
+                    user_message, full_context, scenario_id, language
                 )
 
                 # PydanticモデルをDynamoDB互換の辞書に変換

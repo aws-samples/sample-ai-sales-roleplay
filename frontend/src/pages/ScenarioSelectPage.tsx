@@ -498,7 +498,9 @@ const ScenarioSelectPage: React.FC = () => {
               displayEmpty
               startAdornment={<SortIcon fontSize="small" sx={{ mr: 0.5 }} />}
             >
-              <MenuItem value="difficulty">難易度順</MenuItem>
+              <MenuItem value="difficulty">
+                {t("scenarios.sort.byDifficulty")}
+              </MenuItem>
               <MenuItem value="industry">
                 {t("scenarios.sort.byIndustry")}
               </MenuItem>
@@ -740,11 +742,13 @@ const ScenarioSelectPage: React.FC = () => {
         {/* フッター情報 */}
         <Box textAlign="center" mt={6} pt={3} borderTop="1px solid #eee">
           <Typography variant="body2" color="text.secondary" mb={1}>
-            💡 ヒント:
-            初級シナリオから始めて、徐々に難易度を上げることをお勧めします
+            {t("scenarios.hints.title")}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={1}>
+            {t("scenarios.hints.beginnerRecommendation")}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            各シナリオは約5-15分で完了します
+            {t("scenarios.hints.duration")}
           </Typography>
         </Box>
       </Container>

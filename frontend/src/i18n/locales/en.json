@@ -250,6 +250,7 @@
       "importDuplicateError": "Import failed: Scenario ID already exists. Duplicate IDs are not allowed during import."
     },
     "sort": {
+      "byDifficulty": "Sort by Difficulty",
       "byIndustry": "Sort by Industry",
       "byTitle": "Sort by Title"
     },
@@ -257,6 +258,11 @@
       "allLevels": "All Levels",
       "allIndustries": "All Industries",
       "favoritesOnly": "Favorites Only"
+    },
+    "hints": {
+      "title": "💡 Tips:",
+      "beginnerRecommendation": "We recommend starting with beginner scenarios and gradually increasing the difficulty",
+      "duration": "Each scenario takes approximately 5-15 minutes to complete"
     },
     "create": {
       "button": "Create Scenario",
@@ -738,6 +744,7 @@
     "noIssues": "No consistency issues with documents were found. Appropriate information was provided.",
     "issuesFoundTitle": "Issues Found",
     "issuesFoundDescription": "Consistency issues with documents were found. Please review the details below.",
+    "allMessages": "All Message Details",
     "messageDetails": "Message Details",
     "messageNumber": "Message {{number}}",
     "userMessage": "User Statement",
