@@ -828,43 +828,76 @@ const ConversationPage: React.FC = () => {
       await transcribeServiceRef.current.startListening(
         // 文字起こしコールバック（音声認識結果の蓄積）
         (text, isFinal) => {
-          // console.log(`音声認識結果: "${text}", isFinal: ${isFinal}`);
+          console.log(`音声認識結果: "${text}", isFinal: ${isFinal}`);
           
           if (isFinal) {
-            // 重複テキスト問題修正: テキストが重複しているかを確認
+            // 最終確定結果を処理
             setUserInput((prevInput) => {
               const trimmedText = text.trim();
               if (!trimmedText) return prevInput;
               
-              // テキスト整形 - 重複フレーズのパターンを検出して削除
-              let cleanedText = trimmedText;
-              // 同じ文章が繰り返されているパターンを検出
-              const sentences = trimmedText.split(/[。.？?！!]/);
-              if (sentences.length >= 2) {
-                // 文単位で重複を検出する
-                for (let i = 0; i < sentences.length - 1; i++) {
-                  const currentSentence = sentences[i].trim();
-                  if (currentSentence && sentences.filter(s => s.trim() === currentSentence).length > 1) {
-                    console.log(`文単位の重複を検出: "${currentSentence}"`);
-                    // 重複した文は1つだけ残す処理を行う
-                    cleanedText = sentences.filter((s, index, self) => 
-                      index === self.findIndex(t => t.trim() === s.trim()) && s.trim()
-                    ).join('。') + '。';
-                    console.log(`クリーニング後のテキスト: "${cleanedText}"`);
-                    break;
-                  }
+              // 重要な修正: 現在のテキストが途中結果から来ている場合は、それを置換する
+              // この処理により、途中結果と最終結果が重複することを防止
+              let previousTextWithoutTemp = prevInput;
+              
+              // 途中結果と確定結果の類似度を確認して、途中結果を削除
+              const lines = prevInput.split('\n');
+              if (lines.length > 0) {
+                const lastLine = lines[lines.length - 1];
+                
+                // 最後の行が現在の確定テキストの一部を含んでいる場合
+                if (lastLine && 
+                    (trimmedText.includes(lastLine) || 
+                     lastLine.includes(trimmedText.substring(0, Math.min(trimmedText.length, lastLine.length * 0.8))))) {
+                  console.log(`途中結果を検出して削除: "${lastLine}"`);
+                  // 途中結果を削除し、確定結果のみを使用
+                  previousTextWithoutTemp = lines.slice(0, lines.length - 1).join('\n');
                 }
               }
               
-              // 既存の入力と重複チェック
-              if (prevInput.includes(cleanedText)) {
-                console.log(`重複テキスト検出: "${cleanedText}" は既に含まれています`);
-                return prevInput;
+              // テキスト整形 - 文の重複を検出して削除
+              let cleanedText = trimmedText;
+              
+              // 文末文字で分割して重複検出
+              const sentences = trimmedText.split(/[。.？?！!\n]/).map(s => s.trim()).filter(s => s);
+              if (sentences.length >= 2) {
+                // 同じ文が複数含まれているかチェック
+                const uniqueSentences = [...new Set(sentences)];
+                if (uniqueSentences.length < sentences.length) {
+                  console.log(`文単位の重複を検出: ${sentences.length}文中${uniqueSentences.length}文がユニーク`);
+                  // 重複を除去したテキスト生成
+                  cleanedText = uniqueSentences.join('。') + '。';
+                  console.log(`クリーニング後のテキスト: "${cleanedText}"`);
+                }
               }
               
-              if (prevInput && prevInput.trim()) {
-                // 既存テキストがある場合は改行で区切って追加
-                const newInput = `${prevInput}\n${cleanedText}`;
+              // フレーズの重複パターン検出（「こんにちは こんにちは」型）
+              const words = cleanedText.split(/\s+/);
+              if (words.length >= 2) {
+                // 前半と後半が同じ場合
+                const halfIndex = Math.ceil(words.length / 2);
+                const firstHalf = words.slice(0, halfIndex).join(' ');
+                const secondHalf = words.slice(halfIndex).join(' ');
+                
+                if (firstHalf === secondHalf || 
+                    (firstHalf.length > 3 && secondHalf.includes(firstHalf)) ||
+                    (secondHalf.length > 3 && firstHalf.includes(secondHalf))) {
+                  console.log(`フレーズ重複を検出: "${firstHalf}" と "${secondHalf}"`);
+                  cleanedText = firstHalf;
+                }
+              }
+              
+              // 既存の文と完全重複チェック
+              if (previousTextWithoutTemp && previousTextWithoutTemp.includes(cleanedText)) {
+                console.log(`重複テキスト検出: "${cleanedText}" は既に含まれています`);
+                return prevInput; // 変更なし
+              }
+              
+              // 最終的なテキスト構築
+              if (previousTextWithoutTemp && previousTextWithoutTemp.trim()) {
+                const newInput = previousTextWithoutTemp 
+                  ? `${previousTextWithoutTemp}\n${cleanedText}`
+                  : cleanedText;
                 console.log(`isFinal=true: 新しい入力設定 = "${newInput}"`);
                 return newInput;
               } else {
@@ -874,37 +907,47 @@ const ConversationPage: React.FC = () => {
               }
             });
           } else {
-            // 途中結果：現在の認識結果のみを表示（蓄積しない）
+            // 途中結果処理：確定部分は維持し、未確定部分だけ更新
             setUserInput((prevInput) => {
-              // 途中結果でも重複チェックを行う
-              let currentRecognition = text.trim();
+              // 一時的な認識結果
+              const currentRecognition = text.trim();
+              if (!currentRecognition) return prevInput;
               
-              // フレーズ重複パターンを検出して修正
-              const phrases = currentRecognition.split(/\s+/);
-              if (phrases.length > 1) {
-                const firstHalf = phrases.slice(0, Math.ceil(phrases.length / 2)).join(' ');
-                const secondHalf = phrases.slice(Math.ceil(phrases.length / 2)).join(' ');
-                if (firstHalf === secondHalf) {
-                  console.log(`途中認識でフレーズ重複を検出: "${firstHalf}" が2回繰り返されています`);
-                  currentRecognition = firstHalf;
+              // フレーズ重複の検出と修正
+              let tempText = currentRecognition;
+              
+              // 重複パターン検出: 「こんにちは こんにちは」型
+              const words = tempText.split(/\s+/);
+              if (words.length >= 2) {
+                const halfIndex = Math.ceil(words.length / 2);
+                const firstHalf = words.slice(0, halfIndex).join(' ');
+                const secondHalf = words.slice(halfIndex).join(' ');
+                
+                if (firstHalf === secondHalf || 
+                    (firstHalf.length > 3 && secondHalf.includes(firstHalf)) ||
+                    (secondHalf.length > 3 && firstHalf.includes(secondHalf))) {
+                  console.log(`途中認識で重複フレーズ: "${firstHalf}" と "${secondHalf}"`);
+                  tempText = firstHalf;
                 }
               }
               
-              // 重複テキストチェック - 同じ文章が含まれている場合
-              if (prevInput === currentRecognition) {
-                console.log(`途中認識で重複検出: "${currentRecognition}"`);
+              // 重複テキストと同一なら更新しない
+              if (prevInput === tempText) {
                 return prevInput;
               }
               
-              const existingLines = prevInput.split('\n');
-              const confirmedLines = existingLines.slice(0, -1); // 最後の行以外は確定済み
+              // 確定済みテキストと現在の途中認識を分離
+              const lines = prevInput.split('\n');
+              const confirmedLines = lines.filter(line => 
+                // 途中認識が確定ラインを含まない場合のみ確定と判断
+                !tempText.includes(line)
+              );
               
+              // 確定済みテキストに途中認識を追加
               if (confirmedLines.length > 0) {
-                // 既に確定した行がある場合、最後の行を現在の認識結果に置き換え
-                return `${confirmedLines.join('\n')}\n${currentRecognition}`;
+                return `${confirmedLines.join('\n')}\n${tempText}`;
               } else {
-                // 確定行がない場合は、現在の認識結果のみ表示
-                return currentRecognition;
+                return tempText;
               }
             });
           }
