@@ -60,8 +60,6 @@ const ConversationPage: React.FC = () => {
   const [userInput, setUserInput] = useState("");
   // 音声認識の確定済みテキストを保持（複数セッション間での累積用）
   const [confirmedTranscripts, setConfirmedTranscripts] = useState<string[]>([]);
-  // 現在の音声認識セッション内の途中認識テキスト
-  const [currentPartialTranscript, setCurrentPartialTranscript] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
   // セッション開始後、コンポーネントの再マウントを防止するためのRef
@@ -130,7 +128,6 @@ const ConversationPage: React.FC = () => {
       
       // 音声認識関連の状態もクリアする
       setConfirmedTranscripts([]);
-      setCurrentPartialTranscript("");
     };
   }, []);
 
@@ -453,7 +450,6 @@ const ConversationPage: React.FC = () => {
     
     // 音声認識の状態もリセット
     setConfirmedTranscripts([]);
-    setCurrentPartialTranscript("");
 
     // メッセージ送信時に一時的に感情状態を更新
     // ユーザーが入力している間は中立的な状態にする
@@ -853,7 +849,6 @@ const ConversationPage: React.FC = () => {
       } else {
         // テキストがない場合は音声認識状態だけクリア
         setConfirmedTranscripts([]);
-        setCurrentPartialTranscript("");
       }
       return;
     }
@@ -901,11 +896,10 @@ const ConversationPage: React.FC = () => {
               return prev;
             });
             
-            // 部分認識をクリア
-            setCurrentPartialTranscript("");
+            // 部分認識をクリア（状態変数は不要のため処理のみ記録）
             
             // ユーザー入力を更新（全確定テキストを連結）
-            setUserInput((prev) => {
+            setUserInput(() => {
               const allConfirmedTexts = [...confirmedTranscripts, cleanedText];
               const combinedText = allConfirmedTexts.join("\n");
               
@@ -918,8 +912,7 @@ const ConversationPage: React.FC = () => {
             const currentPartial = text.trim();
             if (!currentPartial) return;
             
-            // 現在の部分認識を保存
-            setCurrentPartialTranscript(currentPartial);
+            // 現在の部分認識を処理（状態変数への保存は不要）
             
             // ユーザー入力を更新（確定テキスト + 途中認識）
             setUserInput(() => {
@@ -975,7 +968,7 @@ const ConversationPage: React.FC = () => {
       setSpeechRecognitionError("not-supported");
       setIsListening(false);
     }
-  }, [isListening, sessionId, sendMessage]);
+  }, [isListening, sessionId, sendMessage, confirmedTranscripts, normalizeTranscriptText]);
 
   // 音声認識を停止し、テキスト入力モードに切り替え
   const switchToTextInput = useCallback(() => {
@@ -989,7 +982,6 @@ const ConversationPage: React.FC = () => {
     }
     
     // 部分認識をクリア（確定済みテキストは保持）
-    setCurrentPartialTranscript("");
     
     // ユーザー入力を確定済みテキストのみに更新
     if (confirmedTranscripts.length > 0) {
