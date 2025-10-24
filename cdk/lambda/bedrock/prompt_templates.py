@@ -27,6 +27,12 @@ NPC_BASE_PROMPT_TEMPLATE = {
     "ja": """
 あなたは商談シミュレーションのNPCとして以下の人物を演じてください：
 
+## Scenario Context
+シナリオ: {scenario_title}
+説明: {scenario_description}
+目標: {scenario_goals}
+目的: {scenario_objectives}
+
 ## Character Profile
 名前: {npc_name}
 役職: {npc_role}
@@ -48,6 +54,12 @@ NPC_BASE_PROMPT_TEMPLATE = {
 """,
     "en": """
 You are playing the role of an NPC in a sales simulation as the following character:
+
+## Scenario Context
+Scenario: {scenario_title}
+Description: {scenario_description}
+Goals: {scenario_goals}
+Objectives: {scenario_objectives}
 
 ## Character Profile
 Name: {npc_name}
