@@ -865,10 +865,9 @@ const ConversationPage: React.FC = () => {
                 }
               }
               
-              // 既存テキストとの重複チェック
-              if (previousConfirmedText && previousConfirmedText.includes(cleanedText)) {
-                return prevInput; // 重複の場合は変更なし
-              }
+              // 重要な修正: 重複チェックを無効化し、常に新しいテキストを追加する
+              // これにより、無音検出前の複数の文章が保持される
+              // 以前の重複チェックロジックを削除:
               
               // 最終テキスト構築
               if (previousConfirmedText) {
