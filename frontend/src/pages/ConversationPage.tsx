@@ -956,8 +956,8 @@ const ConversationPage: React.FC = () => {
         // 必須ゴールがすべて達成された場合、セッションを終了
         if (areAllRequiredGoalsAchieved(goalStatuses, goals)) {
           setTimeout(async () => {
-            if (!sessionEnded && messages.length > 0) {
-              await endSession(messages, currentMetrics);
+            if (!sessionEnded && messagesRef.current.length > 0) {
+              await endSession(messagesRef.current, currentMetrics);
             }
           }, 2000);
         }
