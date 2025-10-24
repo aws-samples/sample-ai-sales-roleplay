@@ -381,12 +381,12 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
               if (event.TranscriptEvent?.Transcript?.Results) {
                 for (const result of event.TranscriptEvent.Transcript.Results) {
                   const transcript = result.Alternatives?.[0]?.Transcript || '';
-                  const isFinal = result.IsPartial === false;
+                  const isPartial = result.IsPartial === true;  // AWS Transcribe APIの標準に準拠
                   
                   if (transcript.trim()) {
                     await sendToClient(apiClient, connectionId, {
                       transcript,
-                      isFinal
+                      isPartial  // true=途中認識、false=最終確定
                     });
                     
                     // 音声アクティビティの検出
