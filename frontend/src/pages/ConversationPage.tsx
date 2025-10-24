@@ -826,58 +826,34 @@ const ConversationPage: React.FC = () => {
       
       // Amazon Transcribeを使った常時マイク入力を開始
       await transcribeServiceRef.current.startListening(
-        // 文字起こしコールバック（音声認識結果の蓄積）
+        // 文字起こしコールバック
         (text, isFinal) => {
-          console.log(`音声認識結果: "${text}", isFinal: ${isFinal}`);
-          
           if (isFinal) {
             // 最終確定結果を処理
             setUserInput((prevInput) => {
               const trimmedText = text.trim();
               if (!trimmedText) return prevInput;
               
-              // 重要な修正: 現在のテキストが途中結果から来ている場合は、それを完全に置き換える
-              // これにより、途中結果と最終結果が混在することを防止する
-              
-              // 途中認識結果をすべて削除し、確定結果のみを使用
-              // ログから分析: 途中結果は最終結果に含まれるが、最終結果とは若干異なる場合がある
-              // そのため、途中結果はすべて破棄して最終結果のみを信頼する
-              console.log(`確定結果受信: "${trimmedText}"`);
-              
-              // 以前の確定行だけを保持し、途中認識結果は破棄する
-              let previousConfirmedText = "";
+              // 途中認識結果と確定結果の分離
               const lines = prevInput.split('\n').filter(line => line.trim());
+              // 最後の行は途中認識の可能性があるため、確定行は複数行ある場合のみ抽出
+              const previousConfirmedText = lines.length <= 1 ? "" : lines.slice(0, -1).join('\n');
               
-              // 空でないラインが1行のみの場合、途中認識結果と判断
-              if (lines.length <= 1) {
-                console.log(`途中認識結果を完全に置換: "${prevInput}"`);
-                previousConfirmedText = "";
-              } else {
-                // 複数行ある場合、最後の行を途中認識結果と判断して削除
-                previousConfirmedText = lines.slice(0, -1).join('\n');
-                console.log(`途中認識結果を削除: "${lines[lines.length - 1]}"、確定テキスト: "${previousConfirmedText}"`);
-              }
-              
-              // テキスト整形 - 文の重複を検出して削除
+              // テキスト正規化 - 重複の検出と除去
               let cleanedText = trimmedText;
               
-              // 文末文字で分割して重複検出
+              // 文単位の重複除去
               const sentences = trimmedText.split(/[。.？?！!\n]/).map(s => s.trim()).filter(s => s);
               if (sentences.length >= 2) {
-                // 同じ文が複数含まれているかチェック
                 const uniqueSentences = [...new Set(sentences)];
                 if (uniqueSentences.length < sentences.length) {
-                  console.log(`文単位の重複を検出: ${sentences.length}文中${uniqueSentences.length}文がユニーク`);
-                  // 重複を除去したテキスト生成
                   cleanedText = uniqueSentences.join('。') + '。';
-                  console.log(`クリーニング後のテキスト: "${cleanedText}"`);
                 }
               }
               
-              // フレーズの重複パターン検出（「こんにちは こんにちは」型）
+              // フレーズの重複除去
               const words = cleanedText.split(/\s+/);
               if (words.length >= 2) {
-                // 前半と後半が同じ場合
                 const halfIndex = Math.ceil(words.length / 2);
                 const firstHalf = words.slice(0, halfIndex).join(' ');
                 const secondHalf = words.slice(halfIndex).join(' ');
@@ -885,39 +861,30 @@ const ConversationPage: React.FC = () => {
                 if (firstHalf === secondHalf || 
                     (firstHalf.length > 3 && secondHalf.includes(firstHalf)) ||
                     (secondHalf.length > 3 && firstHalf.includes(secondHalf))) {
-                  console.log(`フレーズ重複を検出: "${firstHalf}" と "${secondHalf}"`);
                   cleanedText = firstHalf;
                 }
               }
               
-              // 既存の文と完全重複チェック
+              // 既存テキストとの重複チェック
               if (previousConfirmedText && previousConfirmedText.includes(cleanedText)) {
-                console.log(`重複テキスト検出: "${cleanedText}" は既に含まれています`);
-                return prevInput; // 変更なし
+                return prevInput; // 重複の場合は変更なし
               }
               
-              // 最終的なテキスト構築
-              if (previousConfirmedText && previousConfirmedText.trim()) {
-                const newInput = `${previousConfirmedText}\n${cleanedText}`;
-                console.log(`isFinal=true: 新しい入力設定 = "${newInput}"`);
-                return newInput;
+              // 最終テキスト構築
+              if (previousConfirmedText) {
+                return `${previousConfirmedText}\n${cleanedText}`;
               } else {
-                // 既存テキストがない場合は新規設定
-                console.log(`isFinal=true: 初期入力設定 = "${cleanedText}"`);
                 return cleanedText;
               }
             });
           } else {
-            // 途中結果処理：完全に新しいアプローチ - 途中認識は別トラックとして扱う
+            // 途中認識結果の処理
             setUserInput((prevInput) => {
-              // 一時的な認識結果
               const currentRecognition = text.trim();
               if (!currentRecognition) return prevInput;
               
               // フレーズ重複の検出と修正
               let tempText = currentRecognition;
-              
-              // 重複パターン検出: 「こんにちは こんにちは」型
               const words = tempText.split(/\s+/);
               if (words.length >= 2) {
                 const halfIndex = Math.ceil(words.length / 2);
@@ -927,29 +894,25 @@ const ConversationPage: React.FC = () => {
                 if (firstHalf === secondHalf || 
                     (firstHalf.length > 3 && secondHalf.includes(firstHalf)) ||
                     (secondHalf.length > 3 && firstHalf.includes(secondHalf))) {
-                  console.log(`途中認識で重複フレーズ: "${firstHalf}" と "${secondHalf}"`);
                   tempText = firstHalf;
                 }
               }
               
-              // 重要な修正: 途中認識は確定行と完全に分離する
-              // prevInputから確定行を抽出
+              // 確定行と途中認識を分離
               const lines = prevInput.split('\n').filter(line => line.trim());
               
-              // 確定行がない場合は単純に途中認識を表示
+              // 確定行がない場合は途中認識のみ表示
               if (lines.length === 0) {
                 return tempText;
               }
               
-              // 最後の行が途中認識の場合は、その行だけを置き換える
-              // 確定行が複数ある場合は、最後の行以外を「確定行」と判断
+              // 確定行が複数ある場合は、最後の行以外を確定行として保持
               const confirmedLines = lines.length > 1 ? lines.slice(0, -1) : [];
               
               // 確定行 + 途中認識を返す
               if (confirmedLines.length > 0) {
                 return `${confirmedLines.join('\n')}\n${tempText}`;
               } else {
-                // 確定行なし、途中認識のみ
                 return tempText;
               }
             });
