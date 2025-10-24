@@ -48,12 +48,13 @@ class PromptBuilder:
         npc_info: Dict[str, Any],
         previous_messages: List[Dict[str, Any]] = None,
         emotion_params: Optional[Dict[str, int]] = None,
+        scenario_info: Optional[Dict[str, Any]] = None,
         language: str = None
     ) -> str:
         """
         NPCとの対話用プロンプトを生成
         
-        ユーザーのメッセージ、NPC情報、過去の会話履歴、およびシナリオタイプに基づいて
+        ユーザーのメッセージ、NPC情報、シナリオ情報、過去の会話履歴に基づいて
         Bedrockモデルへ送信するためのプロンプトを生成します。
         NPC情報にはデフォルト値が適用され、会話履歴はフォーマットされ、
         シナリオや性格に応じた追加ルールが適用されます。
@@ -61,11 +62,12 @@ class PromptBuilder:
         
         Args:
             user_message (str): ユーザーのメッセージ
-            npc_info (Dict[str, Any]): NPC情報（name, role, company, personality）
+            npc_info (Dict[str, Any]): NPC情報（name, role, company, personality, description）
                 - name (str): NPCの名前
                 - role (str): NPCの役職
                 - company (str): NPCの会社名
                 - personality (List[str]): 性格特性のリスト（例：["厳しい", "効率重視"]）
+                - description (str): NPCの詳細な背景説明（年齢、状況など）
             previous_messages (List[Dict[str, Any]], optional): 過去の会話履歴
                 - sender (str): メッセージの送信者 ("user" または "npc")
                 - content (str): メッセージの内容
@@ -74,6 +76,11 @@ class PromptBuilder:
                 - angerLevel (int): 怒りレベル (1-10)
                 - trustLevel (int): 信頼レベル (1-10)
                 - progressLevel (int): 進捗レベル (1-10)
+            scenario_info (Dict[str, Any], optional): シナリオ情報
+                - title (str): シナリオタイトル
+                - description (str): シナリオ説明
+                - goals (str/List): シナリオの目標
+                - objectives (str/List): シナリオの目的
             language (str, optional): 使用言語コード（"ja", "en"など）。
                 - 指定がない場合はデフォルト言語（日本語）を使用
         
@@ -100,6 +107,34 @@ class PromptBuilder:
         separator = ", " if lang == "en" else "、"
         personality_text = separator.join(personality_traits)
         
+        # NPCの詳細説明を取得（ない場合は空文字）
+        npc_description = npc_info.get('description', '')
+        
+        # シナリオ情報を処理
+        scenario_title = ""
+        scenario_description = ""
+        scenario_goals = ""
+        scenario_objectives = ""
+        
+        if scenario_info:
+            scenario_title = scenario_info.get('title', '')
+            scenario_description = scenario_info.get('description', '')
+            
+            # goals と objectives は文字列またはリストの可能性がある
+            goals = scenario_info.get('goals', '')
+            if isinstance(goals, list):
+                separator = ", " if lang == "en" else "、"
+                scenario_goals = separator.join(str(g) for g in goals)
+            else:
+                scenario_goals = str(goals) if goals else ""
+                
+            objectives = scenario_info.get('objectives', '')
+            if isinstance(objectives, list):
+                separator = ", " if lang == "en" else "、"
+                scenario_objectives = separator.join(str(o) for o in objectives)
+            else:
+                scenario_objectives = str(objectives) if objectives else ""
+        
         # ルールの構築（シナリオ別・性格別ルール含む）
         conversation_rules = self._build_conversation_rules(
             personality_traits, lang
@@ -125,10 +160,15 @@ class PromptBuilder:
         
         # プロンプトの組み立て
         prompt = base_template.format(
+            scenario_title=scenario_title,
+            scenario_description=scenario_description,
+            scenario_goals=scenario_goals,
+            scenario_objectives=scenario_objectives,
             npc_name=npc_info['name'],
             npc_role=npc_info['role'],
             npc_company=npc_info['company'],
             personality_text=personality_text,
+            npc_description=npc_description,
             conversation_rules=conversation_rules,
             emotion_state=emotion_text,
             conversation_history=conversation_history,

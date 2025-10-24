@@ -93,6 +93,49 @@ def get_user_id_from_event():
         logger.warning("ユーザーID取得失敗、匿名ユーザーとして処理します")
         return "anonymous"
 
+
+def get_scenario_info(scenario_id: str) -> Dict[str, Any]:
+    """
+    シナリオIDからシナリオ詳細情報を取得する
+    
+    Args:
+        scenario_id (str): シナリオID
+        
+    Returns:
+        Dict[str, Any]: シナリオ情報（title, description, goals, objectives等）
+                       取得できない場合は空の辞書を返す
+    """
+    try:
+        if not SCENARIOS_TABLE:
+            logger.warning("SCENARIOS_TABLE環境変数が設定されていません")
+            return {}
+            
+        # DynamoDBからシナリオ詳細を取得
+        scenarios_table = dynamodb.Table(SCENARIOS_TABLE)
+        response = scenarios_table.get_item(Key={'scenarioId': scenario_id})
+        
+        if 'Item' not in response:
+            logger.warning(f"シナリオが見つかりません: {scenario_id}")
+            return {}
+            
+        scenario_data = response['Item']
+        
+        # プロンプト生成に必要な情報のみを抽出
+        scenario_info = {
+            'title': scenario_data.get('title', ''),
+            'description': scenario_data.get('description', ''),
+            'goals': scenario_data.get('goals', ''),
+            'objectives': scenario_data.get('objectives', '')
+        }
+        
+        logger.info(f"シナリオ情報取得成功: {scenario_id}")
+        return scenario_info
+        
+    except Exception as e:
+        logger.error(f"シナリオ情報取得エラー: {str(e)}, scenario_id: {scenario_id}")
+        return {}
+
+
 def create_or_update_session(user_id: str, session_id: str = None, scenario_id: str = None, npc_info: Dict = None, title: str = None):
     """
     セッションを作成または更新します
@@ -522,12 +565,18 @@ def handle_bedrock_conversation():
             metrics=emotion_params  # メトリクスとして感情パラメータを保存
         )
         
+        # シナリオ情報を取得（scenario_idが指定されている場合）
+        scenario_info = None
+        if scenario_id:
+            scenario_info = get_scenario_info(scenario_id)
+        
         # プロンプトの作成
         prompt = prompt_builder.build_npc_prompt(
             user_message=user_message,
             npc_info=npc_info,
             previous_messages=previous_messages,
             emotion_params=emotion_params,  # 感情パラメータを追加
+            scenario_info=scenario_info,  # シナリオ情報を追加
             language=language  # 言語設定を追加
         )
         logger.info("NPC会話用のプロンプトを生成しました", extra={

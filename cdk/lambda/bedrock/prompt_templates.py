@@ -27,11 +27,18 @@ NPC_BASE_PROMPT_TEMPLATE = {
     "ja": """
 あなたは商談シミュレーションのNPCとして以下の人物を演じてください：
 
+## Scenario Context
+シナリオ: {scenario_title}
+説明: {scenario_description}
+目標: {scenario_goals}
+目的: {scenario_objectives}
+
 ## Character Profile
 名前: {npc_name}
 役職: {npc_role}
 会社: {npc_company}
 性格: {personality_text}
+背景: {npc_description}
 
 ## emotion_state
 {emotion_state}
@@ -48,11 +55,18 @@ NPC_BASE_PROMPT_TEMPLATE = {
     "en": """
 You are playing the role of an NPC in a sales simulation as the following character:
 
+## Scenario Context
+Scenario: {scenario_title}
+Description: {scenario_description}
+Goals: {scenario_goals}
+Objectives: {scenario_objectives}
+
 ## Character Profile
 Name: {npc_name}
 Role: {npc_role}
 Company: {npc_company}
 Personality: {personality_text}
+Background: {npc_description}
 
 ## emotion_state
 {emotion_state}
@@ -194,5 +208,6 @@ DEFAULT_NPC_INFO = {
     "name": "田中太郎",
     "role": "購買担当者",
     "company": "株式会社ABC",
-    "personality": ["厳しい", "効率重視", "合理的"]
+    "personality": ["厳しい", "効率重視", "合理的"],
+    "description": "30代のビジネスマン。製造業の購買部門で働いている。"
 }
