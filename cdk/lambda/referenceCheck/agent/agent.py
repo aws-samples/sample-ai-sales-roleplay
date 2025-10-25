@@ -19,13 +19,6 @@ boto_config = BotocoreConfig(
     read_timeout=300,
 )
 
-# システムプロンプトは言語に応じて動的に設定するため、ここでは基本設定のみ
-bedrock_model_base = BedrockModel(
-    model_id=BEDROCK_MODEL_REFERENCE_CHECK,
-    region_name=REGION,
-    boto_client_config=boto_config,
-)
-
 
 def call_agent(
     user_message: str, context: str, scenario_id: str, language: str = "ja"
@@ -158,12 +151,13 @@ check_single_message_reference: Knowledge Baseのクエリが可能。ユーザ�
 - related: ユーザーの発言に問題があるかどうか。ドキュメントとの矛盾、または一般的な営業ベストプラクティスに反する場合はfalse、それ以外はtrue（true/false）
 """
         
+        logger.debug(f"BEDROCK_MODEL_REFERENCE_CHECK: {BEDROCK_MODEL_REFERENCE_CHECK}")
         # 言語に応じたBedrockModelを作成
         bedrock_model = BedrockModel(
-            model_id=bedrock_model_base.model_id,
-            region_name=bedrock_model_base.region_name,
+            model_id=BEDROCK_MODEL_REFERENCE_CHECK,
+            region_name=REGION,
             system_prompt=system_prompt,
-            boto_client_config=bedrock_model_base.boto_client_config,
+            boto_client_config=boto_config
         )
 
         logger.debug(f"prompt: {prompt}")

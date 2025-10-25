@@ -572,7 +572,7 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                             messages=messages,
                             goal_statuses=current_goal_statuses,
                             scenario_goals=scenario_goals,
-                            language=session_info.get('language', 'ja')
+                            language=scenario_info.get('language', 'ja') if scenario_info else 'ja'
                         )
                         
                         logger.info("通常セッションフィードバック生成完了", extra={
