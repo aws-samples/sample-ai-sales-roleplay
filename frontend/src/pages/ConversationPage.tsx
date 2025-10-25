@@ -512,6 +512,8 @@ const ConversationPage: React.FC = () => {
             cleanMetrics,
             // シナリオIDを追加
             String(scenario.id),
+            // 言語設定を追加
+            scenario?.language || 'ja',
           );
 
           const { response } = result;

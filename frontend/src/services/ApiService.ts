@@ -243,6 +243,7 @@ export class ApiService {
    * @param messageId メッセージID
    * @param emotionParams 感情パラメータ（怒りレベル、信頼レベル、進捗レベル）
    * @param scenarioId シナリオID
+   * @param language 言語設定（"ja", "en"など）
    * @returns NPCの応答
    */
   public async chatWithNPC(
@@ -257,6 +258,7 @@ export class ApiService {
       progressLevel?: number;
     },
     scenarioId?: string,
+    language?: string,
   ): Promise<{ response: string; sessionId: string; messageId: string }> {
     try {
       // リクエストボディの作成
@@ -292,6 +294,8 @@ export class ApiService {
               },
             }
           : {}),
+        // 言語設定を追加
+        ...(language ? { language } : {}),
       };
 
       console.log("requestBody:", requestBody);
