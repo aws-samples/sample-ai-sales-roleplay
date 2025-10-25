@@ -39,72 +39,16 @@ function mapLanguageCodeToTranscribe(scenarioLanguage: string): string {
 }
 
 /**
- * セッションIDからシナリオ言語設定を取得（リトライ機能付き）
+ * 旧版：セッションIDからシナリオ言語設定を取得（リトライ機能付き） - 廃止予定
+ * 新しい実装では、WebSocketメッセージに言語情報を直接含めるため、この関数は不要になりました
  */
+/* 
 async function getLanguageFromSession(sessionId: string, connectionId: string, retryCount: number = 0): Promise<string> {
-  const maxRetries = 3;
-  const retryDelay = 2000; // 2秒
-  
-  try {
-    // 接続情報からuserIdを取得
-    const connectionInfo = await ddbDocClient.send(new GetCommand({
-      TableName: TABLE_NAME,
-      Key: { connectionId }
-    }));
-    
-    if (!connectionInfo.Item?.userId) {
-      console.warn(`接続 ${connectionId} にuserIdが見つかりません`);
-      return 'ja-JP'; // デフォルト
-    }
-    
-    const userId = connectionInfo.Item.userId;
-    
-    // セッション情報を取得（複合キーを使用）
-    const sessionResponse = await ddbDocClient.send(new GetCommand({
-      TableName: SESSIONS_TABLE,
-      Key: { 
-        userId: userId,
-        sessionId: sessionId 
-      }
-    }));
-    
-    if (!sessionResponse.Item?.scenarioId) {
-      // セッションが見つからない場合、リトライを試行
-      if (retryCount < maxRetries) {
-        console.warn(`セッション ${sessionId} (userId: ${userId}) にシナリオIDが見つかりません。${retryCount + 1}/${maxRetries + 1}回目の試行、${retryDelay}ms後にリトライします。`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        return getLanguageFromSession(sessionId, connectionId, retryCount + 1);
-      } else {
-        console.warn(`セッション ${sessionId} (userId: ${userId}) にシナリオIDが見つかりません（最大リトライ回数に達しました）`);
-        return 'ja-JP'; // デフォルト
-      }
-    }
-    
-    const scenarioId = sessionResponse.Item.scenarioId;
-    console.log(`セッション情報取得成功: userId=${userId}, sessionId=${sessionId}, scenarioId=${scenarioId}`);
-    
-    // シナリオ情報を取得
-    const scenarioResponse = await ddbDocClient.send(new GetCommand({
-      TableName: SCENARIOS_TABLE,
-      Key: { scenarioId: scenarioId }
-    }));
-    
-    if (!scenarioResponse.Item?.language) {
-      console.warn(`シナリオ ${scenarioId} に言語設定が見つかりません`);
-      return 'ja-JP'; // デフォルト
-    }
-    
-    const scenarioLanguage = scenarioResponse.Item.language;
-    const transcribeLanguageCode = mapLanguageCodeToTranscribe(scenarioLanguage);
-    
-    console.log(`言語設定取得成功: セッション=${sessionId}, シナリオ=${scenarioId}, 言語=${scenarioLanguage} -> Transcribe=${transcribeLanguageCode}`);
-    
-    return transcribeLanguageCode;
-  } catch (error) {
-    console.error('言語設定の取得に失敗:', error);
-    return 'ja-JP'; // エラー時はデフォルト
-  }
+  // この関数は WebSocket言語情報方式の実装により不要になりました
+  // 言語情報は音声データと一緒に WebSocket メッセージで送信されます
+  return 'ja-JP'; // デフォルト
 }
+*/
 
 /**
  * WebSocket接続ハンドラ
@@ -297,7 +241,9 @@ export const defaultHandler = async (event: APIGatewayProxyEvent): Promise<APIGa
     if (action === 'sendAudio' && body.audio) {
       const domainName = event.requestContext.domainName || '';
       const stage = event.requestContext.stage || '';
-      await processAudioData(connectionId, body.audio, domainName, stage);
+      const language = body.language || 'ja'; // WebSocketメッセージから言語情報を取得
+      console.log(`音声データ受信 - connectionId: ${connectionId}, language: ${language}`);
+      await processAudioData(connectionId, body.audio, domainName, stage, language);
       return { statusCode: 200, body: 'Audio data received' };
     }
     
@@ -315,7 +261,8 @@ async function processAudioData(
   connectionId: string,
   base64Audio: string,
   domainName: string,
-  stage: string
+  stage: string,
+  language: string = 'ja'
 ): Promise<void> {
   // APIクライアントの作成
   const apiClient = new ApiGatewayManagementApiClient({
@@ -331,8 +278,8 @@ async function processAudioData(
     
     // TranscribeStreamingセッションが存在しなければ作成
     if (!activeTranscribeSessions.has(connectionId)) {
-      console.log(`新しいTranscribeセッションを音声データ受信時に開始: ${connectionId}`);
-      await startTranscribeSession(connectionId, domainName, stage);
+      console.log(`新しいTranscribeセッションを音声データ受信時に開始: ${connectionId}, language: ${language}`);
+      await startTranscribeSession(connectionId, domainName, stage, language);
       // セッションの初期化には少し時間がかかるため、短い待機を挿入
       await new Promise(resolve => setTimeout(resolve, 200));
     }
@@ -352,7 +299,7 @@ async function processAudioData(
     } else {
       console.warn(`有効なTranscribeセッションが見つかりません: ${connectionId}`);
       // セッションがない場合は再作成を試みる
-      await startTranscribeSession(connectionId, domainName, stage);
+      await startTranscribeSession(connectionId, domainName, stage, language);
     }
     
   } catch (error) {
@@ -371,33 +318,28 @@ async function processAudioData(
 }
 
 /**
+ * 言語コードをTranscribe用の言語コードにマッピング
+ */
+function mapLanguageToTranscribeCode(language: string): string {
+  const languageMap: Record<string, string> = {
+    'ja': 'ja-JP',
+    'en': 'en-US'
+  };
+  return languageMap[language] || 'ja-JP';
+}
+
+/**
  * Transcribeストリーミングセッションを開始
  */
-async function startTranscribeSession(connectionId: string, domainName: string, stage: string): Promise<void> {
+async function startTranscribeSession(connectionId: string, domainName: string, stage: string, language: string = 'ja'): Promise<void> {
   const apiClient = new ApiGatewayManagementApiClient({
     region: REGION,
     endpoint: `https://${domainName}/${stage}`
   });
   
-  // セッション情報から言語コードを取得
-  let languageCode = 'ja-JP'; // デフォルト: 日本語
-  try {
-    // 接続情報からセッションIDを取得
-    const connectionInfo = await ddbDocClient.send(new GetCommand({
-      TableName: TABLE_NAME,
-      Key: { connectionId }
-    }));
-    
-    if (connectionInfo.Item?.sessionId) {
-      // セッション→シナリオ→言語の順で取得
-      languageCode = await getLanguageFromSession(connectionInfo.Item.sessionId, connectionId);
-      console.log(`接続 ${connectionId} の言語設定: ${languageCode}`);
-    } else {
-      console.warn(`接続 ${connectionId} にセッションIDが見つかりません`);
-    }
-  } catch (error) {
-    console.warn('言語設定の取得に失敗しました:', error);
-  }
+  // WebSocketメッセージから受け取った言語情報を使用
+  const languageCode = mapLanguageToTranscribeCode(language);
+  console.log(`接続 ${connectionId} の言語設定: ${language} -> ${languageCode}`);
   
   // AbortControllerを作成
   const abortController = new AbortController();

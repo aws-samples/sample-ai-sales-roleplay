@@ -19,6 +19,7 @@ export class TranscribeService {
   // 設定パラメータ
   private silenceThresholdMs: number = 1500;  // 無音判定閾値（ミリ秒）
   private websocketUrl: string = '';
+  private language: string = 'ja';  // 言語情報を保持
   
   // コールバック関数
   private onTranscriptCallback: ((text: string, isFinal: boolean) => void) | null = null;
@@ -79,8 +80,12 @@ export class TranscribeService {
    * WebSocket接続を初期化
    *
    * @param sessionId セッションID
+   * @param language 言語設定 (例: 'ja', 'en')
    */
-  public async initializeConnection(sessionId: string): Promise<void> {
+  public async initializeConnection(sessionId: string, language?: string): Promise<void> {
+    // 言語情報を保存
+    this.language = language || 'ja';
+    console.log(`言語設定: ${this.language}`);
     if (!this.websocketUrl) {
       throw new Error('WebSocketエンドポイントが設定されていません');
     }
@@ -240,7 +245,8 @@ export class TranscribeService {
             
             this.socket.send(JSON.stringify({
               action: 'sendAudio',
-              audio: base64Audio
+              audio: base64Audio,
+              language: this.language  // 言語情報を追加
             }));
           } catch (error) {
             console.error('音声データ処理エラー:', error);

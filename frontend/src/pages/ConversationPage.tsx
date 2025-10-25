@@ -318,7 +318,7 @@ const ConversationPage: React.FC = () => {
     
     // Transcribe WebSocketの初期化
     if (transcribeServiceRef.current) {
-      transcribeServiceRef.current.initializeConnection(newSessionId)
+      transcribeServiceRef.current.initializeConnection(newSessionId, scenario?.language || 'ja')
         .catch(error => {
           console.error("Transcribe WebSocket接続エラー:", error);
           // エラーがあっても通常の会話は続行できるようにする
@@ -861,7 +861,7 @@ const ConversationPage: React.FC = () => {
       // WebSocketが接続されていなければ再接続を試みる
       if (!transcribeServiceRef.current.isConnected() && sessionId) {
         try {
-          await transcribeServiceRef.current.initializeConnection(sessionId);
+          await transcribeServiceRef.current.initializeConnection(sessionId, scenario?.language || 'ja');
         } catch (error) {
           console.error("Transcribe WebSocket接続エラー:", error);
           setSpeechRecognitionError("network");
