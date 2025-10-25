@@ -26,6 +26,28 @@ const transcribeClient = new TranscribeStreamingClient({
 // 接続中のセッションを保持するマップ
 const activeTranscribeSessions = new Map<string, any>();
 
+// ApiGatewayManagementApiClientをキャッシュ (パフォーマンス向上・DNS解決負荷軽減)
+const apiClientCache = new Map<string, ApiGatewayManagementApiClient>();
+
+/**
+ * ApiGatewayManagementApiClientを取得（キャッシュ機能付き）
+ */
+function getApiClient(domainName: string, stage: string): ApiGatewayManagementApiClient {
+  const endpoint = `https://${domainName}/${stage}`;
+  
+  if (!apiClientCache.has(endpoint)) {
+    console.log(`新しいAPI Gatewayクライアントを作成: ${endpoint}`);
+    apiClientCache.set(endpoint, new ApiGatewayManagementApiClient({
+      region: REGION,
+      endpoint
+    }));
+  } else {
+    console.log(`キャッシュ済みAPI Gatewayクライアントを使用: ${endpoint}`);
+  }
+  
+  return apiClientCache.get(endpoint)!;
+}
+
 /**
  * シナリオ言語設定をTranscribe言語コードにマッピング
  */
@@ -264,13 +286,8 @@ async function processAudioData(
   stage: string,
   language: string = 'ja'
 ): Promise<void> {
-  // APIクライアントの作成
-  const apiClient = new ApiGatewayManagementApiClient({
-    region: REGION,
-    endpoint: `https://${domainName}/${stage}`
-  });
-  
-  console.log(`API Gateway Management API エンドポイント: https://${domainName}/${stage}`);
+  // キャッシュされたAPIクライアントを取得
+  const apiClient = getApiClient(domainName, stage);
   
   try {
     // Base64音声データをデコード
@@ -332,10 +349,8 @@ function mapLanguageToTranscribeCode(language: string): string {
  * Transcribeストリーミングセッションを開始
  */
 async function startTranscribeSession(connectionId: string, domainName: string, stage: string, language: string = 'ja'): Promise<void> {
-  const apiClient = new ApiGatewayManagementApiClient({
-    region: REGION,
-    endpoint: `https://${domainName}/${stage}`
-  });
+  // キャッシュされたAPIクライアントを取得
+  const apiClient = getApiClient(domainName, stage);
   
   // WebSocketメッセージから受け取った言語情報を使用
   const languageCode = mapLanguageToTranscribeCode(language);
