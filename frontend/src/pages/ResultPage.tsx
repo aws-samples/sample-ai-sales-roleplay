@@ -1531,7 +1531,11 @@ const ResultPage: React.FC = () => {
           <Card sx={{ mb: 3 }}>
             <CardContent>
               {sessionId && (
-                <ReferenceCheck sessionId={sessionId} isVisible={true} />
+                <ReferenceCheck 
+                  sessionId={sessionId} 
+                  language={scenario?.language || "ja"}
+                  isVisible={true} 
+                />
               )}
             </CardContent>
           </Card>

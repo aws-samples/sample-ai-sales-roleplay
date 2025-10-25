@@ -279,6 +279,7 @@
       "importDuplicateError": "インポートに失敗しました: シナリオIDが既に存在します。インポート時に重複するIDは許可されていません。"
     },
     "sort": {
+      "byDifficulty": "難易度順",
       "byIndustry": "業界順",
       "byTitle": "タイトル順"
     },
@@ -286,6 +287,11 @@
       "allLevels": "全難易度",
       "allIndustries": "全業界",
       "favoritesOnly": "お気に入りのみ"
+    },
+    "hints": {
+      "title": "💡 ヒント:",
+      "beginnerRecommendation": "初級シナリオから始めて、徐々に難易度を上げることをお勧めします",
+      "duration": "各シナリオは約5-15分で完了します"
     },
     "create": {
       "button": "シナリオを作成",
@@ -767,6 +773,7 @@
     "noIssues": "ドキュメントとの整合性に問題は見つかりませんでした。適切な情報提供ができています。",
     "issuesFoundTitle": "問題が発見されました",
     "issuesFoundDescription": "ドキュメントとの整合性に問題が見つかりました。以下の詳細を確認してください。",
+    "allMessages": "全メッセージの詳細",
     "messageDetails": "メッセージ詳細",
     "messageNumber": "メッセージ {{number}}",
     "userMessage": "ユーザーの発言",

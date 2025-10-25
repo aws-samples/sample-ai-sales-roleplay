@@ -243,6 +243,7 @@ export class ApiService {
    * @param messageId メッセージID
    * @param emotionParams 感情パラメータ（怒りレベル、信頼レベル、進捗レベル）
    * @param scenarioId シナリオID
+   * @param language 言語設定（"ja", "en"など）
    * @returns NPCの応答
    */
   public async chatWithNPC(
@@ -257,6 +258,7 @@ export class ApiService {
       progressLevel?: number;
     },
     scenarioId?: string,
+    language?: string,
   ): Promise<{ response: string; sessionId: string; messageId: string }> {
     try {
       // リクエストボディの作成
@@ -292,6 +294,8 @@ export class ApiService {
               },
             }
           : {}),
+        // 言語設定を追加
+        ...(language ? { language } : {}),
       };
 
       console.log("requestBody:", requestBody);
@@ -1428,11 +1432,13 @@ export class ApiService {
   /**
    * リファレンスチェックの結果を取得する
    * @param sessionId セッションID
+   * @param language 言語設定 ("ja" または "en")
    * @param retryCount 内部的なリトライ回数（通常は指定不要）
    * @returns リファレンスチェックの結果
    */
   public async getReferenceCheck(
     sessionId: string,
+    language: string = "ja",
     retryCount: number = 0,
   ): Promise<{
     sessionId: string;
@@ -1444,7 +1450,7 @@ export class ApiService {
 
     try {
       const referenceCheckResult = await this.apiGet<ReferenceCheckResult>(
-        `/referenceCheck/${sessionId}`,
+        `/referenceCheck/${sessionId}?language=${encodeURIComponent(language)}`,
       );
 
       if (!referenceCheckResult) {
@@ -1472,7 +1478,7 @@ export class ApiService {
           `504 Gateway Timeoutエラーを検出。${retryDelay}ms後にリトライします (${retryCount + 1}/${maxRetries})`,
         );
         await new Promise((resolve) => setTimeout(resolve, retryDelay));
-        return this.getReferenceCheck(sessionId, retryCount + 1);
+        return this.getReferenceCheck(sessionId, language, retryCount + 1);
       }
 
       if (this.is404Error(error)) {

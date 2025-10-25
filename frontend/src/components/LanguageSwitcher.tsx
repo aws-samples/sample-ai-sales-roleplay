@@ -67,8 +67,9 @@ const LanguageSwitcher: React.FC = () => {
 
   return (
     <>
-      {/* デスクトップ表示用のセレクトボックス */}
-      <Box sx={{ display: { xs: "none", md: "flex" } }}>
+      {/* デスクトップ表示用のセレクトボックス（アイコン付き） */}
+      <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center", gap: 1 }}>
+        <TranslateIcon sx={{ color: "inherit", fontSize: "1.2rem" }} />
         <FormControl size="small" sx={{ minWidth: 120 }}>
           <Select
             value={currentLanguage}

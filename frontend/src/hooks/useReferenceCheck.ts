@@ -18,11 +18,13 @@ export interface ReferenceCheckState {
 /**
  * リファレンスチェック用カスタムフック
  * @param sessionId セッションID
+ * @param language 言語設定 ("ja" または "en")
  * @param isVisible コンポーネントが表示されているかどうか
  * @returns リファレンスチェックの状態と操作関数
  */
 export const useReferenceCheck = (
   sessionId: string,
+  language: string = "ja",
   isVisible: boolean = true,
 ): ReferenceCheckState & {
   refetch: () => Promise<void>;
@@ -62,7 +64,7 @@ export const useReferenceCheck = (
     setError("");
 
     try {
-      const result = await apiService.getReferenceCheck(sessionId);
+      const result = await apiService.getReferenceCheck(sessionId, language);
 
       if (result?.referenceCheck) {
         setData(result.referenceCheck);
@@ -107,7 +109,7 @@ export const useReferenceCheck = (
     } finally {
       setIsLoading(false);
     }
-  }, [sessionId, isVisible, apiService, t]);
+  }, [sessionId, language, isVisible, apiService, t]);
 
   /**
    * 問題があるメッセージの数を計算

@@ -10,6 +10,8 @@ import jwksClient from 'jwks-rsa';
 const TABLE_NAME = process.env.CONNECTION_TABLE_NAME || '';
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
 const USER_POOL_CLIENT_ID = process.env.USER_POOL_CLIENT_ID || '';
+const SESSIONS_TABLE = process.env.SESSIONS_TABLE || '';
+const SCENARIOS_TABLE = process.env.SCENARIOS_TABLE || '';
 const REGION = process.env.AWS_REGION!; // Lambda環境では必ず設定される
 
 // DynamoDBクライアントの初期化
@@ -23,6 +25,52 @@ const transcribeClient = new TranscribeStreamingClient({
 
 // 接続中のセッションを保持するマップ
 const activeTranscribeSessions = new Map<string, any>();
+
+// ApiGatewayManagementApiClientをキャッシュ (パフォーマンス向上・DNS解決負荷軽減)
+const apiClientCache = new Map<string, ApiGatewayManagementApiClient>();
+
+/**
+ * ApiGatewayManagementApiClientを取得（キャッシュ機能付き）
+ */
+function getApiClient(domainName: string, stage: string): ApiGatewayManagementApiClient {
+  const endpoint = `https://${domainName}/${stage}`;
+  
+  if (!apiClientCache.has(endpoint)) {
+    console.log(`新しいAPI Gatewayクライアントを作成: ${endpoint}`);
+    apiClientCache.set(endpoint, new ApiGatewayManagementApiClient({
+      region: REGION,
+      endpoint
+    }));
+  } else {
+    console.log(`キャッシュ済みAPI Gatewayクライアントを使用: ${endpoint}`);
+  }
+  
+  return apiClientCache.get(endpoint)!;
+}
+
+/**
+ * シナリオ言語設定をTranscribe言語コードにマッピング
+ */
+function mapLanguageCodeToTranscribe(scenarioLanguage: string): string {
+  const languageMapping: { [key: string]: string } = {
+    'en': 'en-US',
+    'ja': 'ja-JP'
+  };
+  
+  return languageMapping[scenarioLanguage] || 'ja-JP'; // デフォルトは日本語
+}
+
+/**
+ * 旧版：セッションIDからシナリオ言語設定を取得（リトライ機能付き） - 廃止予定
+ * 新しい実装では、WebSocketメッセージに言語情報を直接含めるため、この関数は不要になりました
+ */
+/* 
+async function getLanguageFromSession(sessionId: string, connectionId: string, retryCount: number = 0): Promise<string> {
+  // この関数は WebSocket言語情報方式の実装により不要になりました
+  // 言語情報は音声データと一緒に WebSocket メッセージで送信されます
+  return 'ja-JP'; // デフォルト
+}
+*/
 
 /**
  * WebSocket接続ハンドラ
@@ -215,7 +263,9 @@ export const defaultHandler = async (event: APIGatewayProxyEvent): Promise<APIGa
     if (action === 'sendAudio' && body.audio) {
       const domainName = event.requestContext.domainName || '';
       const stage = event.requestContext.stage || '';
-      await processAudioData(connectionId, body.audio, domainName, stage);
+      const language = body.language || 'ja'; // WebSocketメッセージから言語情報を取得
+      console.log(`音声データ受信 - connectionId: ${connectionId}, language: ${language}`);
+      await processAudioData(connectionId, body.audio, domainName, stage, language);
       return { statusCode: 200, body: 'Audio data received' };
     }
     
@@ -233,13 +283,11 @@ async function processAudioData(
   connectionId: string,
   base64Audio: string,
   domainName: string,
-  stage: string
+  stage: string,
+  language: string = 'ja'
 ): Promise<void> {
-  // APIクライアントの作成
-  const apiClient = new ApiGatewayManagementApiClient({
-    region: REGION,
-    endpoint: `https://${domainName}/${stage}`
-  });
+  // キャッシュされたAPIクライアントを取得
+  const apiClient = getApiClient(domainName, stage);
   
   try {
     // Base64音声データをデコード
@@ -247,8 +295,8 @@ async function processAudioData(
     
     // TranscribeStreamingセッションが存在しなければ作成
     if (!activeTranscribeSessions.has(connectionId)) {
-      console.log(`新しいTranscribeセッションを音声データ受信時に開始: ${connectionId}`);
-      await startTranscribeSession(connectionId, domainName, stage);
+      console.log(`新しいTranscribeセッションを音声データ受信時に開始: ${connectionId}, language: ${language}`);
+      await startTranscribeSession(connectionId, domainName, stage, language);
       // セッションの初期化には少し時間がかかるため、短い待機を挿入
       await new Promise(resolve => setTimeout(resolve, 200));
     }
@@ -268,7 +316,7 @@ async function processAudioData(
     } else {
       console.warn(`有効なTranscribeセッションが見つかりません: ${connectionId}`);
       // セッションがない場合は再作成を試みる
-      await startTranscribeSession(connectionId, domainName, stage);
+      await startTranscribeSession(connectionId, domainName, stage, language);
     }
     
   } catch (error) {
@@ -287,29 +335,26 @@ async function processAudioData(
 }
 
 /**
+ * 言語コードをTranscribe用の言語コードにマッピング
+ */
+function mapLanguageToTranscribeCode(language: string): string {
+  const languageMap: Record<string, string> = {
+    'ja': 'ja-JP',
+    'en': 'en-US'
+  };
+  return languageMap[language] || 'ja-JP';
+}
+
+/**
  * Transcribeストリーミングセッションを開始
  */
-async function startTranscribeSession(connectionId: string, domainName: string, stage: string): Promise<void> {
-  const apiClient = new ApiGatewayManagementApiClient({
-    region: REGION,
-    endpoint: `https://${domainName}/${stage}`
-  });
+async function startTranscribeSession(connectionId: string, domainName: string, stage: string, language: string = 'ja'): Promise<void> {
+  // キャッシュされたAPIクライアントを取得
+  const apiClient = getApiClient(domainName, stage);
   
-  // セッション情報を取得して言語コードを確認
-  let languageCode = 'ja-JP'; // デフォルト: 日本語
-  try {
-    const connectionInfo = await ddbDocClient.send(new GetCommand({
-      TableName: TABLE_NAME,
-      Key: { connectionId }
-    }));
-    
-    // セッション情報から言語設定があれば使用
-    if (connectionInfo.Item?.languageCode) {
-      languageCode = connectionInfo.Item.languageCode;
-    }
-  } catch (error) {
-    console.warn('言語設定の取得に失敗しました:', error);
-  }
+  // WebSocketメッセージから受け取った言語情報を使用
+  const languageCode = mapLanguageToTranscribeCode(language);
+  console.log(`接続 ${connectionId} の言語設定: ${language} -> ${languageCode}`);
   
   // AbortControllerを作成
   const abortController = new AbortController();
