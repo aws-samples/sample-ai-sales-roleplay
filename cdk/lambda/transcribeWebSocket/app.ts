@@ -41,25 +41,42 @@ function mapLanguageCodeToTranscribe(scenarioLanguage: string): string {
 /**
  * セッションIDからシナリオ言語設定を取得
  */
-async function getLanguageFromSession(sessionId: string): Promise<string> {
+async function getLanguageFromSession(sessionId: string, connectionId: string): Promise<string> {
   try {
-    // セッション情報を取得
+    // 接続情報からuserIdを取得
+    const connectionInfo = await ddbDocClient.send(new GetCommand({
+      TableName: TABLE_NAME,
+      Key: { connectionId }
+    }));
+    
+    if (!connectionInfo.Item?.userId) {
+      console.warn(`接続 ${connectionId} にuserIdが見つかりません`);
+      return 'ja-JP'; // デフォルト
+    }
+    
+    const userId = connectionInfo.Item.userId;
+    
+    // セッション情報を取得（複合キーを使用）
     const sessionResponse = await ddbDocClient.send(new GetCommand({
       TableName: SESSIONS_TABLE,
-      Key: { sessionId }
+      Key: { 
+        userId: userId,
+        sessionId: sessionId 
+      }
     }));
     
     if (!sessionResponse.Item?.scenarioId) {
-      console.warn(`セッション ${sessionId} にシナリオIDが見つかりません`);
+      console.warn(`セッション ${sessionId} (userId: ${userId}) にシナリオIDが見つかりません`);
       return 'ja-JP'; // デフォルト
     }
     
     const scenarioId = sessionResponse.Item.scenarioId;
+    console.log(`セッション情報取得成功: userId=${userId}, sessionId=${sessionId}, scenarioId=${scenarioId}`);
     
     // シナリオ情報を取得
     const scenarioResponse = await ddbDocClient.send(new GetCommand({
       TableName: SCENARIOS_TABLE,
-      Key: { id: scenarioId }
+      Key: { scenarioId: scenarioId }
     }));
     
     if (!scenarioResponse.Item?.language) {
@@ -296,6 +313,8 @@ async function processAudioData(
     endpoint: `https://${domainName}/${stage}`
   });
   
+  console.log(`API Gateway Management API エンドポイント: https://${domainName}/${stage}`);
+  
   try {
     // Base64音声データをデコード
     const audioBuffer = Buffer.from(base64Audio, 'base64');
@@ -361,7 +380,7 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
     
     if (connectionInfo.Item?.sessionId) {
       // セッション→シナリオ→言語の順で取得
-      languageCode = await getLanguageFromSession(connectionInfo.Item.sessionId);
+      languageCode = await getLanguageFromSession(connectionInfo.Item.sessionId, connectionId);
       console.log(`接続 ${connectionId} の言語設定: ${languageCode}`);
     } else {
       console.warn(`接続 ${connectionId} にセッションIDが見つかりません`);
