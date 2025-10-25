@@ -40,6 +40,10 @@
       "feedback": {
         "title": "Personalized Feedback",
         "description": "Analyze conversation content and suggest specific improvement points"
+      },
+      "audioAnalysis": {
+        "title": "Audio Data Analysis",
+        "description": "Upload actual business audio recordings for AI analysis and evaluation"
       }
     }
   },
