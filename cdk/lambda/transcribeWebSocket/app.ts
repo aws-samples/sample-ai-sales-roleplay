@@ -39,9 +39,12 @@ function mapLanguageCodeToTranscribe(scenarioLanguage: string): string {
 }
 
 /**
- * セッションIDからシナリオ言語設定を取得
+ * セッションIDからシナリオ言語設定を取得（リトライ機能付き）
  */
-async function getLanguageFromSession(sessionId: string, connectionId: string): Promise<string> {
+async function getLanguageFromSession(sessionId: string, connectionId: string, retryCount: number = 0): Promise<string> {
+  const maxRetries = 3;
+  const retryDelay = 2000; // 2秒
+  
   try {
     // 接続情報からuserIdを取得
     const connectionInfo = await ddbDocClient.send(new GetCommand({
@@ -66,8 +69,15 @@ async function getLanguageFromSession(sessionId: string, connectionId: string): 
     }));
     
     if (!sessionResponse.Item?.scenarioId) {
-      console.warn(`セッション ${sessionId} (userId: ${userId}) にシナリオIDが見つかりません`);
-      return 'ja-JP'; // デフォルト
+      // セッションが見つからない場合、リトライを試行
+      if (retryCount < maxRetries) {
+        console.warn(`セッション ${sessionId} (userId: ${userId}) にシナリオIDが見つかりません。${retryCount + 1}/${maxRetries + 1}回目の試行、${retryDelay}ms後にリトライします。`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return getLanguageFromSession(sessionId, connectionId, retryCount + 1);
+      } else {
+        console.warn(`セッション ${sessionId} (userId: ${userId}) にシナリオIDが見つかりません（最大リトライ回数に達しました）`);
+        return 'ja-JP'; // デフォルト
+      }
     }
     
     const scenarioId = sessionResponse.Item.scenarioId;
