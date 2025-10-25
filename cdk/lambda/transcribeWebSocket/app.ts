@@ -10,6 +10,8 @@ import jwksClient from 'jwks-rsa';
 const TABLE_NAME = process.env.CONNECTION_TABLE_NAME || '';
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
 const USER_POOL_CLIENT_ID = process.env.USER_POOL_CLIENT_ID || '';
+const SESSIONS_TABLE = process.env.SESSIONS_TABLE || '';
+const SCENARIOS_TABLE = process.env.SCENARIOS_TABLE || '';
 const REGION = process.env.AWS_REGION!; // Lambda環境では必ず設定される
 
 // DynamoDBクライアントの初期化
@@ -23,6 +25,59 @@ const transcribeClient = new TranscribeStreamingClient({
 
 // 接続中のセッションを保持するマップ
 const activeTranscribeSessions = new Map<string, any>();
+
+/**
+ * シナリオ言語設定をTranscribe言語コードにマッピング
+ */
+function mapLanguageCodeToTranscribe(scenarioLanguage: string): string {
+  const languageMapping: { [key: string]: string } = {
+    'en': 'en-US',
+    'ja': 'ja-JP'
+  };
+  
+  return languageMapping[scenarioLanguage] || 'ja-JP'; // デフォルトは日本語
+}
+
+/**
+ * セッションIDからシナリオ言語設定を取得
+ */
+async function getLanguageFromSession(sessionId: string): Promise<string> {
+  try {
+    // セッション情報を取得
+    const sessionResponse = await ddbDocClient.send(new GetCommand({
+      TableName: SESSIONS_TABLE,
+      Key: { sessionId }
+    }));
+    
+    if (!sessionResponse.Item?.scenarioId) {
+      console.warn(`セッション ${sessionId} にシナリオIDが見つかりません`);
+      return 'ja-JP'; // デフォルト
+    }
+    
+    const scenarioId = sessionResponse.Item.scenarioId;
+    
+    // シナリオ情報を取得
+    const scenarioResponse = await ddbDocClient.send(new GetCommand({
+      TableName: SCENARIOS_TABLE,
+      Key: { id: scenarioId }
+    }));
+    
+    if (!scenarioResponse.Item?.language) {
+      console.warn(`シナリオ ${scenarioId} に言語設定が見つかりません`);
+      return 'ja-JP'; // デフォルト
+    }
+    
+    const scenarioLanguage = scenarioResponse.Item.language;
+    const transcribeLanguageCode = mapLanguageCodeToTranscribe(scenarioLanguage);
+    
+    console.log(`言語設定取得成功: セッション=${sessionId}, シナリオ=${scenarioId}, 言語=${scenarioLanguage} -> Transcribe=${transcribeLanguageCode}`);
+    
+    return transcribeLanguageCode;
+  } catch (error) {
+    console.error('言語設定の取得に失敗:', error);
+    return 'ja-JP'; // エラー時はデフォルト
+  }
+}
 
 /**
  * WebSocket接続ハンドラ
@@ -295,17 +350,21 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
     endpoint: `https://${domainName}/${stage}`
   });
   
-  // セッション情報を取得して言語コードを確認
+  // セッション情報から言語コードを取得
   let languageCode = 'ja-JP'; // デフォルト: 日本語
   try {
+    // 接続情報からセッションIDを取得
     const connectionInfo = await ddbDocClient.send(new GetCommand({
       TableName: TABLE_NAME,
       Key: { connectionId }
     }));
     
-    // セッション情報から言語設定があれば使用
-    if (connectionInfo.Item?.languageCode) {
-      languageCode = connectionInfo.Item.languageCode;
+    if (connectionInfo.Item?.sessionId) {
+      // セッション→シナリオ→言語の順で取得
+      languageCode = await getLanguageFromSession(connectionInfo.Item.sessionId);
+      console.log(`接続 ${connectionId} の言語設定: ${languageCode}`);
+    } else {
+      console.warn(`接続 ${connectionId} にセッションIDが見つかりません`);
     }
   } catch (error) {
     console.warn('言語設定の取得に失敗しました:', error);

@@ -13,6 +13,8 @@ export interface TranscribeWebSocketProps {
   envId: string;
   userPool: cognito.UserPool;
   userPoolClient: cognito.UserPoolClient;
+  sessionsTable: dynamodb.Table;
+  scenariosTable: dynamodb.Table;
 }
 
 /**
@@ -57,7 +59,9 @@ export class TranscribeWebSocketConstruct extends Construct {
       environment: {
         CONNECTION_TABLE_NAME: connectionTable.tableName,
         USER_POOL_ID: props.userPool.userPoolId,
-        USER_POOL_CLIENT_ID: props.userPoolClient.userPoolClientId
+        USER_POOL_CLIENT_ID: props.userPoolClient.userPoolClientId,
+        SESSIONS_TABLE: props.sessionsTable.tableName,
+        SCENARIOS_TABLE: props.scenariosTable.tableName
       }
     });
     
@@ -67,7 +71,9 @@ export class TranscribeWebSocketConstruct extends Construct {
       handler: 'disconnectHandler',
       entry: path.join(__dirname, '../../../lambda/transcribeWebSocket/app.ts'),
       environment: {
-        CONNECTION_TABLE_NAME: connectionTable.tableName
+        CONNECTION_TABLE_NAME: connectionTable.tableName,
+        SESSIONS_TABLE: props.sessionsTable.tableName,
+        SCENARIOS_TABLE: props.scenariosTable.tableName
       }
     });
     
@@ -77,7 +83,9 @@ export class TranscribeWebSocketConstruct extends Construct {
       handler: 'defaultHandler',
       entry: path.join(__dirname, '../../../lambda/transcribeWebSocket/app.ts'),
       environment: {
-        CONNECTION_TABLE_NAME: connectionTable.tableName
+        CONNECTION_TABLE_NAME: connectionTable.tableName,
+        SESSIONS_TABLE: props.sessionsTable.tableName,
+        SCENARIOS_TABLE: props.scenariosTable.tableName
       },
       timeout: cdk.Duration.seconds(30),
       memorySize: 512
@@ -87,6 +95,15 @@ export class TranscribeWebSocketConstruct extends Construct {
     connectionTable.grantReadWriteData(connectHandler);
     connectionTable.grantReadWriteData(disconnectHandler);
     connectionTable.grantReadWriteData(defaultHandler);
+    
+    // セッションとシナリオテーブルへの読み取り権限を付与
+    props.sessionsTable.grantReadData(connectHandler);
+    props.sessionsTable.grantReadData(disconnectHandler);
+    props.sessionsTable.grantReadData(defaultHandler);
+    
+    props.scenariosTable.grantReadData(connectHandler);
+    props.scenariosTable.grantReadData(disconnectHandler);
+    props.scenariosTable.grantReadData(defaultHandler);
     
     // Transcribeアクセス権限を付与
     defaultHandler.addToRolePolicy(new iam.PolicyStatement({

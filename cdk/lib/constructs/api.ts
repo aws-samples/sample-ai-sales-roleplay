@@ -238,7 +238,9 @@ export class Api extends Construct {
       stageName: 'prod',
       envId: props.envId,
       userPool: props.userPool!,
-      userPoolClient: props.userPoolClient!
+      userPoolClient: props.userPoolClient!,
+      sessionsTable: props.databaseTables.sessionsTable,
+      scenariosTable: props.databaseTables.scenariosTable
     });
     
     // API Gateway
