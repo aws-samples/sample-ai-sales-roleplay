@@ -63,9 +63,10 @@
     "viewResults": "View Results",
     "status": {
       "waiting": "Waiting",
-      "processing": "Processing",
+      "uploading": "Uploading",
+      "analyzing": "Analyzing",
       "completed": "Completed",
-      "error": "Error"
+      "failed": "Failed"
     }
   },
   "common": {
@@ -87,6 +88,8 @@
     "close": "Close",
     "ok": "OK",
     "refresh": "Refresh",
+    "confirmation": "Confirmation",
+    "processing": "Processing...",
     "metricsLabel": "Metrics",
     "analysisLabel": "Analysis",
     "analysisResultLabel": "Analysis Results",
