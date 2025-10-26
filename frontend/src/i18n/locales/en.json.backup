@@ -47,27 +47,6 @@
       }
     }
   },
-  "audioAnalysis": {
-    "title": "Audio Analysis",
-    "description": "Upload actual business audio data and analyze it with the selected scenario.",
-    "settings": "Analysis Settings",
-    "language": "Language Settings",
-    "selectScenario": "Select Analysis Scenario",
-    "selectFile": "Select Audio File",
-    "startAnalysis": "Start Analysis",
-    "progress": "Analysis Progress",
-    "processingNote": "※ Processing may take some time. Please wait without closing the screen.",
-    "analysisComplete": "Audio Analysis Complete",
-    "analysisCompleteMessage": "Audio analysis is complete. Would you like to view the results?",
-    "resultViewNote": "In the analysis results screen, you can check details such as speaker role analysis, evaluation scores, and reference checks.",
-    "viewResults": "View Results",
-    "status": {
-      "waiting": "Waiting",
-      "processing": "Processing",
-      "completed": "Completed",
-      "error": "Error"
-    }
-  },
   "common": {
     "loading": "Loading...",
     "error_msg": "An error occurred",
@@ -776,10 +755,6 @@
     "userMessage": "User Statement",
     "relatedDocument": "Related Document",
     "reviewComment": "Review Comment",
-    "status": {
-      "success": "Appropriate",
-      "issue": "Issue"
-    },
     "severity": {
       "high": "High",
       "medium": "Medium",

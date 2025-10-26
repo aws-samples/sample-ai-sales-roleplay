@@ -779,6 +779,10 @@
     "userMessage": "ユーザーの発言",
     "relatedDocument": "関連ドキュメント",
     "reviewComment": "レビューコメント",
+    "status": {
+      "success": "適切",
+      "issue": "問題あり"
+    },
     "severity": {
       "high": "高",
       "medium": "中",
