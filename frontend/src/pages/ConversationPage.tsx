@@ -19,7 +19,7 @@ import { ApiService } from "../services/ApiService";
 import { AudioService } from "../services/AudioService";
 import { LanguageService } from "../services/LanguageService";
 import { PollyService } from "../services/PollyService";
-import { TranscribeService } from "../services/TranscribeService";
+import { TranscribeService, ConnectionState } from "../services/TranscribeService";
 import type { EmotionState } from "../types/index";
 import {
   initializeGoalStatuses,
@@ -78,6 +78,7 @@ const ConversationPage: React.FC = () => {
   const [speechRecognitionError, setSpeechRecognitionError] = useState<
     "permission" | "no-speech" | "network" | "not-supported" | "unknown" | null
   >(null);
+  const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.DISCONNECTED);
   const [metricsUpdating, setMetricsUpdating] = useState(false);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [goalStatuses, setGoalStatuses] = useState<GoalStatus[]>([]);
@@ -110,6 +111,12 @@ const ConversationPage: React.FC = () => {
     
     // TranscribeServiceの初期化
     transcribeServiceRef.current = TranscribeService.getInstance();
+    
+    // 接続状態変更コールバックを設定
+    transcribeServiceRef.current.setOnConnectionStateChange((state: ConnectionState) => {
+      console.log(`接続状態変更コールバック: ${state}`);
+      setConnectionState(state);
+    });
     
     // 環境変数からWebSocketエンドポイントを取得
     const websocketEndpoint = import.meta.env.VITE_TRANSCRIBE_WEBSOCKET_URL;
@@ -1130,6 +1137,7 @@ const ConversationPage: React.FC = () => {
             sendMessage={sendMessage}
             isProcessing={isProcessing}
             isListening={isListening}
+            isConnecting={connectionState === ConnectionState.CONNECTING}
             speechRecognitionError={speechRecognitionError}
             startSpeechRecognition={startSpeechRecognition}
             switchToTextInput={switchToTextInput}

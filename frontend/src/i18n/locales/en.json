@@ -185,6 +185,7 @@
   "speech": {
     "processing": "Processing audio...",
     "listening": "Listening...",
+    "connecting": "Connecting to speech recognition service...",
     "switchToText": "Switch to text input",
     "switchToTextInput": "Switch to text input mode",
     "error": {
@@ -195,7 +196,8 @@
       "unknown": "Speech recognition error occurred. Please try again."
     },
     "a11y": {
-      "processing": "Processing your speech input"
+      "processing": "Processing your speech input",
+      "connecting": "Connecting to speech recognition service"
     }
   },
   "navigation": {
