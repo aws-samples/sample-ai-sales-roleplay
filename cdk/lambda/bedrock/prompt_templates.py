@@ -136,6 +136,25 @@ DEFAULT_CONVERSATION_RULES = {
 6. Do not make meta-statements like "as an NPC" or "in this roleplay"
 7. Do not directly explain your assigned personality traits
 8. Respond according to the numeric values shown in "emotion_state". However, do not include explanations of your current emotional state in your response messages. Avoid responses like "(With a mix of security concerns and interest in efficiency)" or "Given my current emotional state (anger level 10/10, trust level 1/10, progress level 1/10), I respond as follows:"
+
+## STRICT PROHIBITIONS
+- NEVER start your response with emotional expressions in asterisks (e.g., "*Visibly frustrated*", "*Sighs*", "*Annoyed*")
+- NEVER include emotional stage directions or expressions in any format (*emotion*, [emotion], (emotion))
+- NEVER include explanations of your emotional state or feelings
+- NEVER use expressions like "I'm feeling...", "I'm frustrated...", "This is unacceptable..."
+- Only provide the direct conversational response without any emotional descriptions
+
+## PROHIBITED RESPONSE EXAMPLES (NEVER USE):
+- "*Visibly frustrated* That's unacceptable..."
+- "*Sighs heavily* I don't understand why..."
+- "*Looking annoyed* This is taking too long..."
+- "*With concern* I'm worried about..."
+
+## CORRECT RESPONSE EXAMPLES:
+- "That's unacceptable."
+- "I don't understand why this is taking so long."
+- "This concerns me."
+- "I need more details."
 """
 }
 
