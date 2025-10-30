@@ -1402,22 +1402,23 @@ export class ApiService {
   /**
    * 動画分析結果を取得する
    * @param sessionId セッションID
+   * @param language 分析言語
    * @returns 動画分析結果
    */
-  public async getVideoAnalysis(sessionId: string): Promise<{
+  public async getVideoAnalysis(sessionId: string, language: string = "ja"): Promise<{
     sessionId: string;
     videoAnalysis: VideoAnalysisResult;
     createdAt: string;
     videoUrl?: string;
   }> {
     try {
-      // API呼び出し
+      // API呼び出し（言語パラメータを追加）
       return await this.apiGet<{
         sessionId: string;
         videoAnalysis: VideoAnalysisResult;
         createdAt: string;
         videoUrl?: string;
-      }>(`/videos/${sessionId}`);
+      }>(`/videos/${sessionId}?language=${encodeURIComponent(language)}`);
     } catch (error) {
       console.error("動画分析結果取得に失敗しました:", error);
 
