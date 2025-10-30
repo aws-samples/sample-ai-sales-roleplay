@@ -10,6 +10,7 @@ interface MessageInputProps {
   sendMessage: () => void;
   isProcessing: boolean;
   isListening: boolean;
+  isConnecting?: boolean;
   speechRecognitionError: string | null;
   startSpeechRecognition: () => void;
   switchToTextInput: () => void;
@@ -28,6 +29,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   sendMessage,
   isProcessing,
   isListening,
+  isConnecting = false,
   speechRecognitionError,
   startSpeechRecognition,
   switchToTextInput,
@@ -55,6 +57,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
       <SpeechRecognitionFeedback
         isListening={isListening}
         isProcessing={isProcessing}
+        isConnecting={isConnecting}
         errorState={speechRecognitionError}
         onSwitchToTextInput={switchToTextInput}
       />

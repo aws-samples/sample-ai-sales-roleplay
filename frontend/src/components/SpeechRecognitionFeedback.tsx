@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Typography, CircularProgress, Alert, Fade } from "@mui/material";
-import { Mic, ErrorOutline, TextFields } from "@mui/icons-material";
+import { Mic, ErrorOutline, TextFields, WifiTethering } from "@mui/icons-material";
 import { visuallyHidden } from "@mui/utils";
 import {
   getFocusStyles,
@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 interface SpeechRecognitionFeedbackProps {
   isListening: boolean;
   isProcessing: boolean;
+  isConnecting?: boolean;
   errorState: string | null;
   onSwitchToTextInput?: () => void;
 }
@@ -30,6 +31,7 @@ interface SpeechRecognitionFeedbackProps {
 const SpeechRecognitionFeedback: React.FC<SpeechRecognitionFeedbackProps> = ({
   isListening,
   isProcessing,
+  isConnecting = false,
   errorState,
   onSwitchToTextInput,
 }) => {
@@ -85,6 +87,75 @@ const SpeechRecognitionFeedback: React.FC<SpeechRecognitionFeedbackProps> = ({
               {errorState === "unknown" && t("speech.error.unknown")}
             </Typography>
           </Alert>
+        </Box>
+      </Fade>
+    );
+  }
+
+  // 接続中の場合
+  if (isConnecting) {
+    return (
+      <Fade in={true}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            p: 1.5,
+            borderRadius: 1,
+            bgcolor: "rgba(156, 39, 176, 0.08)", // 接続中は紫系の色
+            mb: 2,
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <Box
+            sx={{
+              position: "relative",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <WifiTethering
+              color="secondary"
+              sx={{
+                ...getAccessibleAnimation("pulse", 2000),
+                "@keyframes pulse": {
+                  "0%": { opacity: 1 },
+                  "50%": { opacity: 0.4 },
+                  "100%": { opacity: 1 },
+                },
+              }}
+              aria-hidden="true"
+            />
+            <Box
+              sx={{
+                position: "absolute",
+                width: "200%",
+                height: "200%",
+                borderRadius: "50%",
+                border: "2px solid",
+                borderColor: "secondary.main",
+                opacity: 0.3,
+                ...getAccessibleAnimation("ripple", 2000),
+                "@keyframes ripple": {
+                  "0%": { transform: "scale(0.5)", opacity: 0.3 },
+                  "100%": { transform: "scale(1.2)", opacity: 0 },
+                },
+              }}
+              aria-hidden="true"
+            />
+          </Box>
+          <Typography
+            variant="body2"
+            color="secondary"
+          >
+            {t("speech.connecting")}
+          </Typography>
+          <Typography sx={visuallyHidden}>
+            {t("speech.a11y.connecting")}
+          </Typography>
         </Box>
       </Fade>
     );

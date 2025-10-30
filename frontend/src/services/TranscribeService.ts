@@ -5,6 +5,16 @@
  * 実行するためのサービスクラスです。常時マイク入力を可能にし、無音検出による自動発話終了を
  * サポートします。認証されたWebSocket接続を使用します。
  */
+
+/**
+ * WebSocket接続状態の定義
+ */
+export enum ConnectionState {
+  DISCONNECTED = 'disconnected',    // 未接続
+  CONNECTING = 'connecting',        // 接続中
+  CONNECTED = 'connected',          // 接続完了
+  CONNECTION_ERROR = 'connection_error'  // 接続エラー
+}
 export class TranscribeService {
   private static instance: TranscribeService;
   private socket: WebSocket | null = null;
@@ -16,6 +26,9 @@ export class TranscribeService {
   private silenceDetectionTimer: ReturnType<typeof setTimeout> | null = null;
   private lastVoiceActivityTime: number = 0;
   
+  // 接続状態管理
+  private connectionState: ConnectionState = ConnectionState.DISCONNECTED;
+  
   // 設定パラメータ
   private silenceThresholdMs: number = 1500;  // 無音判定閾値（ミリ秒）
   private websocketUrl: string = '';
@@ -25,6 +38,7 @@ export class TranscribeService {
   private onTranscriptCallback: ((text: string, isFinal: boolean) => void) | null = null;
   private onSilenceDetectedCallback: (() => void) | null = null;
   private onErrorCallback: ((error: Error) => void) | null = null;
+  private onConnectionStateChangeCallback: ((state: ConnectionState) => void) | null = null;
   
   /**
    * コンストラクタ - シングルトンパターン
@@ -65,6 +79,43 @@ export class TranscribeService {
   }
 
   /**
+   * 接続状態を変更する（内部使用）
+   * 
+   * @private
+   * @param {ConnectionState} newState 新しい接続状態
+   */
+  private setConnectionState(newState: ConnectionState): void {
+    if (this.connectionState !== newState) {
+      const oldState = this.connectionState;
+      this.connectionState = newState;
+      console.log(`接続状態変更: ${oldState} → ${newState}`);
+      
+      // 接続状態変更コールバックを実行
+      if (this.onConnectionStateChangeCallback) {
+        this.onConnectionStateChangeCallback(newState);
+      }
+    }
+  }
+
+  /**
+   * 現在の接続状態を取得
+   * 
+   * @returns {ConnectionState} 現在の接続状態
+   */
+  public getConnectionState(): ConnectionState {
+    return this.connectionState;
+  }
+
+  /**
+   * 接続状態変更時のコールバックを設定
+   * 
+   * @param {function} callback 接続状態変更時に呼ばれるコールバック関数
+   */
+  public setOnConnectionStateChange(callback: (state: ConnectionState) => void | null): void {
+    this.onConnectionStateChangeCallback = callback;
+  }
+
+  /**
    * シングルトンインスタンスを取得
    *
    * @returns {TranscribeService} シングルトンインスタンス
@@ -87,11 +138,15 @@ export class TranscribeService {
     this.language = language || 'ja';
     console.log(`言語設定: ${this.language}`);
     if (!this.websocketUrl) {
+      this.setConnectionState(ConnectionState.CONNECTION_ERROR);
       throw new Error('WebSocketエンドポイントが設定されていません');
     }
 
     // 既存の接続を閉じる
     this.closeConnection();
+    
+    // 接続開始状態に変更
+    this.setConnectionState(ConnectionState.CONNECTING);
 
     try {
       // AuthServiceから認証トークンを取得
@@ -113,6 +168,7 @@ export class TranscribeService {
 
           this.socket.onopen = () => {
             console.log('WebSocket接続確立成功!');
+            this.setConnectionState(ConnectionState.CONNECTED);
             resolve();
           };
 
@@ -138,11 +194,13 @@ export class TranscribeService {
               readyState: this.socket?.readyState,
               url: this.socket?.url
             });
+            this.setConnectionState(ConnectionState.CONNECTION_ERROR);
             reject(error);
           };
 
           this.socket.onclose = (event) => {
             console.log(`WebSocket切断詳細: コード=${event.code}, 理由=${event.reason}, wasClean=${event.wasClean}`);
+            this.setConnectionState(ConnectionState.DISCONNECTED);
           };
         } catch (error) {
           console.error('WebSocket初期化エラー:', error);
@@ -151,6 +209,7 @@ export class TranscribeService {
       });
     } catch (error) {
       console.error('WebSocket接続エラー:', error);
+      this.setConnectionState(ConnectionState.CONNECTION_ERROR);
       if (this.onErrorCallback) {
         this.onErrorCallback(error instanceof Error ? error : new Error('WebSocket接続エラー'));
       }
@@ -372,6 +431,10 @@ export class TranscribeService {
         console.warn('WebSocket切断エラー:', e);
       }
       this.socket = null;
+    }
+    // 手動で切断した場合は切断状態に設定
+    if (this.connectionState !== ConnectionState.CONNECTION_ERROR) {
+      this.setConnectionState(ConnectionState.DISCONNECTED);
     }
   }
 

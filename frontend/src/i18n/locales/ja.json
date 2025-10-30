@@ -185,6 +185,7 @@
   "speech": {
     "processing": "音声を処理中...",
     "listening": "聴いています...",
+    "connecting": "音声認識サービスに接続中...",
     "switchToText": "テキスト入力に切替",
     "switchToTextInput": "テキスト入力モードに切り替え",
     "error": {
@@ -195,7 +196,8 @@
       "unknown": "音声認識エラーが発生しました。もう一度お試しください。"
     },
     "a11y": {
-      "processing": "音声入力を処理中です"
+      "processing": "音声入力を処理中です",
+      "connecting": "音声認識サービスに接続中です"
     }
   },
   "navigation": {
