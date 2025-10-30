@@ -14,6 +14,7 @@ import { ApiService } from "../../services/ApiService";
 interface VideoFeedbackProps {
   sessionId: string;
   isVisible?: boolean;
+  language?: string;
 }
 
 /**
@@ -22,6 +23,7 @@ interface VideoFeedbackProps {
 const VideoFeedback: React.FC<VideoFeedbackProps> = ({
   sessionId,
   isVisible = true,
+  language = "ja",
 }) => {
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -36,7 +38,7 @@ const VideoFeedback: React.FC<VideoFeedbackProps> = ({
 
     try {
       const apiService = ApiService.getInstance();
-      const result = await apiService.getVideoAnalysis(sessionId);
+      const result = await apiService.getVideoAnalysis(sessionId, language);
       if (result && result.videoAnalysis) {
         setVideoAnalysis(result.videoAnalysis);
       }
@@ -62,14 +64,14 @@ const VideoFeedback: React.FC<VideoFeedbackProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [sessionId, t]);
+  }, [sessionId, language, t]);
 
   // 初期データ取得
   useEffect(() => {
     if (isVisible && sessionId) {
       fetchVideoAnalysis();
     }
-  }, [sessionId, isVisible, fetchVideoAnalysis]);
+  }, [sessionId, isVisible, language, fetchVideoAnalysis]);
 
   // 分析データがない場合の定期ポーリング
   useEffect(() => {
@@ -86,6 +88,7 @@ const VideoFeedback: React.FC<VideoFeedbackProps> = ({
     error,
     isVisible,
     sessionId,
+    language,
     fetchVideoAnalysis,
   ]);
 

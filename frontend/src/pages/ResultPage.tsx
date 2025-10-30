@@ -1517,7 +1517,11 @@ const ResultPage: React.FC = () => {
             <Card sx={{ mb: 3 }}>
               <CardContent>
                 {sessionId && (
-                  <VideoFeedback sessionId={sessionId} isVisible={true} />
+                  <VideoFeedback 
+                    sessionId={sessionId} 
+                    isVisible={true} 
+                    language={scenario?.language || "ja"}
+                  />
                 )}
               </CardContent>
             </Card>
