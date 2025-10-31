@@ -14,15 +14,11 @@ This system is designed for junior sales representatives, helping them improve t
 - **Compliance Violation Check**: Identifies statements that violate compliance rules
 - **Reference Check**: Verifies whether user statements are based on reference materials
 
-### Screenshots
+![](./docs/image/demo_image_1_en.png)
 
-![](./docs/image/demo_image_1.png)
+![](./docs/image/demo_image_2_en.png)
 
-![](./docs/image/demo_image_2.png)
-
-![](./docs/image/demo_image_3.png)
-
-![](./docs/image/demo_image_4.png)
+![](./docs/image/demo_image_4_en.png)
 
 ### Technology Stack
 
@@ -44,7 +40,7 @@ This system is designed for junior sales representatives, helping them improve t
 - Amazon Cognito (Authentication)
 
 ### Architecture
-![](./docs/image/Architecture.png)
+![](./docs/image/Architecture_en.png)
 
 ## Setup
 
