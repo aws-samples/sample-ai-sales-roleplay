@@ -228,5 +228,5 @@ DEFAULT_NPC_INFO = {
     "role": "購買担当者",
     "company": "株式会社ABC",
     "personality": ["厳しい", "効率重視", "合理的"],
-    "description": "30代のビジネスマン。製造業の購買部門で働いている。"
+    "description": ""
 }

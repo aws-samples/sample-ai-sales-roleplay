@@ -269,6 +269,7 @@ export class ApiService {
           role: npc.role,
           company: npc.company,
           personality: npc.personality,
+          description: npc.description,
         },
         previousMessages: previousMessages.map((msg) => ({
           sender: msg.sender,
