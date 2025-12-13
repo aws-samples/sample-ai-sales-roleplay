@@ -4,6 +4,7 @@ import * as cdk from 'aws-cdk-lib';
 import { InfrastructureStack } from '../lib/infrastructure-stack';
 import { CloudFrontWafStack } from '../lib/stacks/cloudfront-waf-stack';
 import { DataInitializerStack } from '../lib/data-initializer-stack';
+import { Tags } from 'aws-cdk-lib';
 
 const app = new cdk.App();
 
@@ -95,3 +96,28 @@ const dataInitializerStack = new DataInitializerStack(app, dataInitializerStackN
 
 // データ初期化スタックがインフラストラクチャスタックに依存するように設定
 dataInitializerStack.addDependency(infrastructureStack);
+
+// コスト配分タグを設定
+// context.costAllocationTags から取得したタグをすべてのスタックに適用
+if (context.costAllocationTags) {
+  console.log(`Applying cost allocation tags for environment: ${envId}`);
+  const tagEntries = Object.entries(context.costAllocationTags);
+  
+  // 全スタックにタグを適用
+  [infrastructureStack, dataInitializerStack].forEach(stack => {
+    if (stack) {
+      tagEntries.forEach(([key, value]) => {
+        console.log(`Adding tag ${key}=${value} to stack ${stack.stackName}`);
+        Tags.of(stack).add(key, String(value));
+      });
+    }
+  });
+  
+  // CloudFrontWafStackが存在する場合はそれにもタグを適用
+  if (cloudFrontWafStack) {
+    tagEntries.forEach(([key, value]) => {
+      console.log(`Adding tag ${key}=${value} to stack ${cloudFrontWafStack.stackName}`);
+      Tags.of(cloudFrontWafStack).add(key, String(value));
+    });
+  }
+}
