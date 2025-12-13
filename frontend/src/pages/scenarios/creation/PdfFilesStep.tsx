@@ -228,12 +228,12 @@ const PdfFilesStep: React.FC<PdfFilesStepProps> = ({
   return (
     <Box>
       <Typography variant="h5" gutterBottom>
-        {t("scenarios.create.pdfFiles.title") || "PDF資料のアップロード"}
+        {t("scenarios.create.pdfFiles.title") || "営業資料のアップロード（評価用）"}
       </Typography>
 
       <Typography variant="body1" paragraph>
         {t("scenarios.create.pdfFiles.description") ||
-          "シナリオに関連するPDFファイルをアップロードできます（最大5つまで）"}
+          "営業資料（商品パンフレット、価格表、約款など）をPDFでアップロードすると、セッション後の評価で発言内容がこれらの資料と合っているかを自動チェックできます。正確な営業スキル向上に役立ちます。（最大5つまで）"}
       </Typography>
 
       {uploadError && (
@@ -319,8 +319,15 @@ const PdfFilesStep: React.FC<PdfFilesStepProps> = ({
 
       <Typography variant="caption" color="textSecondary">
         {t("scenarios.create.pdfFiles.note") ||
-          "※ PDFファイルは各シナリオごとに最大5つまでアップロードできます"}
+          "※ アップロードしたPDFは、営業セッション後のリファレンスチェック（発言の正確性評価）に使用されます"}
       </Typography>
+
+      {/* 評価例の表示 */}
+      {t("scenarios.create.pdfFiles.example") && (
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 1, fontStyle: "italic" }}>
+          {t("scenarios.create.pdfFiles.example")}
+        </Typography>
+      )}
     </Box>
   );
 };
