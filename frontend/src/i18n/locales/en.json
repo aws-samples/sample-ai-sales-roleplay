@@ -303,7 +303,7 @@
         "basicInfo": "Basic Information",
         "npcInfo": "NPC Settings",
         "goals": "Goals Settings",
-        "pdfs": "PDF Materials",
+        "pdfs": "Sales Materials & Evaluation",
         "sharing": "Sharing Settings",
         "preview": "Preview & Save"
       },
@@ -369,16 +369,30 @@
       "success": "Scenario created successfully",
       "confirmCancel": "Are you sure you want to cancel? Unsaved changes will be lost.",
       "pdfFiles": {
-        "title": "Upload PDF Materials",
-        "description": "You can upload PDF files related to the scenario (up to 5 files)",
+        "title": "Upload Sales Materials (for Evaluation)",
+        "description": "Upload sales materials (product brochures, price lists, terms, etc.) as PDFs to automatically verify if your statements during the session match these materials in post-session evaluation. This helps improve accurate sales skills. (Up to 5 files)",
         "uploadButton": "Select PDF Files",
         "uploading": "Uploading...",
         "uploadingMessage": "Upload in progress...",
         "noFiles": "No files uploaded",
-        "note": "※ Up to 5 PDF files can be uploaded per scenario",
+        "note": "※ Uploaded PDFs will be used for reference checking (accuracy evaluation of statements) after sales sessions",
+        "example": "Example: Verify accuracy of product prices, insurance coverage/exclusions, loan interest rates, etc.",
         "maxFilesError": "You can upload up to 5 PDF files",
         "onlyPdfError": "Only PDF files can be uploaded",
-        "uploadError": "An error occurred during upload"
+        "uploadError": "An error occurred during upload",
+        "help": {
+          "title": "About Sales Materials Upload",
+          "purpose": "Why upload PDFs?",
+          "purposeAnswer": "After sales sessions, the system automatically checks if your statements match the uploaded materials. This helps verify accurate information delivery and improves your sales skills.",
+          "howItWorks": "How does the evaluation work?",
+          "howItWorksAnswer": "AI analyzes the conversation and compares your statements with the uploaded materials. If there are inaccuracies or vague expressions, it provides specific feedback for improvement.",
+          "examples": {
+            "title": "Evaluation Examples",
+            "good": "✅ 'The housing loan interest rate is 1.2%' → Accurate match with materials",
+            "needsImprovement": "⚠️ 'Interest rate is around 1-2%' → Materials show 1.2%, be more specific",
+            "incorrect": "❌ 'Cancer insurance covers all types of cancer' → Materials exclude skin cancer"
+          }
+        }
       },
       "error": {
         "guardrailsLoad": "Failed to load guardrails",
