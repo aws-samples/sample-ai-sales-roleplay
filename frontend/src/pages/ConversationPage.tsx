@@ -504,6 +504,7 @@ const ConversationPage: React.FC = () => {
             name: String(scenario.npc.name),
             role: String(scenario.npc.role),
             company: String(scenario.npc.company),
+            description: String(scenario.npc.description || ""),
             personality: Array.isArray(scenario.npc.personality) ? 
               scenario.npc.personality.map(p => String(p)) : []
           };
