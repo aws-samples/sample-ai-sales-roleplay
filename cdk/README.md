@@ -169,3 +169,60 @@ npx cdk deploy --all --context env=dev
   }
 }
 ```
+
+## トラブルシューティング
+
+### deploy-time-buildライブラリのNode.js 22対応問題
+
+**問題**: Node.js 22環境でCDKデプロイ時に`deploy-time-build`ライブラリが正常に動作しない
+
+**症状**:
+- Lambda関数がサイレント失敗
+- CodeBuildプロジェクトが実行されない
+- フロントエンドアプリケーションのビルドが完了しない
+
+**原因**: 
+古いバージョンの`deploy-time-build`ライブラリがNode.js 22をサポートしていない
+
+**解決方法**:
+
+1. **npmキャッシュのクリア**
+```bash
+npm cache clean --force
+```
+
+2. **node_modulesの完全削除と再インストール**
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+3. **CDKアセットの強制再生成**
+```bash
+npx cdk synth --force
+```
+
+**確認方法**:
+- `deploy-time-build`が最新版（v0.4.4以上）であること
+- CodeBuildログでNode.js 22.x.xが正常にインストールされること
+- Lambda関数が正常に実行されること
+
+### Knowledge BaseのS3 Vectors移行
+
+**概要**: 
+コスト最適化のため、Knowledge BaseのベクトルストアをOpenSearch ServerlessからS3 Vectorsに移行
+
+**変更内容**:
+- `@cdklabs/generative-ai-cdk-constructs`から`aws-cdk-lib`のネイティブリソースに変更
+- OpenSearch Serverlessコレクションの代わりにS3 Vector Bucketを使用
+- より詳細な権限制御とコスト効率的な構成
+
+**メリット**:
+- **コスト削減**: OpenSearch Serverlessより大幅に安価
+- **スケーラビリティ**: S3の無制限容量を活用
+- **簡素化**: 管理が必要なリソース数の削減
+
+**注意点**:
+- 既存のKnowledge Baseデータは移行が必要
+- クエリレイテンシーがわずかに増加する可能性
+- セマンティック検索のみ対応（ハイブリッド検索は非対応）
