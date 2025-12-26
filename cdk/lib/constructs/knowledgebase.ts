@@ -38,7 +38,16 @@ export class VectorKB extends Construct {
       dataType: 'float32',
       distanceMetric: 'cosine',
       metadataConfiguration: {
-        nonFilterableMetadataKeys: ['chunk_id']
+        // S3 Vectorsのフィルタリング可能メタデータは最大2KB
+        // Bedrockが追加する大きなメタデータを非フィルタリングに設定
+        // Quick createで作成されたインデックスと同様の設定
+        nonFilterableMetadataKeys: [
+          'AMAZON_BEDROCK_TEXT',        // テキストチャンク内容（大きい）
+          'AMAZON_BEDROCK_METADATA',    // Bedrockの追加メタデータJSON（大きい）
+          'x-amz-bedrock-kb-source-uri',
+          'x-amz-bedrock-kb-chunk-id',
+          'x-amz-bedrock-kb-data-source-id',
+        ]
       }
     });
 
@@ -167,10 +176,12 @@ export class VectorKB extends Construct {
       },
       vectorIngestionConfiguration: {
         chunkingConfiguration: {
+          // 固定サイズチャンキングを使用（S3 Vectorsのメタデータ制限に対応）
+          // 階層的チャンキングは親子関係のメタデータが大きくなるため避ける
           chunkingStrategy: 'FIXED_SIZE',
           fixedSizeChunkingConfiguration: {
-            maxTokens: 300,
-            overlapPercentage: 20,
+            maxTokens: 300,        // チャンクあたりの最大トークン数
+            overlapPercentage: 20, // チャンク間のオーバーラップ率
           },
         },
       },
