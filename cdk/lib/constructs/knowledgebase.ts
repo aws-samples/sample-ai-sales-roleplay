@@ -1,10 +1,11 @@
 import {
   aws_s3 as s3,
   aws_iam as iam,
-  aws_opensearchserverless as opensearch_serverless,
+  aws_bedrock as bedrock,
+  aws_s3vectors as s3vectors,
+  Stack,
 } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import { bedrock } from '@cdklabs/generative-ai-cdk-constructs';
 
 export interface VectorKBProps {
   resourceNamePrefix: string; // リソース名のプレフィックス
@@ -12,58 +13,184 @@ export interface VectorKBProps {
 }
 
 export class VectorKB extends Construct {
-  public readonly knowledgeBase: bedrock.VectorKnowledgeBase;
+  public readonly knowledgeBase: bedrock.CfnKnowledgeBase;
+  public readonly knowledgeBaseId: string;
+  public readonly role: iam.Role;
 
   constructor(scope: Construct, id: string, props: VectorKBProps) {
     super(scope, id);
 
-    // 埋め込みモデルを定義
-    const embeddingModel = bedrock.BedrockFoundationModel.COHERE_EMBED_MULTILINGUAL_V3;
+    const stack = Stack.of(this);
 
-    // // クロスリージョン推論プロファイルを定義
-    // const cris = bedrock.CrossRegionInferenceProfile.fromConfig({
-    //   geoRegion: bedrock.CrossRegionInferenceProfileRegion.US,
-    //   model: bedrock.BedrockFoundationModel.ANTHROPIC_CLAUDE_3_5_HAIKU_V1_0,
-    // });
-
-    // ナレッジベースを作成（循環依存を避けるため依存関係は設定しない）
-    this.knowledgeBase = new bedrock.VectorKnowledgeBase(this, 'KnowledgeBase', {
-      embeddingsModel: embeddingModel,
-      name: `${props.resourceNamePrefix}ai-sales-roleplay`,
-    });
-
-    // OpenSearch Serverless Collection の冗長構成を無効化
-    const kbVectors = this.knowledgeBase.node.tryFindChild("KBVectors");
-    if (kbVectors) {
-      const vectorCollection = kbVectors.node.tryFindChild("VectorCollection");
-      if (vectorCollection) {
-        const cfnCollection = vectorCollection as opensearch_serverless.CfnCollection;
-        // StandbyReplicasを無効化してコストを削減
-        cfnCollection.standbyReplicas = "DISABLED";
+    // S3 Vector Bucketを作成
+    const vectorBucket = new s3vectors.CfnVectorBucket(this, 'VectorBucket', {
+      vectorBucketName: `${props.resourceNamePrefix.toLowerCase()}ai-sales-roleplay-s3vectors`,
+      encryptionConfiguration: {
+        sseType: 'AES256'
       }
-    }
-
-    // S3データソースを追加
-    this.knowledgeBase.addS3DataSource({
-      bucket: props.dataSourceBucket,
-      // chunkingStrategy: bedrock.ChunkingStrategy.HIERARCHICAL_COHERE,
-      // parsingStrategy: bedrock.ParsingStrategy.foundationModel({
-      //   parsingModel: cris
-      // }),
     });
 
-    // ナレッジベースロールに必要な権限を追加
-    this.knowledgeBase.role.addToPrincipalPolicy(
+    // Vector Indexを作成
+    const vectorIndex = new s3vectors.CfnIndex(this, 'VectorIndex', {
+      vectorBucketName: vectorBucket.vectorBucketName,
+      indexName: `${props.resourceNamePrefix.toLowerCase()}ai-sales-roleplay-s3vectors-index`,
+      dimension: 1024, // Cohere Embed Multilingual V3の次元数
+      dataType: 'float32',
+      distanceMetric: 'cosine',
+      metadataConfiguration: {
+        // S3 Vectorsのフィルタリング可能メタデータは最大2KB
+        // Bedrockが追加する大きなメタデータを非フィルタリングに設定
+        // Quick createで作成されたインデックスと同様の設定
+        nonFilterableMetadataKeys: [
+          'AMAZON_BEDROCK_TEXT',        // テキストチャンク内容（大きい）
+          'AMAZON_BEDROCK_METADATA',    // Bedrockの追加メタデータJSON（大きい）
+          'x-amz-bedrock-kb-source-uri',
+          'x-amz-bedrock-kb-chunk-id',
+          'x-amz-bedrock-kb-data-source-id',
+        ]
+      }
+    });
+
+    // Vector IndexはVector Bucketに依存
+    vectorIndex.addDependency(vectorBucket);
+
+    // Knowledge Base用のIAMロールを作成
+    this.role = new iam.Role(this, 'KnowledgeBaseRole', {
+      roleName: `${props.resourceNamePrefix}ai-sales-roleplay-s3vectors-kb-role`,
+      assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonBedrockFullAccess'),
+      ],
+    });
+
+    // S3 Vectors用の権限を追加（広範囲）
+    this.role.addToPolicy(
       new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
         actions: [
-          "bedrock:GetInferenceProfile",
-          "bedrock:InvokeModel"
+          's3vectors:*',
         ],
         resources: [
-          "arn:aws:bedrock:*:*:inference-profile/*",
-          "arn:aws:bedrock:*::foundation-model/*"
+          `arn:aws:s3vectors:${stack.region}:${stack.account}:bucket/*`,
         ],
       })
     );
+
+    // データソースS3バケットへの権限を追加
+    this.role.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          's3:GetObject',
+          's3:ListBucket',
+        ],
+        resources: [
+          props.dataSourceBucket.bucketArn,
+          `${props.dataSourceBucket.bucketArn}/*`,
+        ],
+      })
+    );
+
+    // Bedrock Foundation Modelへの権限を追加
+    this.role.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'bedrock:InvokeModel',
+        ],
+        resources: [
+          `arn:aws:bedrock:${stack.region}::foundation-model/cohere.embed-multilingual-v3`,
+        ],
+      })
+    );
+
+    // Vector Bucket PolicyでBedrockサービスロールのアクセス権限を設定
+    const vectorBucketPolicy = new s3vectors.CfnVectorBucketPolicy(this, 'VectorBucketPolicy', {
+      vectorBucketArn: vectorBucket.getAtt('VectorBucketArn').toString(),
+      policy: {
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Sid: 'BedrockKnowledgeBaseAccess',
+            Effect: 'Allow',
+            Principal: {
+              AWS: this.role.roleArn,
+            },
+            Action: [
+              's3vectors:QueryVectors',
+              's3vectors:PutVectors',
+              's3vectors:GetVectors',
+              's3vectors:DeleteVectors',
+              's3vectors:ListVectors',
+              's3vectors:GetIndex',
+              's3vectors:ListIndexes',
+            ],
+            Resource: [
+              vectorBucket.getAtt('VectorBucketArn').toString(),
+              `${vectorBucket.getAtt('VectorBucketArn').toString()}/*`,
+            ],
+          },
+        ],
+      },
+    });
+
+    // Vector Bucket PolicyはVector BucketとIAMロールに依存
+    vectorBucketPolicy.addDependency(vectorBucket);
+    vectorBucketPolicy.addDependency(this.role.node.defaultChild as iam.CfnRole);
+
+    // Knowledge Baseを作成
+    this.knowledgeBase = new bedrock.CfnKnowledgeBase(this, 'KnowledgeBase', {
+      name: `${props.resourceNamePrefix}ai-sales-roleplay-s3vectors`,
+      description: 'AI Sales Roleplay Knowledge Base with S3 Vectors',
+      roleArn: this.role.roleArn,
+      knowledgeBaseConfiguration: {
+        type: 'VECTOR',
+        vectorKnowledgeBaseConfiguration: {
+          embeddingModelArn: `arn:aws:bedrock:${stack.region}::foundation-model/cohere.embed-multilingual-v3`,
+        },
+      },
+      storageConfiguration: {
+        type: 'S3_VECTORS',
+        s3VectorsConfiguration: {
+          vectorBucketArn: vectorBucket.getAtt('VectorBucketArn').toString(),
+          indexArn: vectorIndex.ref,
+        },
+      },
+    });
+
+    // Knowledge BaseはVector IndexとVector Bucket Policyに依存
+    this.knowledgeBase.addDependency(vectorIndex);
+    this.knowledgeBase.addDependency(vectorBucketPolicy);
+
+    // S3データソースを作成
+    const dataSource = new bedrock.CfnDataSource(this, 'DataSource', {
+      knowledgeBaseId: this.knowledgeBase.attrKnowledgeBaseId,
+      name: `${props.resourceNamePrefix}ai-sales-roleplay-s3vectors-datasource`,
+      description: 'S3 Data source for AI Sales Roleplay',
+      dataSourceConfiguration: {
+        type: 'S3',
+        s3Configuration: {
+          bucketArn: props.dataSourceBucket.bucketArn,
+          inclusionPrefixes: ['scenarios/'],
+        },
+      },
+      vectorIngestionConfiguration: {
+        chunkingConfiguration: {
+          // 固定サイズチャンキングを使用（S3 Vectorsのメタデータ制限に対応）
+          // 階層的チャンキングは親子関係のメタデータが大きくなるため避ける
+          chunkingStrategy: 'FIXED_SIZE',
+          fixedSizeChunkingConfiguration: {
+            maxTokens: 300,        // チャンクあたりの最大トークン数
+            overlapPercentage: 20, // チャンク間のオーバーラップ率
+          },
+        },
+      },
+    });
+
+    // Data SourceはKnowledge Baseに依存
+    dataSource.addDependency(this.knowledgeBase);
+
+    // 外部から参照できるようにKnowledge Base IDを設定
+    this.knowledgeBaseId = this.knowledgeBase.attrKnowledgeBaseId;
   }
 }

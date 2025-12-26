@@ -97,7 +97,7 @@ export class InfrastructureStack extends cdk.Stack {
       databaseTables: databaseTables, // データベーステーブルを渡す
       guardrails: guardrails, // Guardrailsを渡す
       pdfStorageBucket: pdfStorage.bucket,
-      knowledgeBaseId: kb.knowledgeBase.knowledgeBaseId, // Knowledge Base ID
+      knowledgeBaseId: kb.knowledgeBaseId, // Knowledge Base ID
       bedrockModels: props!.bedrockModels, // propsから渡されたフラット化済みBedrockモデル設定を使用
     });
 
@@ -154,7 +154,7 @@ export class InfrastructureStack extends cdk.Stack {
       description: 'API Gateway Endpoint URL',
       exportName: `${prefix}ApiEndpoint`
     });
-    
+
     new cdk.CfnOutput(this, 'TranscribeWebSocketEndpoint', {
       value: api.transcribeWebSocket.webSocketApiEndpoint,
       description: 'WebSocket API Endpoint for Transcribe integration',
