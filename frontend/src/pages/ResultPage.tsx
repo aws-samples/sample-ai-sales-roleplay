@@ -47,7 +47,7 @@ import {
 } from "chart.js";
 import { Line, Radar } from "react-chartjs-2";
 import type { Session, Metrics, GoalStatus, Goal } from "../types/index";
-import type { RealtimeMetric } from "../types/api";
+import type { RealtimeMetric, ReferenceCheckResult, VideoAnalysisResult } from "../types/api";
 import { addMetricsChangesToMessages } from "../utils/dialogueEngine";
 import VideoFeedback from "../components/recording/VideoFeedback";
 import ReferenceCheck from "../components/referenceCheck/ReferenceCheck";
@@ -101,7 +101,7 @@ const ResultPage: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [feedback, setFeedback] = useState<string[]>([]);
   const [tabValue, setTabValue] = useState(0);
-  
+
   // セッション種別の状態管理（音声分析かどうか）
   const [isAudioAnalysis, setIsAudioAnalysis] = useState(false);
 
@@ -139,8 +139,71 @@ const ResultPage: React.FC = () => {
   >([]);
   const [scenarioGoals, setScenarioGoals] = useState<Goal[]>([]);
 
+  // リファレンスチェック結果（Step Functionsで取得済みのデータ）
+  const [referenceCheckData, setReferenceCheckData] = useState<ReferenceCheckResult | null>(null);
+
+  // 動画分析結果（Step Functionsで取得済みのデータ）
+  const [videoAnalysisData, setVideoAnalysisData] = useState<VideoAnalysisResult | null>(null);
+
+  // 分析ステータス管理
+  const [analysisStatus, setAnalysisStatus] = useState<string>("not_started");
+  const [analysisProgress, setAnalysisProgress] = useState<string>("");
+  const [isPolling, setIsPolling] = useState<boolean>(false);
+
   // APIサービスのインスタンス取得
   const apiService = ApiService.getInstance();
+
+  // 分析ステータスのポーリング
+  useEffect(() => {
+    if (!sessionId || !isPolling) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const statusResponse = await apiService.getSessionAnalysisStatus(sessionId);
+        console.log("分析ステータス:", statusResponse);
+
+        setAnalysisStatus(statusResponse.status);
+
+        if (statusResponse.status === "completed") {
+          // 分析完了 - ポーリング停止してデータを再取得
+          setIsPolling(false);
+          clearInterval(pollInterval);
+
+          // 完全なセッションデータを再取得
+          const completeData = await apiService.getSessionCompleteData(sessionId);
+          console.log("分析完了後のデータ取得:", completeData);
+
+          // 詳細フィードバックを設定
+          if (completeData.feedback) {
+            setDetailedFeedback(completeData.feedback);
+          }
+
+          // リファレンスチェック結果を設定
+          if (completeData.referenceCheck) {
+            setReferenceCheckData(completeData.referenceCheck);
+          }
+
+          // 動画分析結果を設定
+          if (completeData.videoAnalysis) {
+            setVideoAnalysisData(completeData.videoAnalysis);
+          }
+
+          setAnalysisProgress(t("results.analysisCompleted"));
+        } else if (statusResponse.status === "failed" || statusResponse.status === "timeout") {
+          // 分析失敗 - ポーリング停止
+          setIsPolling(false);
+          clearInterval(pollInterval);
+          setError(statusResponse.errorMessage || t("results.analysisError"));
+        } else if (statusResponse.status === "processing") {
+          setAnalysisProgress(t("results.analysisInProgress"));
+        }
+      } catch (err) {
+        console.error("ステータスポーリングエラー:", err);
+      }
+    }, 3000); // 3秒間隔でポーリング
+
+    return () => clearInterval(pollInterval);
+  }, [sessionId, isPolling, apiService, t]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -150,7 +213,7 @@ const ResultPage: React.FC = () => {
   const handleAudioAnalysisSession = (completeData: any, sessionId: string) => {
     try {
       console.log("音声分析セッションの処理を開始:", completeData);
-      
+
       // 音声分析データから既にメッセージが構築されているのでそのまま使用
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const messages = (completeData.messages || []).map((msg: any) => ({
@@ -181,7 +244,21 @@ const ResultPage: React.FC = () => {
       setDetailedFeedback(completeData.feedback as FeedbackAnalysisResult);
       setRealtimeMetricsHistory([]); // 音声分析ではリアルタイムメトリクス履歴なし
       setScenarioGoals((completeData.goalResults?.scenarioGoals as Goal[]) || []);
-      
+
+      // リファレンスチェック結果を設定（音声分析セッション）
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((completeData as any).referenceCheck) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setReferenceCheckData((completeData as any).referenceCheck as ReferenceCheckResult);
+      }
+
+      // 動画分析結果を設定（音声分析セッション）
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((completeData as any).videoAnalysis) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setVideoAnalysisData((completeData as any).videoAnalysis as VideoAnalysisResult);
+      }
+
       console.log("音声分析セッション処理完了:", constructedSession);
     } catch (err) {
       console.error("音声分析セッション処理エラー:", err);
@@ -195,6 +272,21 @@ const ResultPage: React.FC = () => {
     const loadSessionData = async () => {
       try {
         setLoading(true);
+
+        // まず分析ステータスを確認
+        try {
+          const statusResponse = await apiService.getSessionAnalysisStatus(sessionId);
+          console.log("初期分析ステータス:", statusResponse);
+          setAnalysisStatus(statusResponse.status);
+
+          if (statusResponse.status === "processing") {
+            // 分析中の場合はポーリングを開始
+            setIsPolling(true);
+            setAnalysisProgress(t("results.analysisInProgress"));
+          }
+        } catch (statusErr) {
+          console.log("分析ステータス取得スキップ（新規セッションの可能性）:", statusErr);
+        }
 
         // セッション分析結果をAPIから取得
         console.log(t("results.fetchingCompleteSessionData"), sessionId);
@@ -216,7 +308,7 @@ const ResultPage: React.FC = () => {
           setLoading(false); // ローディング状態を解除
           return;
         }
-        
+
         // 通常セッションの場合
         setIsAudioAnalysis(false);
 
@@ -271,15 +363,15 @@ const ResultPage: React.FC = () => {
             (status) => ({
               goalId: status.goalId,
               achieved: status.achieved,
-              achievedAt: status.achievedAt && status.achievedAt !== "null" 
+              achievedAt: status.achievedAt && status.achievedAt !== "null"
                 ? (() => {
-                    try {
-                      const date = new Date(status.achievedAt);
-                      return isNaN(date.getTime()) ? undefined : date;
-                    } catch {
-                      return undefined;
-                    }
-                  })()
+                  try {
+                    const date = new Date(status.achievedAt);
+                    return isNaN(date.getTime()) ? undefined : date;
+                  } catch {
+                    return undefined;
+                  }
+                })()
                 : undefined,
               progress: Number(status.progress),
             }),
@@ -309,18 +401,37 @@ const ResultPage: React.FC = () => {
                 achieved: status.achieved,
                 achievedAt: status.achievedAt && status.achievedAt !== "null"
                   ? (() => {
-                      try {
-                        const date = new Date(status.achievedAt);
-                        return isNaN(date.getTime()) ? undefined : date;
-                      } catch {
-                        return undefined;
-                      }
-                    })()
+                    try {
+                      const date = new Date(status.achievedAt);
+                      return isNaN(date.getTime()) ? undefined : date;
+                    } catch {
+                      return undefined;
+                    }
+                  })()
                   : undefined,
                 progress: Number(status.progress),
               }),
             );
             goalScore = Number(latestMetricsWithGoals.goalScore);
+          }
+        }
+
+        // scenarioGoalsが空の場合、シナリオ情報から取得を試みる
+        if (scenarioGoals.length === 0 && sessionInfo.scenarioId) {
+          try {
+            const scenarioDetail = await apiService.getScenarioDetail(sessionInfo.scenarioId);
+            if (scenarioDetail.goals && scenarioDetail.goals.length > 0) {
+              scenarioGoals = scenarioDetail.goals.map((goal) => ({
+                id: goal.id,
+                description: goal.description,
+                isRequired: goal.isRequired ?? false,
+                priority: Number(goal.priority ?? 1),
+                criteria: goal.criteria ?? [],
+              }));
+              console.log("シナリオ情報からゴールを取得:", scenarioGoals);
+            }
+          } catch (scenarioError) {
+            console.error("シナリオ情報からのゴール取得に失敗:", scenarioError);
           }
         }
 
@@ -361,8 +472,8 @@ const ResultPage: React.FC = () => {
           ),
           endTime: new Date(
             sessionInfo.updatedAt ||
-              sessionInfo.createdAt ||
-              new Date().toISOString(),
+            sessionInfo.createdAt ||
+            new Date().toISOString(),
           ),
           messages: messagesWithMetrics,
           finalMetrics: processedFinalMetrics,
@@ -420,6 +531,18 @@ const ResultPage: React.FC = () => {
             "詳細フィードバックが存在しません（complete-data APIで自動生成されるはずです）",
           );
         }
+
+        // リファレンスチェック結果を設定（Step Functionsで取得済み）
+        if (completeData.referenceCheck) {
+          console.log("リファレンスチェック結果をAPIから取得:", completeData.referenceCheck);
+          setReferenceCheckData(completeData.referenceCheck);
+        }
+
+        // 動画分析結果を設定（Step Functionsで取得済み）
+        if (completeData.videoAnalysis) {
+          console.log("動画分析結果をAPIから取得:", completeData.videoAnalysis);
+          setVideoAnalysisData(completeData.videoAnalysis);
+        }
       } catch (err) {
         console.error("セッションデータ読み込みエラー:", err);
         setError(t("errors.sessionLoadFailed"));
@@ -460,13 +583,51 @@ const ResultPage: React.FC = () => {
             alignItems: "center",
             my: 4,
           }}
+          role="status"
+          aria-live="polite"
         >
           <Typography variant="h6" color="text.secondary" mb={2}>
             {t("results.loadingAnalysis")}
           </Typography>
-          <LinearProgress sx={{ width: "50%", mb: 2 }} />
+          <LinearProgress
+            sx={{ width: "50%", mb: 2 }}
+            aria-label={t("results.loadingAnalysis")}
+          />
           <Typography variant="body2" color="text.secondary" mt={2}>
             {t("results.loadingSessionData")}
+          </Typography>
+        </Box>
+      </Container>
+    );
+  }
+
+  // 分析中の場合のUI
+  if (isPolling && analysisStatus === "processing") {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            my: 4,
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <Typography variant="h5" color="primary" mb={3}>
+            {t("results.analysisInProgressTitle")}
+          </Typography>
+          <LinearProgress
+            sx={{ width: "60%", mb: 3, height: 8, borderRadius: 4 }}
+            aria-label={t("results.analysisInProgress")}
+          />
+          <Alert severity="info" sx={{ mb: 3, maxWidth: 500 }}>
+            <AlertTitle>{t("results.analysisInProgressTitle")}</AlertTitle>
+            {t("results.analysisInProgressDescription")}
+          </Alert>
+          <Typography variant="body2" color="text.secondary">
+            {analysisProgress}
           </Typography>
         </Box>
       </Container>
@@ -528,10 +689,10 @@ const ResultPage: React.FC = () => {
   const duration =
     session.endTime && session.startTime
       ? Math.round(
-          (new Date(session.endTime).getTime() -
-            new Date(session.startTime).getTime()) /
-            60000,
-        )
+        (new Date(session.endTime).getTime() -
+          new Date(session.startTime).getTime()) /
+        60000,
+      )
       : 0;
 
   return (
@@ -1360,12 +1521,14 @@ const ResultPage: React.FC = () => {
             </Box>
           </Box>
         )}
-        {/* ゴール達成状況セクション */}
+        {/* ゴール達成状況セクション - 全幅で表示 */}
         {scenarioGoals && scenarioGoals.length > 0 && (
-          <GoalResultsSection
-            goals={scenarioGoals}
-            goalStatuses={session?.goalStatuses || []}
-          />
+          <Box sx={{ mt: 3 }}>
+            <GoalResultsSection
+              goals={scenarioGoals}
+              goalStatuses={session?.goalStatuses || []}
+            />
+          </Box>
         )}
       </TabPanel>
 
@@ -1399,8 +1562,8 @@ const ResultPage: React.FC = () => {
                     {msg.sender === "user"
                       ? t("results.you")
                       : scenario?.npc?.name ||
-                        scenario?.npcInfo?.name ||
-                        "NPC"}{" "}
+                      scenario?.npcInfo?.name ||
+                      "NPC"}{" "}
                     - {new Date(msg.timestamp).toLocaleTimeString()}
                   </Typography>
                   <Typography variant="body1">{msg.content}</Typography>
@@ -1423,7 +1586,7 @@ const ResultPage: React.FC = () => {
                           variant="outlined"
                           color={
                             msg.metrics.angerChange &&
-                            msg.metrics.angerChange > 0
+                              msg.metrics.angerChange > 0
                               ? "error"
                               : "default"
                           }
@@ -1436,7 +1599,7 @@ const ResultPage: React.FC = () => {
                           variant="outlined"
                           color={
                             msg.metrics.trustChange &&
-                            msg.metrics.trustChange > 0
+                              msg.metrics.trustChange > 0
                               ? "success"
                               : "default"
                           }
@@ -1449,7 +1612,7 @@ const ResultPage: React.FC = () => {
                           variant="outlined"
                           color={
                             msg.metrics.progressChange &&
-                            msg.metrics.progressChange > 0
+                              msg.metrics.progressChange > 0
                               ? "info"
                               : "default"
                           }
@@ -1472,7 +1635,7 @@ const ResultPage: React.FC = () => {
           </Typography>
 
           {!session?.complianceViolations ||
-          session.complianceViolations.length === 0 ? (
+            session.complianceViolations.length === 0 ? (
             <Alert severity="info" sx={{ mb: 3 }}>
               <AlertTitle>
                 {t("compliance.noDataTitle", "データなし")}
@@ -1517,10 +1680,11 @@ const ResultPage: React.FC = () => {
             <Card sx={{ mb: 3 }}>
               <CardContent>
                 {sessionId && (
-                  <VideoFeedback 
-                    sessionId={sessionId} 
-                    isVisible={true} 
+                  <VideoFeedback
+                    sessionId={sessionId}
+                    isVisible={true}
                     language={scenario?.language || "ja"}
+                    initialData={videoAnalysisData}
                   />
                 )}
               </CardContent>
@@ -1535,10 +1699,11 @@ const ResultPage: React.FC = () => {
           <Card sx={{ mb: 3 }}>
             <CardContent>
               {sessionId && (
-                <ReferenceCheck 
-                  sessionId={sessionId} 
+                <ReferenceCheck
+                  sessionId={sessionId}
                   language={scenario?.language || "ja"}
-                  isVisible={true} 
+                  isVisible={true}
+                  initialData={referenceCheckData}
                 />
               )}
             </CardContent>

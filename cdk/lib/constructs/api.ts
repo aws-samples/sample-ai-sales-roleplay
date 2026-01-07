@@ -15,7 +15,6 @@ import { SessionLambdaConstruct } from './api/session-lambda';
 import { ScenarioLambdaConstruct } from './api/scenario-lambda';
 import { RankingsLambdaConstruct } from './api/rankings-lambda';
 import { GuardrailsLambdaConstruct } from './api/guardrails-lambda';
-import { ReferenceCheckLambdaConstruct } from './api/referenceCheck-lambda'
 import { AudioAnalysisLambdaConstruct } from './api/audio-analysis-lambda';
 import { TranscribeWebSocketConstruct } from './api/transcribe-websocket';
 
@@ -25,6 +24,8 @@ import { BedrockModelsConfig } from '../types/bedrock-models';
 
 import { GuardrailsConstruct } from './guardrails';
 import { AudioAnalysisStepFunctionsConstruct } from './audio-analysis-stepfunctions';
+import { SessionAnalysisLambdaConstruct } from './api/session-analysis-lambda';
+import { SessionAnalysisStepFunctionsConstruct } from './session-analysis-stepfunctions';
 
 export interface BackendApiProps {
   userPool?: cognito.UserPool;
@@ -40,7 +41,7 @@ export interface BackendApiProps {
 
 export class Api extends Construct {
   readonly api: ApiGatewayConstruct;
-  
+
   /** WebSocket API for Transcribe */
   public readonly transcribeWebSocket: TranscribeWebSocketConstruct;
 
@@ -77,14 +78,17 @@ export class Api extends Construct {
   /** スコア管理Lambda */
   public readonly scoringLambdaConstruct: ScoringLambdaConstruct;
 
-  /** リファレンスチェックLambda */
-  public readonly referenceCheckLambda: ReferenceCheckLambdaConstruct;
-
   /** 音声分析Lambda */
   public readonly audioAnalysisLambda: AudioAnalysisLambdaConstruct;
 
   /** 音声分析Step Functions */
   public readonly audioAnalysisStepFunctions: AudioAnalysisStepFunctionsConstruct;
+
+  /** セッション分析Lambda */
+  public readonly sessionAnalysisLambda: SessionAnalysisLambdaConstruct;
+
+  /** セッション分析Step Functions */
+  public readonly sessionAnalysisStepFunctions: SessionAnalysisStepFunctionsConstruct;
 
   constructor(scope: Construct, id: string, props: BackendApiProps) {
     super(scope, id);
@@ -200,16 +204,6 @@ export class Api extends Construct {
       envId: props.envId
     });
 
-    // リファレンスチェックLambda関数を作成
-    this.referenceCheckLambda = new ReferenceCheckLambdaConstruct(this, 'ReferenceCheckLambda', {
-      feedbackTable: this.databaseTables.sessionFeedbackTable,
-      sessionTable: this.databaseTables.sessionsTable,
-      messagesTable: this.databaseTables.messagesTable,
-      scenariosTable: this.databaseTables.scenariosTable,
-      bedrockModels: bedrockModels,
-      knowledgeBaseId: props.knowledgeBaseId
-    });
-
     // 音声分析Lambda関数を作成
     this.audioAnalysisLambda = new AudioAnalysisLambdaConstruct(this, 'AudioAnalysisLambda', {
       sessionFeedbackTable: this.databaseTables.sessionFeedbackTable,
@@ -229,8 +223,36 @@ export class Api extends Construct {
 
     // 音声分析API関数にStep Functions ARNを設定
     this.audioAnalysisLambda.apiFunction.addEnvironment(
-      'AUDIO_ANALYSIS_STATE_MACHINE_ARN', 
+      'AUDIO_ANALYSIS_STATE_MACHINE_ARN',
       this.audioAnalysisStepFunctions.stateMachine.stateMachineArn
+    );
+
+    // セッション分析Lambda関数を作成
+    // Cross-region inference profileを使用するため、videoModelRegionは不要
+    this.sessionAnalysisLambda = new SessionAnalysisLambdaConstruct(this, 'SessionAnalysisLambda', {
+      sessionFeedbackTable: this.databaseTables.sessionFeedbackTable,
+      sessionsTable: this.databaseTables.sessionsTable,
+      messagesTable: this.databaseTables.messagesTable,
+      scenariosTable: this.databaseTables.scenariosTable,
+      videoBucket: this.videoStorage.bucket,
+      knowledgeBaseId: props.knowledgeBaseId,
+      bedrockModels: {
+        feedback: bedrockModels.feedback,
+        video: bedrockModels.video,
+        reference: bedrockModels.scoring
+      }
+    });
+
+    // セッション分析Step Functionsを作成
+    this.sessionAnalysisStepFunctions = new SessionAnalysisStepFunctionsConstruct(this, 'SessionAnalysisStepFunctions', {
+      resourceNamePrefix: props.resourceNamePrefix,
+      sessionAnalysisLambda: this.sessionAnalysisLambda
+    });
+
+    // セッション分析API関数にStep Functions ARNを設定
+    this.sessionAnalysisLambda.apiFunction.addEnvironment(
+      'SESSION_ANALYSIS_STATE_MACHINE_ARN',
+      this.sessionAnalysisStepFunctions.stateMachine.stateMachineArn
     );
 
     // WebSocket API for Transcribe
@@ -242,7 +264,7 @@ export class Api extends Construct {
       sessionsTable: props.databaseTables.sessionsTable,
       scenariosTable: props.databaseTables.scenariosTable
     });
-    
+
     // API Gateway
     this.api = new ApiGatewayConstruct(this, 'ApiGateway', {
       userPool: props.userPool!,
@@ -255,8 +277,8 @@ export class Api extends Construct {
       rankingFunction: this.rankingsLambdaConstruct.function, // 新しいランキングLambdaを使用
       videosFunction: this.videosLambda.function, // 動画管理Lambda関数を追加
       guardrailsFunction: this.guardrailsLambda.function, // 新しいガードレールLambdaを使用
-      referenceCheckFunction: this.referenceCheckLambda.function,
       audioAnalysisFunction: this.audioAnalysisLambda.apiFunction, // 音声分析API関数を追加
+      sessionAnalysisFunction: this.sessionAnalysisLambda.apiFunction, // セッション分析API関数を追加
     });
 
     // スコアリングAPIエンドポイントを設定

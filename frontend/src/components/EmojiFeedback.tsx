@@ -172,26 +172,21 @@ const EmojiFeedback: React.FC<EmojiFeedbackProps> = ({
     return optimizeAnimation(baseAnimation);
   }, [animationEnabled, currentEmotion, performanceInfo]);
 
-  // メトリクスの変更を検出するための参照値
-  const metricsRef = useRef({ angerLevel, trustLevel, progressLevel });
+  // メトリクスの変更を検出するための前回値をstateで管理
+  const [prevMetrics, setPrevMetrics] = useState({ angerLevel, trustLevel, progressLevel });
 
   // メトリクスが実際に変更されたかどうかを確認
   const metricsChanged = useMemo(() => {
-    const prevMetrics = metricsRef.current;
-    const changed =
+    return (
       prevMetrics.angerLevel !== angerLevel ||
       prevMetrics.trustLevel !== trustLevel ||
-      prevMetrics.progressLevel !== progressLevel;
+      prevMetrics.progressLevel !== progressLevel
+    );
+  }, [angerLevel, trustLevel, progressLevel, prevMetrics]);
 
-    // 変更があった場合のみ参照値を更新
-    if (changed) {
-      metricsRef.current = { angerLevel, trustLevel, progressLevel };
-    }
-
-    // メトリクス変更を確認
-
-    // 常に再計算させるためにtrueを返す
-    return true;
+  // メトリクス参照値の更新
+  useEffect(() => {
+    setPrevMetrics({ angerLevel, trustLevel, progressLevel });
   }, [angerLevel, trustLevel, progressLevel]);
 
   // 感情状態の計算をメモ化

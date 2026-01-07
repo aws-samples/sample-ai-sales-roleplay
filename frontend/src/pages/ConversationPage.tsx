@@ -1,6 +1,7 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Container, Box } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import type {
   Message,
   Metrics,
@@ -9,8 +10,8 @@ import type {
   GoalStatus,
   Scenario,
 } from "../types/index";
-import type { 
-  ComplianceViolation, 
+import type {
+  ComplianceViolation,
   DifficultyLevel
 } from "../types/api";
 import type { CompositionEventType } from "../types/components";
@@ -45,6 +46,7 @@ import ComplianceAlert from "../components/compliance/ComplianceAlert";
 const ConversationPage: React.FC = () => {
   const { scenarioId } = useParams<{ scenarioId: string }>();
   const navigate = useNavigate();
+  const { i18n } = useTranslation();
 
   // 状態管理
   const [scenario, setScenario] = useState<Scenario | null>(null);
@@ -82,7 +84,7 @@ const ConversationPage: React.FC = () => {
   const [metricsUpdating, setMetricsUpdating] = useState(false);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [goalStatuses, setGoalStatuses] = useState<GoalStatus[]>([]);
-  
+
   // Transcribe音声認識サービスへの参照
   const transcribeServiceRef = useRef<TranscribeService | null>(null);
   // 最新のuserInputを参照するためのRef
@@ -108,16 +110,16 @@ const ConversationPage: React.FC = () => {
     hasComponentMounted.current = true;
     // コンポーネントのマウント状態をログ出力
     console.log("ConversationPageコンポーネントがマウントされました");
-    
+
     // TranscribeServiceの初期化
     transcribeServiceRef.current = TranscribeService.getInstance();
-    
+
     // 接続状態変更コールバックを設定
     transcribeServiceRef.current.setOnConnectionStateChange((state: ConnectionState) => {
       console.log(`接続状態変更コールバック: ${state}`);
       setConnectionState(state);
     });
-    
+
     // 環境変数からWebSocketエンドポイントを取得
     const websocketEndpoint = import.meta.env.VITE_TRANSCRIBE_WEBSOCKET_URL;
     if (websocketEndpoint) {
@@ -126,13 +128,13 @@ const ConversationPage: React.FC = () => {
     } else {
       console.warn("Transcribe WebSocketエンドポイントが設定されていません");
     }
-    
+
     return () => {
       // コンポーネントのアンマウント時にリソース解放
       if (transcribeServiceRef.current) {
         transcribeServiceRef.current.dispose();
       }
-      
+
       // 音声認識関連の状態もクリアする
       setConfirmedTranscripts([]);
     };
@@ -195,7 +197,7 @@ const ConversationPage: React.FC = () => {
                 // goalが文字列の場合はオブジェクトに変換
                 if (typeof goal === "string") {
                   return {
-                    id: `goal-${Math.random().toString(36).substr(2, 9)}`,
+                    id: `goal-${Math.random().toString(36).substring(2, 11)}`,
                     description: goal,
                     priority: 3,
                     criteria: [],
@@ -206,7 +208,7 @@ const ConversationPage: React.FC = () => {
                 return {
                   id:
                     goal.id ||
-                    `goal-${Math.random().toString(36).substr(2, 9)}`,
+                    `goal-${Math.random().toString(36).substring(2, 11)}`,
                   description: goal.description || "",
                   priority: Number(goal.priority || 3),
                   criteria: goal.criteria || [],
@@ -322,7 +324,7 @@ const ConversationPage: React.FC = () => {
 
     // セッションIDを先に設定し、状態更新を確実に行う
     setSessionId(newSessionId);
-    
+
     // Transcribe WebSocketの初期化
     if (transcribeServiceRef.current) {
       transcribeServiceRef.current.initializeConnection(newSessionId, scenario?.language || 'ja')
@@ -399,7 +401,7 @@ const ConversationPage: React.FC = () => {
   const normalizeTranscriptText = useCallback((text: string): string => {
     if (!text) return "";
     let cleanedText = text.trim();
-    
+
     // 文単位の重複除去
     const sentences = cleanedText.split(/[。.？?！!\n]/).map(s => s.trim()).filter(s => s);
     if (sentences.length >= 2) {
@@ -408,21 +410,21 @@ const ConversationPage: React.FC = () => {
         cleanedText = uniqueSentences.join('。') + '。';
       }
     }
-    
+
     // フレーズの重複除去
     const words = cleanedText.split(/\s+/);
     if (words.length >= 2) {
       const halfIndex = Math.ceil(words.length / 2);
       const firstHalf = words.slice(0, halfIndex).join(' ');
       const secondHalf = words.slice(halfIndex).join(' ');
-      
-      if (firstHalf === secondHalf || 
-          (firstHalf.length > 3 && secondHalf.includes(firstHalf)) ||
-          (secondHalf.length > 3 && firstHalf.includes(secondHalf))) {
+
+      if (firstHalf === secondHalf ||
+        (firstHalf.length > 3 && secondHalf.includes(firstHalf)) ||
+        (secondHalf.length > 3 && firstHalf.includes(secondHalf))) {
         cleanedText = firstHalf;
       }
     }
-    
+
     return cleanedText;
   }, []);
 
@@ -446,15 +448,15 @@ const ConversationPage: React.FC = () => {
     // リファレンスを使用して確実に最新のメッセージ履歴を維持（バグ修正）
     const currentMessages = messagesRef.current;
     const updatedMessages = [...currentMessages, userMessage];
-    
+
     // 両方更新して確実に同期を保つ
     messagesRef.current = updatedMessages;
     setMessages(updatedMessages);
-    
+
     // 入力クリアの前にuserInputRefも更新して同期を確保
     userInputRef.current = "";
     setUserInput("");
-    
+
     // 音声認識の状態もリセット
     setConfirmedTranscripts([]);
 
@@ -485,27 +487,27 @@ const ConversationPage: React.FC = () => {
             trustLevel: Number(currentMetrics.trustLevel) || 1,
             progressLevel: Number(currentMetrics.progressLevel) || 1,
           };
-          
+
           // messagesRef経由で確実に最新のメッセージ履歴を取得（バグ修正）
           const currentMessages = messagesRef.current;
-          
+
           console.log(`API呼び出し時のメッセージ数: ${currentMessages.length}`);
-          
-          // メッセージ配列をディープコピーし、純粋なデータ構造にする
+
+          // メッセージ配列をディープコピーし、純粋なデータ構造にする（sender型を正しくキャスト）
           const cleanMessages = currentMessages.map(msg => ({
             id: String(msg.id),
-            sender: String(msg.sender),
+            sender: (msg.sender === "user" || msg.sender === "npc" ? msg.sender : "user") as "user" | "npc",
             content: String(msg.content),
-            timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : new Date().toISOString()
+            timestamp: msg.timestamp instanceof Date ? msg.timestamp : new Date()
           }));
-          
+
           // NPCオブジェクトをディープコピー
           const cleanNpc = {
             name: String(scenario.npc.name),
             role: String(scenario.npc.role),
             company: String(scenario.npc.company),
             description: String(scenario.npc.description || ""),
-            personality: Array.isArray(scenario.npc.personality) ? 
+            personality: Array.isArray(scenario.npc.personality) ?
               scenario.npc.personality.map(p => String(p)) : []
           };
 
@@ -551,7 +553,7 @@ const ConversationPage: React.FC = () => {
           // messagesRefから最新の状態を取得（バグ修正）
           const currentMessagesState = messagesRef.current;
           const finalMessages = [...currentMessagesState, npcMessage];
-          
+
           // 両方同時に更新して一貫性を保つ
           messagesRef.current = finalMessages;
           setMessages(finalMessages);
@@ -560,7 +562,7 @@ const ConversationPage: React.FC = () => {
           // APIからのレスポンスが返ってきた時点で入力処理を有効化
           // ユーザーは音声を聞きながら次の入力を準備できるように
           setIsProcessing(false);
-          
+
           // Amazon Polly で音声合成
           if (audioEnabled) {
             const audioService = AudioService.getInstance();
@@ -597,30 +599,33 @@ const ConversationPage: React.FC = () => {
               );
               // 安全な文字列に変換
               const cleanMessageText = messageText ? String(messageText) : "";
-              
-              // メッセージ配列を純粋なデータ構造に変換
+
+              // メッセージ配列を純粋なデータ構造に変換（sender型を正しくキャスト）
               const cleanMessages = finalMessages.map(msg => ({
                 id: String(msg.id || ""),
-                sender: String(msg.sender || ""),
+                sender: (msg.sender === "user" || msg.sender === "npc" ? msg.sender : "user") as "user" | "npc",
                 content: String(msg.content || ""),
-                timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : 
-                  (typeof msg.timestamp === 'string' ? msg.timestamp : new Date().toISOString())
+                timestamp: msg.timestamp instanceof Date ? msg.timestamp :
+                  (typeof msg.timestamp === 'string' ? new Date(msg.timestamp) : new Date())
               }));
-              
-              // ゴール状態を純粋なデータ構造に変換
-              const cleanGoalStatuses = Array.isArray(goalStatuses) ? 
+
+              // ゴール状態を純粋なデータ構造に変換（GoalStatus型に合わせる）
+              const cleanGoalStatuses = Array.isArray(goalStatuses) ?
                 goalStatuses.map(status => ({
                   goalId: String(status.goalId || ""),
                   achieved: Boolean(status.achieved),
-                  description: String(status.description || "")
+                  progress: Number(status.progress || 0),
+                  achievedAt: status.achievedAt
                 })) : [];
-              
-              // ゴールを純粋なデータ構造に変換
-              const cleanGoals = Array.isArray(goals) ? 
+
+              // ゴールを純粋なデータ構造に変換（Goal型に合わせる）
+              const cleanGoals = Array.isArray(goals) ?
                 goals.map(goal => ({
                   id: String(goal.id || ""),
                   description: String(goal.description || ""),
-                  isRequired: Boolean(goal.isRequired)
+                  isRequired: Boolean(goal.isRequired),
+                  priority: Number(goal.priority || 3),
+                  criteria: Array.isArray(goal.criteria) ? goal.criteria.map(c => String(c)) : []
                 })) : [];
 
               const evaluationResult = await apiService.getRealtimeEvaluation(
@@ -704,7 +709,7 @@ const ConversationPage: React.FC = () => {
               setIsSpeaking(false);
             }
           }, 30000); // 長めのタイムアウト - 通常は音声再生が完了するはず
-          
+
           // クリーンアップ関数
           return () => clearTimeout(fallbackTimerId);
 
@@ -770,41 +775,92 @@ const ConversationPage: React.FC = () => {
       const waitForRecordingUpload = () => {
         return new Promise<void>((resolve) => {
           let uploadCompleted = false;
-          
-          // 60秒でタイムアウト（大きなファイル対応）
+
+          // 前回の録画キーを保存（新しいセッションの録画を待つため）
+          const previousKey = localStorage.getItem("lastRecordingKey");
+          console.log("録画アップロード待機開始, 前回のキー:", previousKey, "セッションID:", session.id);
+
+          // 90秒でタイムアウト（大きなファイル対応）
           const timeoutId = setTimeout(() => {
-            console.warn("録画アップロード待機がタイムアウトしました");
+            console.warn("録画アップロード待機がタイムアウトしました（90秒経過）");
             window.removeEventListener('recordingComplete', handleRecordingComplete as EventListener);
             resolve();
-          }, 60000);
+          }, 90000);
 
-          const checkUploadComplete = () => {
-            const videoKey = localStorage.getItem("lastRecordingKey");
-            if (videoKey && !uploadCompleted) {
-              uploadCompleted = true;
-              console.log(`録画アップロード完了: ${videoKey}`);
-              localStorage.setItem(`session_${session.id}_videoKey`, videoKey);
-              clearTimeout(timeoutId);
-              resolve();
+          const checkUploadComplete = (newVideoKey?: string) => {
+            if (uploadCompleted) return;
+
+            const videoKey = newVideoKey || localStorage.getItem("lastRecordingKey");
+
+            // 新しいキーが設定されているか確認
+            // 1. セッションIDを含むキーであること
+            // 2. 前回のキーと異なること（または前回のキーがない場合）
+            if (videoKey && videoKey.includes(session.id)) {
+              if (!previousKey || videoKey !== previousKey) {
+                uploadCompleted = true;
+                console.log(`録画アップロード完了確認: ${videoKey}`);
+                localStorage.setItem(`session_${session.id}_videoKey`, videoKey);
+                clearTimeout(timeoutId);
+                window.removeEventListener('recordingComplete', handleRecordingComplete as EventListener);
+                resolve();
+              } else {
+                console.log("前回と同じキーのためスキップ:", videoKey);
+              }
             }
           };
 
           // 録画完了イベントリスナー
           const handleRecordingComplete = (event: CustomEvent) => {
             console.log("録画完了イベント受信:", event.detail);
-            checkUploadComplete();
+            if (event.detail?.videoKey) {
+              checkUploadComplete(event.detail.videoKey);
+            } else {
+              checkUploadComplete();
+            }
           };
 
           window.addEventListener('recordingComplete', handleRecordingComplete as EventListener);
 
-          // 既に完了している場合もチェック
-          checkUploadComplete();
+          // 定期的にlocalStorageをチェック（イベントが発火しない場合の対策）
+          const checkInterval = setInterval(() => {
+            if (!uploadCompleted) {
+              const currentKey = localStorage.getItem("lastRecordingKey");
+              if (currentKey && currentKey.includes(session.id) && currentKey !== previousKey) {
+                console.log("定期チェックで録画キーを検出:", currentKey);
+                checkUploadComplete(currentKey);
+                clearInterval(checkInterval);
+              }
+            } else {
+              clearInterval(checkInterval);
+            }
+          }, 1000);
+
+          // タイムアウト時にインターバルもクリア
+          setTimeout(() => {
+            clearInterval(checkInterval);
+          }, 90000);
         });
       };
 
       // 録画アップロード完了を待ってから遷移
       await waitForRecordingUpload();
-      
+
+      // セッション分析を非同期で開始（Step Functions）
+      try {
+        const apiService = ApiService.getInstance();
+        const analysisResponse = await apiService.startSessionAnalysis(
+          session.id,
+          i18n.language || "ja"
+        );
+        console.log("セッション分析開始:", analysisResponse);
+
+        // 分析開始情報をlocalStorageに保存
+        localStorage.setItem(`session_${session.id}_analysisStarted`, "true");
+      } catch (analysisError) {
+        console.warn("セッション分析開始に失敗しましたが、結果ページへ遷移します:", analysisError);
+        // 分析開始に失敗しても結果ページへ遷移（従来の同期分析にフォールバック）
+      }
+
       setTimeout(() => {
         navigate(`/result/${session.id}`);
       }, 1000);
@@ -818,6 +874,7 @@ const ConversationPage: React.FC = () => {
       setSessionEnded,
       goalScore,
       sessionId,
+      i18n.language,
     ],
   );
 
@@ -851,7 +908,7 @@ const ConversationPage: React.FC = () => {
       transcribeServiceRef.current.stopListening();
       setIsListening(false);
       setContinuousListening(false);
-      
+
       // 現在入力中のテキストがあれば送信
       if (userInputRef.current.trim()) {
         sendMessage(userInputRef.current.trim());
@@ -867,7 +924,7 @@ const ConversationPage: React.FC = () => {
       if (!transcribeServiceRef.current) {
         throw new Error("TranscribeServiceが初期化されていません");
       }
-      
+
       // WebSocketが接続されていなければ再接続を試みる
       if (!transcribeServiceRef.current.isConnected() && sessionId) {
         try {
@@ -878,7 +935,7 @@ const ConversationPage: React.FC = () => {
           return;
         }
       }
-      
+
       // Amazon Transcribeを使った常時マイク入力を開始
       await transcribeServiceRef.current.startListening(
         // 文字起こしコールバック（isPartial: true=途中認識、false=最終確定）
@@ -887,36 +944,36 @@ const ConversationPage: React.FC = () => {
           if (process.env.NODE_ENV === 'development') {
             console.log(`音声認識: "${text.trim()}", isPartial: ${isPartial}`);
           }
-          
+
           if (!isPartial) {
             // 最終確定時の処理（無音検出後に来る場合は既に送信済みのためスキップされる）
             const trimmedText = text.trim();
             if (!trimmedText) return;
-            
+
             const cleanedText = normalizeTranscriptText(trimmedText);
             if (!cleanedText) return;
-            
+
             setConfirmedTranscripts((prev) => {
               if (prev.includes(cleanedText)) return prev;
-              
+
               const newConfirmed = [...prev, cleanedText];
               const combinedText = newConfirmed.join("\n");
-              
+
               setUserInput(combinedText);
               userInputRef.current = combinedText;
-              
+
               return newConfirmed;
             });
           } else {
             // 途中認識時の処理 - Transcribeは累積的にテキストを返す
             const currentPartial = text.trim();
             if (!currentPartial) return;
-            
+
             // 確定済みテキストと途中認識を組み合わせて表示
-            const combinedText = confirmedTranscripts.length > 0 
+            const combinedText = confirmedTranscripts.length > 0
               ? confirmedTranscripts.join("\n") + "\n" + currentPartial
               : currentPartial;
-            
+
             setUserInput(combinedText);
             userInputRef.current = combinedText;
           }
@@ -926,21 +983,21 @@ const ConversationPage: React.FC = () => {
           console.log(`🔇 無音検出コールバック実行: userInputRef="${userInputRef.current}"`);
           if (userInputRef.current.trim()) {
             console.log(`📤 無音検出による自動送信実行 - 現在のメッセージ数: ${messagesRef.current.length}`);
-            
+
             // 現在の入力値を一時変数に保存
             const currentInput = userInputRef.current.trim();
-            
+
             // メッセージ送信前に音声入力を一時停止（履歴問題を防止）
             const recognitionActive = transcribeServiceRef.current && transcribeServiceRef.current.isListening();
-            
+
             // 音声認識を一時停止（停止はしないが、テキスト更新を防止）
             if (recognitionActive) {
               console.log('音声認識を一時停止（テキスト更新を防止）');
             }
-            
+
             // 引数付きでsendMessage関数を呼び出し（完全な送信処理を実行）
             sendMessage(currentInput);
-            
+
             console.log(`📤 メッセージ送信後 - 現在のメッセージ数: ${messagesRef.current.length}`);
           } else {
             console.log(`⚠️ 無音検出: userInputが空のため送信をスキップ`);
@@ -954,7 +1011,7 @@ const ConversationPage: React.FC = () => {
           setSpeechRecognitionError("network");
         }
       );
-      
+
       setIsListening(true);
       setContinuousListening(true);
       setSpeechRecognitionError(null);
@@ -970,14 +1027,14 @@ const ConversationPage: React.FC = () => {
     setSpeechRecognitionError(null);
     setIsListening(false);
     setContinuousListening(false);
-    
+
     // Transcribeサービスの停止
     if (transcribeServiceRef.current && transcribeServiceRef.current.isListening()) {
       transcribeServiceRef.current.stopListening();
     }
-    
+
     // 部分認識をクリア（確定済みテキストは保持）
-    
+
     // ユーザー入力を確定済みテキストのみに更新
     if (confirmedTranscripts.length > 0) {
       const confirmedText = confirmedTranscripts.join("\n");

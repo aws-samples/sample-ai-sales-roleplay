@@ -10,8 +10,6 @@ import type {
   MessageListResponse,
   ScenarioListResponse,
   RankingResponse,
-  VideoAnalysisResult,
-  ReferenceCheckResult,
   ComplianceCheck,
   ScenarioExportData,
   ImportResponse,
@@ -24,7 +22,7 @@ import type {
 export class ApiService {
   private static instance: ApiService;
 
-  private constructor() {}
+  private constructor() { }
 
   /**
    * シングルトンインスタンスを取得
@@ -288,12 +286,12 @@ export class ApiService {
         // 感情パラメータがある場合は追加
         ...(emotionParams
           ? {
-              emotionParams: {
-                angerLevel: emotionParams.angerLevel || 1,
-                trustLevel: emotionParams.trustLevel || 1,
-                progressLevel: emotionParams.progressLevel || 1,
-              },
-            }
+            emotionParams: {
+              angerLevel: emotionParams.angerLevel || 1,
+              trustLevel: emotionParams.trustLevel || 1,
+              progressLevel: emotionParams.progressLevel || 1,
+            },
+          }
           : {}),
         // 言語設定を追加
         ...(language ? { language } : {}),
@@ -379,22 +377,22 @@ export class ApiService {
         // セッションIDを含める
         ...(sessionId ? { sessionId } : {}),
         // ゴール達成状況が指定されていれば含める（循環参照対策）
-        ...(goalStatuses ? { 
+        ...(goalStatuses ? {
           goalStatuses: goalStatuses.map(status => ({
             goalId: status.goalId,
             progress: typeof status.progress === "number" ? status.progress : 0,
             achieved: Boolean(status.achieved),
             ...(status.achievedAt ? {
-              achievedAt: status.achievedAt instanceof Date 
-                ? status.achievedAt.toISOString() 
-                : typeof status.achievedAt === "string" 
-                  ? status.achievedAt 
+              achievedAt: status.achievedAt instanceof Date
+                ? status.achievedAt.toISOString()
+                : typeof status.achievedAt === "string"
+                  ? status.achievedAt
                   : undefined
             } : {})
           }))
         } : {}),
         // ゴール定義が指定されていれば含める（循環参照対策）
-        ...(goals ? { 
+        ...(goals ? {
           goals: goals.map(goal => ({
             id: goal.id,
             description: goal.description || "",
@@ -429,15 +427,15 @@ export class ApiService {
         return {
           scores: data.scores
             ? {
-                angerLevel: data.scores.angerLevel || 1,
-                trustLevel: data.scores.trustLevel || 1,
-                progressLevel: data.scores.progressLevel || 1,
-              }
+              angerLevel: data.scores.angerLevel || 1,
+              trustLevel: data.scores.trustLevel || 1,
+              progressLevel: data.scores.progressLevel || 1,
+            }
             : {
-                angerLevel: 1,
-                trustLevel: 1,
-                progressLevel: 1,
-              },
+              angerLevel: 1,
+              trustLevel: 1,
+              progressLevel: 1,
+            },
           analysis: data.scores?.analysis || "",
           goalStatuses: data.goal?.statuses,
           // コンプライアンスチェック結果があれば含める
@@ -1313,201 +1311,6 @@ export class ApiService {
   }
 
   /**
-   * 動画を分析する
-   * @param sessionId セッションID
-   * @param videoKey 動画のS3キー
-   * @returns 分析ジョブ情報
-   */
-  /**
-   * セッションに録画情報を関連付ける
-   * @param sessionId セッションID
-   * @param videoKey 動画キー
-   * @returns 更新結果
-   */
-  public async updateSessionVideo(
-    sessionId: string,
-    videoKey: string,
-  ): Promise<{
-    success: boolean;
-    message?: string;
-  }> {
-    try {
-      // リクエストボディの作成
-      const requestBody = {
-        sessionId,
-        videoKey,
-      };
-
-      // API呼び出し
-      return await this.apiPost<
-        {
-          success: boolean;
-          message?: string;
-        },
-        typeof requestBody
-      >("/sessions/video", requestBody);
-    } catch (error) {
-      console.error("セッション録画情報更新に失敗しました:", error);
-
-      if (error instanceof Error) {
-        throw new Error(
-          `セッション録画情報更新に失敗しました: ${error.message}`,
-        );
-      } else {
-        throw new Error("セッション録画情報更新に失敗しました");
-      }
-    }
-  }
-
-  /**
-   * 動画を分析する
-   * @param sessionId セッションID
-   * @param videoKey 動画のS3キー
-   * @returns 分析ジョブ情報
-   */
-  public async analyzeVideo(
-    sessionId: string,
-    videoKey: string,
-  ): Promise<{
-    jobId: string;
-    status: string;
-    result?: VideoAnalysisResult;
-  }> {
-    try {
-      // リクエストボディの作成
-      const requestBody = {
-        sessionId,
-        videoKey,
-      };
-
-      // API呼び出し
-      return await this.apiPost<
-        {
-          jobId: string;
-          status: string;
-          result?: VideoAnalysisResult;
-        },
-        typeof requestBody
-      >("/videos/analyze", requestBody);
-    } catch (error) {
-      console.error("動画分析に失敗しました:", error);
-
-      if (error instanceof Error) {
-        throw new Error(`動画分析に失敗しました: ${error.message}`);
-      } else {
-        throw new Error("動画分析に失敗しました");
-      }
-    }
-  }
-
-  /**
-   * 動画分析結果を取得する
-   * @param sessionId セッションID
-   * @param language 分析言語
-   * @returns 動画分析結果
-   */
-  public async getVideoAnalysis(sessionId: string, language: string = "ja"): Promise<{
-    sessionId: string;
-    videoAnalysis: VideoAnalysisResult;
-    createdAt: string;
-    videoUrl?: string;
-  }> {
-    try {
-      // API呼び出し（言語パラメータを追加）
-      return await this.apiGet<{
-        sessionId: string;
-        videoAnalysis: VideoAnalysisResult;
-        createdAt: string;
-        videoUrl?: string;
-      }>(`/videos/${sessionId}?language=${encodeURIComponent(language)}`);
-    } catch (error) {
-      console.error("動画分析結果取得に失敗しました:", error);
-
-      if (error instanceof Error) {
-        throw new Error(`動画分析結果取得に失敗しました: ${error.message}`);
-      } else {
-        throw new Error("動画分析結果取得に失敗しました");
-      }
-    }
-  }
-
-  /**
-   * リファレンスチェックの結果を取得する
-   * @param sessionId セッションID
-   * @param language 言語設定 ("ja" または "en")
-   * @param retryCount 内部的なリトライ回数（通常は指定不要）
-   * @returns リファレンスチェックの結果
-   */
-  public async getReferenceCheck(
-    sessionId: string,
-    language: string = "ja",
-    retryCount: number = 0,
-  ): Promise<{
-    sessionId: string;
-    referenceCheck: ReferenceCheckResult;
-    createdAt: string;
-  }> {
-    const maxRetries = 3;
-    const retryDelay = 60000;
-
-    try {
-      const referenceCheckResult = await this.apiGet<ReferenceCheckResult>(
-        `/referenceCheck/${sessionId}?language=${encodeURIComponent(language)}`,
-      );
-
-      if (!referenceCheckResult) {
-        throw new Error("リファレンスチェック結果が空です");
-      }
-
-      const validatedResult: ReferenceCheckResult = {
-        messages: referenceCheckResult.messages || [],
-        summary: referenceCheckResult.summary || {
-          totalMessages: 0,
-          checkedMessages: 0,
-        },
-      };
-
-      return {
-        sessionId: sessionId,
-        referenceCheck: validatedResult,
-        createdAt: new Date().toISOString(),
-      };
-    } catch (error) {
-      console.error("リファレンスチェックの結果取得に失敗しました:", error);
-
-      if (this.isGatewayTimeoutError(error) && retryCount < maxRetries) {
-        console.log(
-          `504 Gateway Timeoutエラーを検出。${retryDelay}ms後にリトライします (${retryCount + 1}/${maxRetries})`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, retryDelay));
-        return this.getReferenceCheck(sessionId, language, retryCount + 1);
-      }
-
-      if (this.is404Error(error)) {
-        throw error;
-      }
-
-      if (this.is409Error(error)) {
-        const conflictError = new Error("リファレンスチェックが既に実行中です");
-        const customError = conflictError as Error & {
-          isReferenceCheckInProgress: boolean;
-          statusCode: number;
-        };
-        customError.isReferenceCheckInProgress = true;
-        customError.statusCode = 409;
-        throw customError;
-      }
-
-      if (error instanceof Error) {
-        throw new Error(
-          `リファレンスチェックの取得に失敗しました: ${error.message}`,
-        );
-      } else {
-        throw new Error("リファレンスチェックの取得に失敗しました");
-      }
-    }
-  }
-
   /**
    * 504 Gateway Timeoutエラーかどうかを判定する
    * @param error エラーオブジェクト
@@ -1700,7 +1503,7 @@ export class ApiService {
       return response;
     } catch (error) {
       console.error('音声アップロードURL生成エラー:', error);
-      
+
       if (error instanceof Error) {
         throw new Error(`音声アップロードURL生成に失敗しました: ${error.message}`);
       } else {
@@ -1747,7 +1550,7 @@ export class ApiService {
       return response;
     } catch (error) {
       console.error('音声分析開始エラー:', error);
-      
+
       if (error instanceof Error) {
         throw new Error(`音声分析開始に失敗しました: ${error.message}`);
       } else {
@@ -1782,7 +1585,7 @@ export class ApiService {
       return response;
     } catch (error) {
       console.error('分析状況確認エラー:', error);
-      
+
       if (error instanceof Error) {
         throw new Error(`分析状況確認に失敗しました: ${error.message}`);
       } else {
@@ -1817,11 +1620,85 @@ export class ApiService {
       return response;
     } catch (error) {
       console.error('音声分析結果取得エラー:', error);
-      
+
       if (error instanceof Error) {
         throw new Error(`音声分析結果取得に失敗しました: ${error.message}`);
       } else {
         throw new Error('音声分析結果取得に失敗しました');
+      }
+    }
+  }
+
+  /**
+   * セッション分析を開始（Step Functions統合）
+   * @param sessionId セッションID
+   * @param language 言語設定
+   * @returns 分析開始結果
+   */
+  public async startSessionAnalysis(
+    sessionId: string,
+    language: string = "ja"
+  ): Promise<{
+    success: boolean;
+    message: string;
+    sessionId: string;
+    status: string;
+    executionArn?: string;
+  }> {
+    try {
+      const requestBody = { language };
+
+      const response = await this.apiPost<{
+        success: boolean;
+        message: string;
+        sessionId: string;
+        status: string;
+        executionArn?: string;
+      }>(`/sessions/${sessionId}/analyze`, requestBody);
+
+      return response;
+    } catch (error) {
+      console.error('セッション分析開始エラー:', error);
+
+      if (error instanceof Error) {
+        throw new Error(`セッション分析開始に失敗しました: ${error.message}`);
+      } else {
+        throw new Error('セッション分析開始に失敗しました');
+      }
+    }
+  }
+
+  /**
+   * セッション分析のステータスを取得（ポーリング用）
+   * @param sessionId セッションID
+   * @returns 分析ステータス
+   */
+  public async getSessionAnalysisStatus(sessionId: string): Promise<{
+    success: boolean;
+    sessionId: string;
+    status: 'not_started' | 'processing' | 'completed' | 'failed' | 'timeout';
+    message?: string;
+    updatedAt?: string;
+    errorMessage?: string;
+  }> {
+    try {
+      const response = await this.apiGet<{
+        success: boolean;
+        sessionId: string;
+        status: 'not_started' | 'processing' | 'completed' | 'failed' | 'timeout';
+        message?: string;
+        updatedAt?: string;
+        errorMessage?: string;
+      }>(`/sessions/${sessionId}/analysis-status`);
+
+      return response;
+    } catch (error) {
+      console.error('セッション分析ステータス取得エラー:', error);
+
+      if (error instanceof Error) {
+        throw new Error(`セッション分析ステータス取得に失敗しました: ${error.message}`);
+      } else {
+        throw new Error('セッション分析ステータス取得に失敗しました');
       }
     }
   }

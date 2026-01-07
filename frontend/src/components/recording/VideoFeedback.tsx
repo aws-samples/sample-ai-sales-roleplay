@@ -2,95 +2,35 @@ import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
-  CircularProgress,
   Alert,
-  AlertTitle,
   LinearProgress,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { VideoAnalysisResult } from "../../types/api";
-import { ApiService } from "../../services/ApiService";
 
 interface VideoFeedbackProps {
   sessionId: string;
   isVisible?: boolean;
   language?: string;
+  /** Step Functionsで取得済みの動画分析結果（渡された場合はAPIを呼び出さない） */
+  initialData?: VideoAnalysisResult | null;
 }
 
 /**
  * 動画分析結果表示コンポーネント
  */
 const VideoFeedback: React.FC<VideoFeedbackProps> = ({
-  sessionId,
   isVisible = true,
-  language = "ja",
+  initialData = null,
 }) => {
   const { t } = useTranslation();
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
   const [videoAnalysis, setVideoAnalysis] =
-    useState<VideoAnalysisResult | null>(null);
+    useState<VideoAnalysisResult | null>(initialData);
 
-  // 動画分析結果の取得
-  const fetchVideoAnalysis = React.useCallback(async () => {
-    setIsLoading(true);
-    setError("");
-
-    try {
-      const apiService = ApiService.getInstance();
-      const result = await apiService.getVideoAnalysis(sessionId, language);
-      if (result && result.videoAnalysis) {
-        setVideoAnalysis(result.videoAnalysis);
-      }
-    } catch (err: unknown) {
-      console.error("Error fetching video analysis:", err);
-
-      // 404エラー（分析データが存在しない）の場合は、分析中状態を維持
-      if (
-        err &&
-        typeof err === "object" &&
-        "response" in err &&
-        err.response &&
-        typeof err.response === "object" &&
-        "status" in err.response &&
-        err.response.status === 404
-      ) {
-        // 分析データがまだ存在しない場合は、エラーではなく分析中として扱う
-        setVideoAnalysis(null);
-        setError("");
-      } else {
-        setError(t("videoFeedback.fetchError"));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [sessionId, language, t]);
-
-  // 初期データ取得
+  // initialDataが変更された場合にデータを更新
   useEffect(() => {
-    if (isVisible && sessionId) {
-      fetchVideoAnalysis();
-    }
-  }, [sessionId, isVisible, language, fetchVideoAnalysis]);
-
-  // 分析データがない場合の定期ポーリング
-  useEffect(() => {
-    if (!videoAnalysis && !isLoading && !error && isVisible && sessionId) {
-      const pollInterval = setInterval(() => {
-        fetchVideoAnalysis();
-      }, 30000); // 30秒間隔でポーリング
-
-      return () => clearInterval(pollInterval);
-    }
-  }, [
-    videoAnalysis,
-    isLoading,
-    error,
-    isVisible,
-    sessionId,
-    language,
-    fetchVideoAnalysis,
-  ]);
+    setVideoAnalysis(initialData);
+  }, [initialData]);
 
   // コンポーネントが非表示の場合は何も表示しない
   if (!isVisible) {
@@ -99,17 +39,7 @@ const VideoFeedback: React.FC<VideoFeedbackProps> = ({
 
   return (
     <Box>
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          <AlertTitle>{error}</AlertTitle>
-        </Alert>
-      )}
-
-      {isLoading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : videoAnalysis ? (
+      {videoAnalysis ? (
         <Box>
           <Typography variant="h6" gutterBottom>
             📹 {t("videoFeedback.title")}
@@ -291,19 +221,18 @@ const VideoFeedback: React.FC<VideoFeedbackProps> = ({
           </Box>
         </Box>
       ) : (
-        // 動画分析データがない場合は「分析中」を表示
-        <Box sx={{ textAlign: "center", p: 4 }}>
-          <CircularProgress sx={{ mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            {t("videoFeedback.analyzing", "分析中...")}
+        // 動画分析データがない場合は「データなし」を表示
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" gutterBottom fontWeight="medium">
+            {t("videoFeedback.noDataTitle", "動画分析データなし")}
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2">
             {t(
-              "videoFeedback.analysisInProgress",
-              "動画の分析を実行しています。しばらくお待ちください。",
+              "videoFeedback.noData",
+              "このセッションには動画分析データがありません。セッション中にカメラで録画された場合のみ、動画分析が実行されます。",
             )}
           </Typography>
-        </Box>
+        </Alert>
       )}
     </Box>
   );
