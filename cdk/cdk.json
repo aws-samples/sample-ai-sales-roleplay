@@ -22,28 +22,28 @@
       "allowedSignUpEmailDomains": null,
       "bedrockModels": {
         "us-regions": {
-          "conversation": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-          "scoring": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-          "feedback": "us.anthropic.claude-sonnet-4-20250514-v1:0",
-          "guardrail": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "conversation": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+          "scoring": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+          "feedback": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+          "guardrail": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
           "video": "us.amazon.nova-lite-v1:0",
-          "referenceCheck": "us.anthropic.claude-sonnet-4-20250514-v1:0"
+          "referenceCheck": "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
         },
         "ap-regions": {
           "conversation": "apac.anthropic.claude-3-haiku-20240307-v1:0",
           "scoring": "apac.anthropic.claude-3-haiku-20240307-v1:0",
-          "feedback": "apac.anthropic.claude-sonnet-4-20250514-v1:0",
+          "feedback": "apac.anthropic.claude-sonnet-4-5-20250929-v1:0",
           "guardrail": "apac.anthropic.claude-3-haiku-20240307-v1:0",
           "video": "apac.amazon.nova-lite-v1:0",
-          "referenceCheck": "apac.anthropic.claude-sonnet-4-20250514-v1:0"
+          "referenceCheck": "apac.anthropic.claude-sonnet-4-5-20250929-v1:0"
         },
         "eu-regions": {
           "conversation": "eu.anthropic.claude-3-haiku-20240307-v1:0",
           "scoring": "eu.anthropic.claude-3-haiku-20240307-v1:0",
-          "feedback": "eu.anthropic.claude-sonnet-4-20250514-v1:0",
+          "feedback": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
           "guardrail": "eu.anthropic.claude-3-haiku-20240307-v1:0",
           "video": "eu.amazon.nova-lite-v1:0",
-          "referenceCheck": "eu.anthropic.claude-sonnet-4-20250514-v1:0"
+          "referenceCheck": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
         }
       },
       "allowedIpV4AddressRanges": null,
@@ -61,28 +61,28 @@
       "allowedSignUpEmailDomains": null,
       "bedrockModels": {
         "us-regions": {
-          "conversation": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-          "scoring": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-          "feedback": "us.anthropic.claude-sonnet-4-20250514-v1:0",
-          "guardrail": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "conversation": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+          "scoring": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+          "feedback": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+          "guardrail": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
           "video": "us.amazon.nova-lite-v1:0",
-          "referenceCheck": "us.anthropic.claude-sonnet-4-20250514-v1:0"
+          "referenceCheck": "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
         },
         "ap-regions": {
           "conversation": "apac.anthropic.claude-3-haiku-20240307-v1:0",
           "scoring": "apac.anthropic.claude-3-haiku-20240307-v1:0",
-          "feedback": "apac.anthropic.claude-sonnet-4-20250514-v1:0",
+          "feedback": "apac.anthropic.claude-sonnet-4-5-20250929-v1:0",
           "guardrail": "apac.anthropic.claude-3-haiku-20240307-v1:0",
           "video": "apac.amazon.nova-lite-v1:0",
-          "referenceCheck": "apac.anthropic.claude-sonnet-4-20250514-v1:0"
+          "referenceCheck": "apac.anthropic.claude-sonnet-4-5-20250929-v1:0"
         },
         "eu-regions": {
           "conversation": "eu.anthropic.claude-3-haiku-20240307-v1:0",
           "scoring": "eu.anthropic.claude-3-haiku-20240307-v1:0",
-          "feedback": "eu.anthropic.claude-sonnet-4-20250514-v1:0",
+          "feedback": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
           "guardrail": "eu.anthropic.claude-3-haiku-20240307-v1:0",
           "video": "eu.amazon.nova-lite-v1:0",
-          "referenceCheck": "eu.anthropic.claude-sonnet-4-20250514-v1:0"
+          "referenceCheck": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
         }
       },
       "allowedIpV4AddressRanges": null,
@@ -100,28 +100,28 @@
       "allowedSignUpEmailDomains": null,
       "bedrockModels": {
         "us-regions": {
-          "conversation": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-          "scoring": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-          "feedback": "us.anthropic.claude-sonnet-4-20250514-v1:0",
-          "guardrail": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "conversation": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+          "scoring": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+          "feedback": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+          "guardrail": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
           "video": "us.amazon.nova-lite-v1:0",
-          "referenceCheck": "us.anthropic.claude-sonnet-4-20250514-v1:0"
+          "referenceCheck": "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
         },
         "ap-regions": {
           "conversation": "apac.anthropic.claude-3-haiku-20240307-v1:0",
           "scoring": "apac.anthropic.claude-3-haiku-20240307-v1:0",
-          "feedback": "apac.anthropic.claude-sonnet-4-20250514-v1:0",
+          "feedback": "apac.anthropic.claude-sonnet-4-5-20250929-v1:0",
           "guardrail": "apac.anthropic.claude-3-haiku-20240307-v1:0",
           "video": "apac.amazon.nova-lite-v1:0",
-          "referenceCheck": "apac.anthropic.claude-sonnet-4-20250514-v1:0"
+          "referenceCheck": "apac.anthropic.claude-sonnet-4-5-20250929-v1:0"
         },
         "eu-regions": {
           "conversation": "eu.anthropic.claude-3-haiku-20240307-v1:0",
           "scoring": "eu.anthropic.claude-3-haiku-20240307-v1:0",
-          "feedback": "eu.anthropic.claude-sonnet-4-20250514-v1:0",
+          "feedback": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
           "guardrail": "eu.anthropic.claude-3-haiku-20240307-v1:0",
           "video": "eu.amazon.nova-lite-v1:0",
-          "referenceCheck": "eu.anthropic.claude-sonnet-4-20250514-v1:0"
+          "referenceCheck": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
         }
       },
       "allowedIpV4AddressRanges": null,
@@ -139,28 +139,28 @@
       "allowedSignUpEmailDomains": null,
       "bedrockModels": {
         "us-regions": {
-          "conversation": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-          "scoring": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-          "feedback": "us.anthropic.claude-sonnet-4-20250514-v1:0",
-          "guardrail": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+          "conversation": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+          "scoring": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+          "feedback": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+          "guardrail": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
           "video": "us.amazon.nova-lite-v1:0",
-          "referenceCheck": "us.anthropic.claude-sonnet-4-20250514-v1:0"
+          "referenceCheck": "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
         },
         "ap-regions": {
           "conversation": "apac.anthropic.claude-3-haiku-20240307-v1:0",
           "scoring": "apac.anthropic.claude-3-haiku-20240307-v1:0",
-          "feedback": "apac.anthropic.claude-sonnet-4-20250514-v1:0",
+          "feedback": "apac.anthropic.claude-sonnet-4-5-20250929-v1:0",
           "guardrail": "apac.anthropic.claude-3-haiku-20240307-v1:0",
           "video": "apac.amazon.nova-lite-v1:0",
-          "referenceCheck": "apac.anthropic.claude-sonnet-4-20250514-v1:0"
+          "referenceCheck": "apac.anthropic.claude-sonnet-4-5-20250929-v1:0"
         },
         "eu-regions": {
           "conversation": "eu.anthropic.claude-3-haiku-20240307-v1:0",
           "scoring": "eu.anthropic.claude-3-haiku-20240307-v1:0",
-          "feedback": "eu.anthropic.claude-sonnet-4-20250514-v1:0",
+          "feedback": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
           "guardrail": "eu.anthropic.claude-3-haiku-20240307-v1:0",
           "video": "eu.amazon.nova-lite-v1:0",
-          "referenceCheck": "eu.anthropic.claude-sonnet-4-20250514-v1:0"
+          "referenceCheck": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
         }
       },
       "allowedIpV4AddressRanges": null,

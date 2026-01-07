@@ -269,12 +269,35 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`アップロード試行 ${attempt}/${maxRetries}`);
-        
+        console.log("フォームデータフィールド:", Object.keys(uploadInfo.formData));
+
         const formData = new FormData();
-        Object.entries(uploadInfo.formData).forEach(([key, value]) => {
-          formData.append(key, value);
+
+        // S3 presigned POSTでは、フィールドの順序が重要
+        // 'key'フィールドを最初に、'file'フィールドを最後に追加する必要がある
+        // また、'Content-Type'フィールドも正しく追加する必要がある
+        const orderedFields = ['key', 'Content-Type', 'x-amz-algorithm', 'x-amz-credential', 'x-amz-date', 'x-amz-security-token', 'policy', 'x-amz-signature'];
+
+        // 順序通りにフィールドを追加
+        orderedFields.forEach(fieldName => {
+          if (uploadInfo.formData[fieldName]) {
+            formData.append(fieldName, uploadInfo.formData[fieldName]);
+            console.log(`フィールド追加: ${fieldName}`);
+          }
         });
-        formData.append("file", blob);
+
+        // 残りのフィールドを追加（上記以外のフィールドがある場合）
+        Object.entries(uploadInfo.formData).forEach(([key, value]) => {
+          if (!orderedFields.includes(key)) {
+            formData.append(key, value);
+            console.log(`追加フィールド: ${key}`);
+          }
+        });
+
+        // fileフィールドは必ず最後に追加（ファイル名も指定）
+        const file = new File([blob], videoKey.split('/').pop() || 'recording.mp4', { type: 'video/mp4' });
+        formData.append("file", file);
+        console.log(`ファイル追加: サイズ=${file.size}, 名前=${file.name}, タイプ=${file.type}`);
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 300000); // 5分タイムアウト
@@ -287,27 +310,30 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
 
         clearTimeout(timeoutId);
 
-        if (response.ok) {
+        if (response.ok || response.status === 204) {
           console.log(t("recording.s3UploadSuccess"), response.status);
           localStorage.setItem("lastRecordingKey", videoKey);
           console.log("録画キーをlocalStorageに保存:", videoKey);
-          
+
           // 録画完了イベントを発火
-          const event = new CustomEvent('recordingComplete', { 
-            detail: { videoKey, sessionId } 
+          const event = new CustomEvent('recordingComplete', {
+            detail: { videoKey, sessionId }
           });
           window.dispatchEvent(event);
           return; // 成功したら終了
         } else {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          // エラーレスポンスの詳細を取得
+          const errorText = await response.text();
+          console.error(`S3エラーレスポンス: ${errorText}`);
+          throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
         }
       } catch (error) {
         console.error(`アップロード試行 ${attempt} 失敗:`, error);
-        
+
         if (attempt === maxRetries) {
           throw error; // 最後の試行で失敗したらエラーを投げる
         }
-        
+
         // 指数バックオフで待機
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
       }
@@ -373,7 +399,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
       return new Promise<void>((resolve) => {
         if (isRecording && mediaRecorderRef.current) {
           console.log("VideoRecorder: 録画中のため停止処理を実行");
-          
+
           // 録画停止完了を待つためのイベントリスナーを設定
           const handleStop = () => {
             console.log("VideoRecorder: 録画停止完了");
@@ -382,7 +408,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
             }
             resolve();
           };
-          
+
           mediaRecorderRef.current.addEventListener('stop', handleStop);
           stopRecording();
         } else {

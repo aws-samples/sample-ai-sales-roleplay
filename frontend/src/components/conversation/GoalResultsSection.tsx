@@ -45,7 +45,7 @@ const GoalResultsSection: React.FC<GoalResultsSectionProps> = ({
   }).length;
 
   return (
-    <Paper sx={{ p: 3, mb: 4 }}>
+    <Paper sx={{ p: 3 }}>
       <Box
         display="flex"
         justifyContent="space-between"

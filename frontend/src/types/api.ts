@@ -357,17 +357,17 @@ export interface VideoAnalysisResult {
   emotion: number; // 感情表現（1-10点）
   overallScore: number; // 総合スコア（1-10点）
   strengths:
-    | Array<{
-        title: string; // 強みのタイトル
-        description: string; // 強みの詳細説明
-      }>
-    | string[]; // 長所（自然言語） - 旧バージョンとの互換性のため両方の型をサポート
+  | Array<{
+    title: string; // 強みのタイトル
+    description: string; // 強みの詳細説明
+  }>
+  | string[]; // 長所（自然言語） - 旧バージョンとの互換性のため両方の型をサポート
   improvements:
-    | Array<{
-        title: string; // 改善点のタイトル
-        description: string; // 改善点の詳細説明
-      }>
-    | string[]; // 改善点（自然言語） - 旧バージョンとの互換性のため両方の型をサポート
+  | Array<{
+    title: string; // 改善点のタイトル
+    description: string; // 改善点の詳細説明
+  }>
+  | string[]; // 改善点（自然言語） - 旧バージョンとの互換性のため両方の型をサポート
   analysis: string; // 詳細分析
   videoUrl?: string; // 録画動画URL（オプション）
 }
@@ -544,4 +544,6 @@ export interface SessionCompleteDataResponse {
     }>;
     goalScore: number;
   };
+  referenceCheck?: ReferenceCheckResult;
+  referenceCheckCreatedAt?: string;
 }

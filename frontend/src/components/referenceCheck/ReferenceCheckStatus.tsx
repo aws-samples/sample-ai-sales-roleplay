@@ -74,23 +74,17 @@ const ReferenceCheckStatus: React.FC<ReferenceCheckStatusProps> = ({
     );
   }
 
-  // データがない場合（分析中または未実行）
+  // データがない場合（PDFがアップロードされていないなど）
   if (!hasData) {
     return (
       <Alert severity="info" sx={{ mb: 3 }}>
         <AlertTitle>
-          {t("referenceCheck.noDataTitle", "リファレンスチェック実行中")}
+          {t("referenceCheck.noDataTitle", "リファレンスチェックデータなし")}
         </AlertTitle>
-        <Typography variant="body2" sx={{ mb: 1 }}>
-          {t(
-            "referenceCheck.noData",
-            "このセッションのリファレンスチェックを実行中です。",
-          )}
-        </Typography>
         <Typography variant="body2">
           {t(
-            "referenceCheck.processingNote",
-            "処理に時間がかかる場合があります。自動的に結果を取得しますので、しばらくお待ちください。",
+            "referenceCheck.noData",
+            "このセッションにはリファレンスチェックデータがありません。シナリオにPDF資料がアップロードされている場合のみ、リファレンスチェックが実行されます。",
           )}
         </Typography>
       </Alert>

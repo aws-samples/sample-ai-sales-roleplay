@@ -26,8 +26,9 @@ export class VideoStorageConstruct extends Construct {
       cors: [
         {
           allowedHeaders: ['*'],
-          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.POST],
+          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.POST, s3.HttpMethods.PUT],
           allowedOrigins: ['*'], // クロスオリジンリクエストを許可（署名付きURLで安全に制御）
+          exposedHeaders: ['ETag', 'x-amz-meta-custom-header'],
           maxAge: 3600,
         },
       ],

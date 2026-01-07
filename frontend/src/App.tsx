@@ -128,11 +128,13 @@ function App() {
   const { i18n } = useTranslation();
   const languageService = LanguageService.getInstance();
 
-  // RTL言語（アラビア語、ヘブライ語等）の文字方向を設定
-  const isRTL = ["ar", "he"].includes(i18n.language);
-  document.dir = isRTL ? "rtl" : "ltr";
-
   // 言語設定の初期化
+  useEffect(() => {
+    // RTL言語（アラビア語、ヘブライ語等）の文字方向を設定
+    const isRTL = ["ar", "he"].includes(i18n.language);
+    document.dir = isRTL ? "rtl" : "ltr";
+  }, [i18n.language]);
+
   useEffect(() => {
     // ローカルストレージから保存済み言語設定を読み込み
     languageService

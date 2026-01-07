@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Box,
   Typography,
@@ -28,6 +28,11 @@ interface GoalsPanelProps {
  */
 const GoalsPanel: React.FC<GoalsPanelProps> = ({ goals, goalStatuses }) => {
   const { t } = useTranslation();
+  
+  const currentTime = useMemo(() => {
+    const now = new Date();
+    return now.getTime();
+  }, []);
 
   if (!goals || goals.length === 0) {
     return (
@@ -69,7 +74,7 @@ const GoalsPanel: React.FC<GoalsPanelProps> = ({ goals, goalStatuses }) => {
                   animation:
                     status.achieved &&
                     status.achievedAt &&
-                    new Date(status.achievedAt).getTime() > Date.now() - 5000
+                    new Date(status.achievedAt).getTime() > currentTime - 5000
                       ? "pulse 1s ease-in-out 3"
                       : "none",
                   "@keyframes pulse": {

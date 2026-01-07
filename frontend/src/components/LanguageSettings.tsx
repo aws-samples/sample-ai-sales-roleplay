@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Box,
@@ -30,9 +30,9 @@ const LanguageSettings: React.FC = () => {
   const languageService = LanguageService.getInstance();
 
   // 初期値設定
-  useEffect(() => {
-    setSelectedLanguage(i18n.language.split("-")[0]);
-  }, [i18n.language]);
+  const [selectedLanguage, setSelectedLanguage] = useState(() => 
+    i18n.language.split("-")[0]
+  );
 
   // 言語変更ハンドラ
   const handleLanguageChange = async (

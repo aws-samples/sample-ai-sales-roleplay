@@ -29,10 +29,10 @@ export interface ApiGatewayConstructProps {
   scenarioFunction: lambda.Function;
   /** 動画管理Lambda関数 */
   videosFunction: lambda.Function;
-  /** リファレンスチェックLambda関数 */
-  referenceCheckFunction?: lambda.Function;
   /** 音声分析Lambda関数 */
   audioAnalysisFunction?: lambda.Function;
+  /** セッション分析Lambda関数 */
+  sessionAnalysisFunction?: lambda.Function;
 }
 
 export class ApiGatewayConstruct extends Construct {
@@ -175,16 +175,8 @@ export class ApiGatewayConstruct extends Construct {
       }
     );
 
-    // GET /videos/{sessionId} - 動画分析結果取得エンドポイント
-    const sessionVideoResource = videosResource.addResource('{sessionId}');
-    sessionVideoResource.addMethod(
-      'GET',
-      new apigateway.LambdaIntegration(props.videosFunction),
-      {
-        authorizationType: apigateway.AuthorizationType.COGNITO,
-        authorizer: auth
-      }
-    );
+    // 注意: GET /videos/{sessionId} エンドポイントは削除されました
+    // 動画分析結果はStep Functionsで取得され、analysis-results APIで返されます
 
     // Sessions API endpoints (セッション管理API)
     // セッション一覧のルート
@@ -232,6 +224,31 @@ export class ApiGatewayConstruct extends Construct {
         authorizationType: apigateway.AuthorizationType.COGNITO,
       }
     );
+
+    // セッション分析API endpoints (Step Functions統合)
+    if (props.sessionAnalysisFunction) {
+      // POST /sessions/{sessionId}/analyze - セッション分析開始
+      const analyzeResource = sessionDetailResource.addResource('analyze');
+      analyzeResource.addMethod(
+        'POST',
+        new apigateway.LambdaIntegration(props.sessionAnalysisFunction),
+        {
+          authorizer: auth,
+          authorizationType: apigateway.AuthorizationType.COGNITO,
+        }
+      );
+
+      // GET /sessions/{sessionId}/analysis-status - 分析ステータス取得
+      const analysisStatusResource = sessionDetailResource.addResource('analysis-status');
+      analysisStatusResource.addMethod(
+        'GET',
+        new apigateway.LambdaIntegration(props.sessionAnalysisFunction),
+        {
+          authorizer: auth,
+          authorizationType: apigateway.AuthorizationType.COGNITO,
+        }
+      );
+    }
 
     // Scenarios API endpoints (シナリオ管理API)
     // シナリオのルート
@@ -353,21 +370,6 @@ export class ApiGatewayConstruct extends Construct {
       guardrailsResource.addMethod(
         'GET',
         new apigateway.LambdaIntegration(props.guardrailsFunction),
-        {
-          authorizer: auth,
-          authorizationType: apigateway.AuthorizationType.COGNITO,
-        }
-      );
-    }
-
-    // リファレンスチェックAPI endpoints
-    if (props.referenceCheckFunction) {
-      const referenceCheckResource = this.api.root.addResource("referenceCheck")
-      const sessionDetailResource = referenceCheckResource.addResource('{session_id}');
-
-      sessionDetailResource.addMethod(
-        'GET',
-        new apigateway.LambdaIntegration(props.referenceCheckFunction),
         {
           authorizer: auth,
           authorizationType: apigateway.AuthorizationType.COGNITO,

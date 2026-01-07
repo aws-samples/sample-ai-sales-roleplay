@@ -2,11 +2,14 @@ import React from "react";
 import { useReferenceCheck } from "../../hooks/useReferenceCheck";
 import ReferenceCheckStatus from "./ReferenceCheckStatus";
 import ReferenceCheckResults from "./ReferenceCheckResults";
+import { ReferenceCheckResult } from "../../types/api";
 
 interface ReferenceCheckProps {
   sessionId: string;
   language?: string;
   isVisible?: boolean;
+  /** Step Functionsで取得済みのリファレンスチェック結果（渡された場合はAPIを呼び出さない） */
+  initialData?: ReferenceCheckResult | null;
 }
 
 /**
@@ -16,9 +19,10 @@ const ReferenceCheck: React.FC<ReferenceCheckProps> = ({
   sessionId,
   language = "ja",
   isVisible = true,
+  initialData = null,
 }) => {
   const { data, isLoading, isAnalyzing, error, issuesCount } =
-    useReferenceCheck(sessionId, language, isVisible);
+    useReferenceCheck(sessionId, language, isVisible, initialData);
 
   // コンポーネントが非表示の場合は何も表示しない
   if (!isVisible) {

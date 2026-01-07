@@ -3,6 +3,8 @@
 
 通常セッションと音声分析セッションの両方に対応した
 分析結果取得機能を提供します。
+
+通常セッションの分析はStep Functionsで非同期実行されます。
 """
 
 import os
@@ -449,7 +451,7 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                 })
                 raise InternalServerError(f"音声分析セッション判定エラー: {str(audio_query_error)}")
             
-            # 通常のセッション処理（既存のcomplete_data_handlers.pyのロジックを継承）
+            # 通常のセッション処理（Step Functionsで分析済みの結果を取得）
             if not sessions_table:
                 raise InternalServerError("セッションテーブル未定義")
                 
@@ -522,177 +524,46 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                 "violations_count": len(compliance_violations)
             })
             
-            # フィードバックが存在しない場合は新規生成
-            if not final_feedback and realtime_metrics:
-                logger.info("通常セッション用フィードバック生成開始", extra={
-                    "session_id": session_id,
-                    "realtime_metrics_count": len(realtime_metrics)
+            # レスポンスデータを構築（Step Functionsで生成済みのフィードバックを使用）
+            response_data = {
+                "success": True,
+                "sessionType": "regular",
+                "sessionId": session_id,
+                "sessionInfo": session_info,
+                "messages": messages,
+                "realtimeMetrics": realtime_metrics,
+                "complianceViolations": compliance_violations
+            }
+            
+            if final_feedback:
+                response_data["feedback"] = final_feedback.get("feedbackData")
+                response_data["finalMetrics"] = final_feedback.get("finalMetrics")
+                response_data["feedbackCreatedAt"] = final_feedback.get("createdAt")
+                response_data["goalResults"] = final_feedback.get("goalResults")
+                
+                # 動画分析結果があれば追加
+                if final_feedback.get("videoAnalysis"):
+                    response_data["videoAnalysis"] = final_feedback.get("videoAnalysis")
+                    response_data["videoUrl"] = final_feedback.get("videoUrl")
+                
+                # 参照資料評価結果があれば追加
+                if final_feedback.get("referenceCheck"):
+                    response_data["referenceCheck"] = final_feedback.get("referenceCheck")
+            else:
+                # フィードバックがない場合（Step Functions未実行または処理中）
+                logger.warning("フィードバックが見つかりません（Step Functions未実行の可能性）", extra={
+                    "session_id": session_id
                 })
                 
-                # シナリオ情報を取得
-                scenario_info = None
-                scenario_goals = []
-                scenario_id = session_info.get('scenarioId')
-                if scenario_id and scenarios_table:
-                    try:
-                        scenario_response = scenarios_table.get_item(Key={'scenarioId': scenario_id})
-                        scenario_data = scenario_response.get('Item')
-                        if scenario_data:
-                            scenario_info = scenario_data
-                            scenario_goals = scenario_data.get('goals', [])
-                            logger.info("通常セッション用シナリオ情報を取得", extra={
-                                "session_id": session_id,
-                                "scenario_id": scenario_id,
-                                "goals_count": len(scenario_goals)
-                            })
-                    except Exception as e:
-                        logger.warning("通常セッション用シナリオ情報の取得に失敗", extra={
-                            "error": str(e),
-                            "scenario_id": scenario_id
-                        })
-                
-                # リアルタイムメトリクスから最終メトリクスを計算
-                latest_realtime_metric = realtime_metrics[0] if realtime_metrics else None
-                if latest_realtime_metric:
-                    final_metrics = {
-                        "angerLevel": int(latest_realtime_metric.get("angerLevel", 1)),
-                        "trustLevel": int(latest_realtime_metric.get("trustLevel", 5)),
-                        "progressLevel": int(latest_realtime_metric.get("progressLevel", 5)),
-                        "analysis": latest_realtime_metric.get("analysis", "")
+                # リアルタイムメトリクスから最終メトリクスを取得
+                if realtime_metrics:
+                    latest_metric = realtime_metrics[0]
+                    response_data["finalMetrics"] = {
+                        "angerLevel": int(latest_metric.get("angerLevel", 1)),
+                        "trustLevel": int(latest_metric.get("trustLevel", 5)),
+                        "progressLevel": int(latest_metric.get("progressLevel", 5)),
+                        "analysis": latest_metric.get("analysis", "")
                     }
-                    
-                    # 最新のゴール状況を取得
-                    current_goal_statuses = latest_realtime_metric.get("goalStatuses", [])
-                    
-                    # フィードバック生成
-                    try:
-                        feedback_data = generate_feedback_with_bedrock(
-                            session_id=session_id,
-                            metrics=final_metrics,
-                            messages=messages,
-                            goal_statuses=current_goal_statuses,
-                            scenario_goals=scenario_goals,
-                            language=scenario_info.get('language', 'ja') if scenario_info else 'ja'
-                        )
-                        
-                        logger.info("通常セッションフィードバック生成完了", extra={
-                            "session_id": session_id,
-                            "overall_score": feedback_data.get("scores", {}).get("overall")
-                        })
-                        
-                        # ゴール結果を生成
-                        goal_results = create_goal_results_from_feedback(
-                            feedback_data, scenario_goals, session_id
-                        ) if scenario_goals else None
-                        
-                        # 通常セッションのフィードバックをDynamoDBに保存（リファレンスチェックAPI用）
-                        try:
-                            save_success = save_feedback_to_dynamodb(
-                                session_id=session_id,
-                                feedback_data=feedback_data,
-                                final_metrics=final_metrics,
-                                messages=messages,
-                                goal_data=goal_results
-                            )
-                            
-                            if save_success:
-                                logger.info("通常セッションフィードバックをDynamoDBに保存完了", extra={
-                                    "session_id": session_id,
-                                    "overall_score": feedback_data.get("scores", {}).get("overall")
-                                })
-                            else:
-                                logger.warning("通常セッションフィードバックのDynamoDB保存に失敗", extra={
-                                    "session_id": session_id
-                                })
-                                
-                        except Exception as save_error:
-                            logger.error("通常セッションフィードバックの保存中にエラー", extra={
-                                "error": str(save_error),
-                                "session_id": session_id
-                            })
-                            # 保存エラーでもレスポンスは返す
-                        
-                        # 通常セッション用のレスポンスデータを構築（フィードバック付き）
-                        response_data = {
-                            "success": True,
-                            "sessionType": "regular",
-                            "sessionId": session_id,
-                            "sessionInfo": session_info,
-                            "messages": messages,
-                            "realtimeMetrics": realtime_metrics,
-                            "feedback": feedback_data,
-                            "finalMetrics": final_metrics,
-                            "feedbackCreatedAt": latest_realtime_metric.get("createdAt"),
-                            "complianceViolations": compliance_violations,
-                            "goalResults": goal_results
-                        }
-                        
-                    except Exception as feedback_error:
-                        logger.error("通常セッションフィードバック生成エラー", extra={
-                            "error": str(feedback_error),
-                            "session_id": session_id
-                        })
-                        # フィードバック生成に失敗した場合でも基本データは返す
-                        response_data = {
-                            "success": True,
-                            "sessionType": "regular",
-                            "sessionId": session_id,
-                            "sessionInfo": session_info,
-                            "messages": messages,
-                            "realtimeMetrics": realtime_metrics,
-                            "finalMetrics": final_metrics,
-                            "complianceViolations": compliance_violations
-                        }
-                else:
-                    # リアルタイムメトリクスがない場合
-                    response_data = {
-                        "success": True,
-                        "sessionType": "regular",
-                        "sessionId": session_id,
-                        "sessionInfo": session_info,
-                        "messages": messages,
-                        "realtimeMetrics": realtime_metrics,
-                        "complianceViolations": []
-                    }
-            else:
-                # 既存のフィードバックがある場合
-                response_data = {
-                    "success": True,
-                    "sessionType": "regular",
-                    "sessionId": session_id,
-                    "sessionInfo": session_info,
-                    "messages": messages,
-                    "realtimeMetrics": realtime_metrics,
-                    "complianceViolations": compliance_violations
-                }
-                
-                if final_feedback:
-                    response_data["feedback"] = final_feedback.get("feedbackData")
-                    response_data["finalMetrics"] = final_feedback.get("finalMetrics")
-                    response_data["feedbackCreatedAt"] = final_feedback.get("createdAt")
-                    
-                    # 既存フィードバックからゴール結果も生成
-                    feedback_data = final_feedback.get("feedbackData")
-                    if feedback_data:
-                        scenario_id = session_info.get('scenarioId')
-                        scenario_goals = []
-                        if scenario_id and scenarios_table:
-                            try:
-                                scenario_response = scenarios_table.get_item(Key={'scenarioId': scenario_id})
-                                scenario_data = scenario_response.get('Item')
-                                if scenario_data:
-                                    scenario_goals = scenario_data.get('goals', [])
-                            except Exception as e:
-                                logger.warning("既存フィードバック用シナリオ情報の取得に失敗", extra={
-                                    "error": str(e),
-                                    "scenario_id": scenario_id
-                                })
-                        
-                        if scenario_goals:
-                            goal_results = create_goal_results_from_feedback(
-                                feedback_data, scenario_goals, session_id
-                            )
-                            response_data["goalResults"] = goal_results
             
             logger.info("通常セッション分析結果取得成功", extra={
                 "session_id": session_id,
