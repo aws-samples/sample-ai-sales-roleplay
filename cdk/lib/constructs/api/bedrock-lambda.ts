@@ -44,7 +44,8 @@ export class BedrockLambdaConstruct extends Construct {
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: [
-          'bedrock:InvokeModel'
+          'bedrock:InvokeModel',
+          'bedrock:InvokeModelWithResponseStream'
         ],
         resources: [
           'arn:aws:bedrock:*::foundation-model/*',

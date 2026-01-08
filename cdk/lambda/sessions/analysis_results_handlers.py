@@ -24,9 +24,6 @@ from realtime_scoring import calculate_realtime_scores
 # ロガー設定
 logger = Logger(service="analysis-results-handlers")
 
-# Bedrockクライアント初期化
-bedrock_runtime = boto3.client('bedrock-runtime')
-
 def calculate_audio_analysis_metrics(messages, scenario_goals, session_id, language):
     """
     音声分析結果のメッセージに対してリアルタイムスコアリングを実行

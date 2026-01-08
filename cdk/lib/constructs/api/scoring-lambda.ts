@@ -55,6 +55,7 @@ export class ScoringLambdaConstruct extends Construct {
         effect: iam.Effect.ALLOW,
         actions: [
           'bedrock:InvokeModel',
+          'bedrock:InvokeModelWithResponseStream',
           'bedrock:ApplyGuardrail'
         ],
         resources: [

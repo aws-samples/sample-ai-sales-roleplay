@@ -5,6 +5,8 @@ Amazon Bedrock統合Lambda関数
 主な機能は以下の通りです：
 - NPCとの会話処理（/bedrock/conversation）
 - プロンプト生成と管理
+
+Strands Agentsを使用してLLM呼び出しを行います。
 """
 
 import json
@@ -19,6 +21,10 @@ from aws_lambda_powertools import Logger
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver, CORSConfig
 from aws_lambda_powertools.logging import correlation_paths
 from aws_lambda_powertools.utilities.typing import LambdaContext
+
+# Strands Agents
+from strands import Agent
+from strands.models import BedrockModel
 
 # カスタム例外クラス
 class InternalServerError(Exception):
@@ -42,7 +48,6 @@ cors_config = CORSConfig(
 app = APIGatewayRestResolver(cors=cors_config)
 
 # グローバル変数
-bedrock_runtime = boto3.client('bedrock-runtime')
 dynamodb = boto3.resource('dynamodb')
 
 # 環境変数
@@ -629,7 +634,7 @@ def invoke_bedrock_model(prompt: str) -> str:
     """
     Bedrockモデルを呼び出してレスポンスを取得
     
-    Converse APIを使用して応答を生成します。
+    Strands Agentsを使用して応答を生成します。
     
     Args:
         prompt (str): Bedrockモデルに送信するプロンプト
@@ -643,43 +648,28 @@ def invoke_bedrock_model(prompt: str) -> str:
     # 会話生成用のモデルIDを取得
     model_id = os.environ.get('BEDROCK_MODEL_CONVERSATION', 'amazon.nova-lite-v1:0')
     
-    # Converse APIのリクエストパラメータ
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {
-                    "text": prompt
-                }
-            ]
-        }
-    ]
-    
-    inference_config = {
-        "maxTokens": 1000,
-        "temperature": 0.7
-    }
-    
     try:
-        logger.info("Bedrockモデルを呼び出し中", extra={
+        logger.info("Bedrockモデルを呼び出し中（Strands Agents使用）", extra={
             "model_id": model_id
         })
         
-        # Converse APIで呼び出し
-        response = bedrock_runtime.converse(
-            modelId=model_id,
-            messages=messages,
-            inferenceConfig=inference_config
+        # BedrockModelを作成
+        bedrock_model = BedrockModel(
+            model_id=model_id,
+            temperature=0.7,
+            max_tokens=1000
         )
         
-        # レスポンス解析
-        output_message = response['output']['message']
-        model_response = output_message['content'][0]['text']
+        # Agentを作成して呼び出し
+        agent = Agent(model=bedrock_model)
+        result = agent(prompt)
+        
+        # 応答テキストを取得
+        model_response = str(result)
         
         logger.info("Bedrockモデルの呼び出しに成功しました", extra={
             "model_id": model_id,
-            "response_tokens": len(model_response.split()),
-            "stop_reason": response.get('stopReason')
+            "response_tokens": len(model_response.split())
         })
         
         return model_response

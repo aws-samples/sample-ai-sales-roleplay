@@ -4,29 +4,39 @@
 
 このモジュールは、ユーザーとNPCの会話をリアルタイムで分析し、
 11の異なるパラメータに基づいてスコアを計算します。
-Claude 3.5 Haikuを使用して会話の文脈を考慮した分析を行い、
+Strands Agentsを使用して会話の文脈を考慮した分析を行い、
 結果をJSON形式で返します。
 
 Functions:
     calculate_realtime_scores: 会話データに基づいてリアルタイムスコアを計算
-    parse_scoring_response: Claude 3.5 Haikuの応答をパースしてスコアを抽出
+    parse_scoring_response: LLMの応答をパースしてスコアを抽出
     normalize_scores: スコアを正規化して有効な範囲に収める
 """
 
 import json
-import boto3
 import os
 from typing import Dict, Any, List
 from datetime import datetime
+from pydantic import BaseModel, Field
 
 # AWS Lambda Powertools
 from aws_lambda_powertools import Logger
 
+# Strands Agents
+from strands import Agent
+from strands.models import BedrockModel
+
 # Powertools 初期化
 logger = Logger(service="realtime-scoring-service")
 
-# Bedrockクライアント初期化
-bedrock_runtime = boto3.client('bedrock-runtime')
+
+# Pydanticモデル（Structured Output用）
+class RealtimeScores(BaseModel):
+    """リアルタイムスコアリング結果"""
+    angerLevel: int = Field(description="怒りレベル (1-10)", ge=1, le=10)
+    trustLevel: int = Field(description="信頼レベル (1-10)", ge=1, le=10)
+    progressLevel: int = Field(description="進捗レベル (1-10)", ge=1, le=10)
+    analysis: str = Field(description="簡潔な分析（50文字以内）", max_length=50)
 
 def calculate_realtime_scores(
     user_input: str,
@@ -230,8 +240,8 @@ def invoke_bedrock_model(prompt: str) -> str:
     """
     Bedrockモデルを呼び出してスコアリング結果を取得
     
-    環境変数から設定されたモデルを使用して、プロンプトに基づいた
-    スコアリング結果を取得します。Converse APIを使用します。
+    Strands Agentsを使用して、プロンプトに基づいた
+    スコアリング結果を取得します。
     
     Args:
         prompt (str): スコアリング用のプロンプト
@@ -245,21 +255,7 @@ def invoke_bedrock_model(prompt: str) -> str:
     # スコアリング用のモデルIDを取得
     model_id = os.environ.get('BEDROCK_MODEL_SCORING')
     
-    # Converse APIのリクエストパラメータ
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {
-                    "text": prompt
-                }
-            ]
-        }
-    ]
-    
-    system = [
-        {
-            "text": """あなたは営業トレーニングの専門家です。
+    system_prompt = """あなたは営業トレーニングの専門家です。
 
 重要な出力ルール:
 1. 必ず有効なJSON形式のみで出力してください
@@ -269,33 +265,28 @@ def invoke_bedrock_model(prompt: str) -> str:
 
 出力例:
 {"angerLevel": 5, "trustLevel": 7, "progressLevel": 3, "analysis": "分析結果"}"""
-        }
-    ]
-    
-    inference_config = {
-        "maxTokens": 1000,
-        "temperature": 0.1  # 正確な評価のために低い温度を設定
-    }
     
     try:
-        logger.info(f"Bedrockモデル呼び出し: {model_id}")
+        logger.info(f"Bedrockモデル呼び出し（Strands Agents使用）: {model_id}")
         
-        # Converse APIでBedrockモデル呼び出し
-        response = bedrock_runtime.converse(
-            modelId=model_id,
-            messages=messages,
-            system=system,
-            inferenceConfig=inference_config
+        # BedrockModelを作成
+        bedrock_model = BedrockModel(
+            model_id=model_id,
+            temperature=0.1,  # 正確な評価のために低い温度を設定
+            max_tokens=1000
         )
         
-        # レスポンス解析
-        output_message = response['output']['message']
-        model_response = output_message['content'][0]['text']
+        # Agentを作成して呼び出し
+        agent = Agent(
+            model=bedrock_model,
+            system_prompt=system_prompt
+        )
+        result = agent(prompt)
         
-        logger.info("Bedrockモデル呼び出し成功", extra={
-            "stop_reason": response.get('stopReason'),
-            "usage": response.get('usage', {})
-        })
+        # 応答テキストを取得
+        model_response = str(result)
+        
+        logger.info("Bedrockモデル呼び出し成功（Strands Agents）")
         
         return model_response
         

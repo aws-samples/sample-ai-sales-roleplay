@@ -1,3 +1,4 @@
+strands-agents==1.11.0
 pydantic==2.11.7
 boto3==1.40.24
 aws-lambda-powertools==3.19.0

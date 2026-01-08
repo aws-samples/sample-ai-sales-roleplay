@@ -2,6 +2,7 @@
 参照資料評価Lambda関数
 
 Knowledge Baseを使用してユーザーの発言が参照資料に基づいているか評価します。
+Strands Agentsを使用してLLM呼び出しを行います。
 """
 
 import os
@@ -10,6 +11,10 @@ import boto3
 from aws_lambda_powertools import Logger
 from typing import Dict, Any, List, Optional
 
+# Strands Agents
+from strands import Agent
+from strands.models import BedrockModel
+
 # ロガー設定
 logger = Logger(service="session-analysis-reference")
 
@@ -17,9 +22,8 @@ logger = Logger(service="session-analysis-reference")
 KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID")
 BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_REFERENCE", "amazon.nova-pro-v1:0")
 
-# Bedrockクライアント
+# Bedrockクライアント（Knowledge Base用のみ）
 bedrock_agent_runtime = boto3.client("bedrock-agent-runtime")
-bedrock_runtime = boto3.client("bedrock-runtime")
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -237,7 +241,7 @@ def evaluate_relevance(
     related_document: str,
     language: str
 ) -> Dict[str, Any]:
-    """Bedrockで関連性を評価"""
+    """Strands Agentsで関連性を評価"""
     
     if language == "en":
         prompt = f"""Evaluate whether the user's statement is based on the reference document.
@@ -267,19 +271,19 @@ JSON形式で回答してください:
 {{"related": true/false, "comment": "簡潔な評価コメント"}}"""
     
     try:
-        response = bedrock_runtime.converse(
-            modelId=BEDROCK_MODEL_ID,
-            messages=[{
-                "role": "user",
-                "content": [{"text": prompt}]
-            }],
-            inferenceConfig={
-                "maxTokens": 256,
-                "temperature": 0.1
-            }
+        # BedrockModelを作成
+        bedrock_model = BedrockModel(
+            model_id=BEDROCK_MODEL_ID,
+            temperature=0.1,
+            max_tokens=256
         )
         
-        response_text = response["output"]["message"]["content"][0]["text"]
+        # Agentを作成して呼び出し
+        agent = Agent(model=bedrock_model)
+        result = agent(prompt)
+        
+        # 応答テキストを取得
+        response_text = str(result)
         
         # JSON解析
         json_start = response_text.find("{")
