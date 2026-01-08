@@ -33,13 +33,21 @@
 ### 2.2 認証方式
 
 #### 2.2.1 AgentCore Identity Inbound Auth
-- **適用範囲**: AgentCore Runtimeに移行するエージェントのみ
-- **他のAPI**: 現状のAPI Gateway + Cognito Authorizer維持
+- **適用範囲**: **フロントエンドから直接呼ばれるエージェントのみ**
+- **Step Functions内Lambda**: IAMロール認証（Inbound Auth不要）
 - **JWT認証設定**:
   - discoveryUrl: `https://cognito-idp.{region}.amazonaws.com/{userPoolId}/.well-known/openid-configuration`
   - allowedClients: 既存Cognito App Client ID
 
-**根拠**: Q2回答「A」、Q3回答「A」
+**AgentCore Identity適用対象**:
+| Lambda | 呼び出し元 | AgentCore Identity |
+|--------|-----------|-------------------|
+| `bedrock/index.py` | フロントエンド直接 | **必要** |
+| `scoring/realtime_scoring.py` | フロントエンド直接 | **必要** |
+| `sessionAnalysis/*` | Step Functions | 不要 |
+| `audioAnalysis/*` | Step Functions | 不要 |
+
+**根拠**: Q2回答「A」、Q3回答「A」、Step Functions内LambdaはIAMロール認証
 
 #### 2.2.2 フロントエンド認証フロー
 ```
@@ -55,25 +63,49 @@
 |-----|-----|-----|
 | Runtime（ホスティング） | ✅ | Strands Agentのホスティング |
 | Inbound Auth | ✅ | Cognito JWT認証 |
-| Memory | ✅ | セッション状態の永続化 |
+| Memory | ✅ | **統合データストア**（会話履歴、メトリクス、ゴール状態） |
 | Observability | ✅ | トレーシング、メトリクス |
 | Gateway | ❌ | 使用しない |
 
-**根拠**: Q6回答「B,C」
+**根拠**: Q6回答「B,C」、アーキテクチャ全面改修決定
 
-### 2.4 フロントエンド変更
+### 2.4 データストレージ戦略（AgentCoreネイティブ）
 
-#### 2.4.1 変更範囲
-- **最小限の変更**のみ実施
+| データ種別 | 保存先 | 理由 |
+|-----------|--------|------|
+| 会話履歴 | AgentCore Memory | 統合管理、エージェント間共有 |
+| リアルタイムメトリクス | AgentCore Memory | セッション状態の一元管理 |
+| ゴール達成状況 | AgentCore Memory | エージェント間で参照 |
+| セッションメタデータ | AgentCore Memory | 統合管理 |
+| フィードバック分析結果 | S3 (JSON) | 大容量データ、長期保存 |
+| 動画分析結果 | S3 (JSON) | 大容量データ |
+| リファレンスチェック結果 | S3 (JSON) | 大容量データ |
+| シナリオマスタ | DynamoDB（継続） | マスタデータ |
+| NPCマスタ | DynamoDB（継続） | マスタデータ |
+
+### 2.5 新規API設計（評価画面用）
+
+| エンドポイント | 機能 | データソース |
+|---------------|------|-------------|
+| GET /sessions/{id}/history | 会話履歴取得 | AgentCore Memory ListEvents |
+| GET /sessions/{id}/metrics | メトリクス履歴取得 | AgentCore Memory ListEvents |
+| GET /sessions/{id}/feedback | フィードバック取得 | S3 |
+| GET /sessions/{id}/video-analysis | 動画分析結果取得 | S3 |
+
+### 2.6 フロントエンド変更
+
+#### 2.6.1 変更範囲
 - エンドポイントURL変更
 - Authorizationヘッダー形式変更（`Bearer {token}`）
+- **評価画面データ取得ロジック変更**（新規API使用）
 
-**根拠**: Q4回答「A」
+**根拠**: Q4回答「A」→ アーキテクチャ全面改修により変更範囲拡大
 
-#### 2.4.2 変更対象ファイル（想定）
-- `frontend/src/services/ApiClient.ts` - AgentCore Runtime用メソッド追加
+#### 2.6.2 変更対象ファイル（想定）
+- `frontend/src/services/ApiService.ts` - AgentCore Memory API呼び出し追加
 - `frontend/src/services/BedrockService.ts` - エンドポイント変更
 - `frontend/src/services/ScoringService.ts` - エンドポイント変更
+- `frontend/src/pages/ResultPage.tsx` - データ取得ロジック変更
 
 ---
 
@@ -135,31 +167,52 @@
 
 ### 5.1 実装アプローチ
 - **既存InfrastructureStackに追加**
-- 新規Stackは作成しない
+- **CfnRuntime L1コンストラクト使用**（Custom Resource不要）
 
-**根拠**: Q8回答「A」
+**根拠**: Q8回答「A」、CDK L1コンストラクト利用可能
 
 ### 5.2 実装コンポーネント
 
 #### 5.2.1 AgentCore Runtime Construct
 ```typescript
 // cdk/lib/constructs/agentcore/agentcore-runtime.ts
+import { aws_bedrockagentcore as bedrockagentcore } from 'aws-cdk-lib';
+
 export class AgentCoreRuntimeConstruct extends Construct {
-  // AgentCore Runtime作成（Custom Resource経由）
+  // CfnRuntime L1コンストラクトを使用
   // Inbound Auth設定（Cognito JWT）
   // Memory設定
   // Observability設定
 }
 ```
 
-#### 5.2.2 Custom Resource
-AgentCore RuntimeはCDK L1/L2コンストラクトが未提供のため、Custom Resource（Lambda + boto3）で実装
-
+#### 5.2.2 CfnRuntime使用例
 ```typescript
-// Custom Resource Lambda
-// - create_runtime()
-// - update_runtime()
-// - delete_runtime()
+const npcRuntime = new bedrockagentcore.CfnRuntime(this, 'NpcAgentRuntime', {
+  agentRuntimeArtifact: {
+    codeConfiguration: {
+      code: {
+        s3: {
+          bucket: codeBucket.bucketName,
+          prefix: 'agents/npc/',
+        },
+      },
+      entryPoint: ['python', '-m', 'agent'],
+      runtime: 'python3.9',
+    },
+  },
+  agentRuntimeName: 'npc-conversation-agent',
+  networkConfiguration: {
+    networkMode: 'PUBLIC',
+  },
+  roleArn: agentRole.roleArn,
+  authorizerConfiguration: {
+    customJwtAuthorizer: {
+      discoveryUrl: `https://cognito-idp.${region}.amazonaws.com/${userPoolId}/.well-known/openid-configuration`,
+      allowedClients: [clientId],
+    },
+  },
+});
 ```
 
 ### 5.3 依存関係
@@ -248,8 +301,7 @@ AGENTCORE_AUDIO_RUNTIME_ARN: string;
 ### 8.1 CDK成果物
 | ファイル | 説明 |
 |---------|------|
-| `cdk/lib/constructs/agentcore/agentcore-runtime.ts` | AgentCore Runtime Construct |
-| `cdk/lambda/agentcore-custom-resource/index.py` | Custom Resource Lambda |
+| `cdk/lib/constructs/agentcore/agentcore-runtime.ts` | AgentCore Runtime Construct (CfnRuntime使用) |
 | `cdk/lambda/agentcore/npc/index.py` | NPC会話エージェント（AgentCore形式） |
 | `cdk/lambda/agentcore/scoring/index.py` | スコアリングエージェント（AgentCore形式） |
 | `cdk/lambda/agentcore/audio/index.py` | 音声分析エージェント（AgentCore形式） |
@@ -276,8 +328,8 @@ AGENTCORE_AUDIO_RUNTIME_ARN: string;
 ### 9.1 技術リスク
 | リスク | 影響度 | 対策 |
 |-------|-------|------|
-| AgentCore Runtime CDK未サポート | 高 | Custom Resourceで実装 |
-| コールドスタート遅延 | 中 | Provisioned Concurrency検討 |
+| ~~AgentCore Runtime CDK未サポート~~ | ~~高~~ | ✅ CfnRuntime L1コンストラクト利用可能 |
+| コールドスタート遅延 | 低 | 許容（コスト優先） |
 | AgentCore Memory互換性 | 中 | 既存DynamoDBセッション管理との整合性確認 |
 
 ### 9.2 運用リスク
