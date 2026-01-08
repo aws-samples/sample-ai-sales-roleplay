@@ -32,9 +32,9 @@
 ### 🟢 CONSTRUCTION PHASE
 - [ ] Functional Design - SKIP (ビジネスロジック変更なし)
 - [x] NFR Requirements - COMPLETED (2026-01-08)
-- [x] NFR Design - COMPLETED (2026-01-08) - 承認待ち
-- [ ] Infrastructure Design - EXECUTE
-- [ ] Code Generation - EXECUTE
+- [x] NFR Design - COMPLETED (2026-01-08)
+- [x] Infrastructure Design - COMPLETED (2026-01-08)
+- [ ] Code Generation - IN PROGRESS
 - [ ] Build and Test - EXECUTE
 
 ### 🟡 OPERATIONS PHASE
@@ -42,9 +42,9 @@
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: NFR Design Complete (承認待ち)
-- **Next Stage**: Infrastructure Design
-- **Status**: Awaiting approval
+- **Current Stage**: Code Generation
+- **Next Stage**: Build and Test
+- **Status**: In Progress
 
 ## Notes
 - AI営業ロールプレイアプリケーション

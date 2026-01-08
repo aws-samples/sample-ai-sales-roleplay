@@ -367,3 +367,48 @@
 
 ---
 
+
+## CONSTRUCTION - NFR Design Approval
+**Timestamp**: 2026-01-08T13:00:00Z
+**User Input**: "yes"
+**AI Response**: NFR Designステージを承認。Infrastructure Designステージに進む。
+**Status**: Approved
+**Context**: NFR Design stage completed, proceeding to Infrastructure Design
+
+---
+
+
+## CONSTRUCTION - Infrastructure Design (回答受領・設計ドキュメント生成)
+**Timestamp**: 2026-01-08T13:15:00Z
+**User Input**: 
+- Q1: A (PUBLIC - VPCなし)
+- Q2: CDK CfnRuntime L1コンストラクト使用
+- Q3: A (Python 3.9)
+- Q4: A (既存InfrastructureStackに追加)
+- Q5: A (環境別AgentCore Runtime)
+**AI Response**: Infrastructure Design質問への回答を確認。インフラストラクチャ設計書とデプロイメントアーキテクチャを生成。
+**Context**: Infrastructure Design stage - Answer collection and document generation
+
+### User Answers Summary:
+- Q1: A（PUBLIC - VPCなし）
+- Q2: CDK CfnRuntime L1コンストラクト使用
+- Q3: A（Python 3.9）
+- Q4: A（既存InfrastructureStackに追加）
+- Q5: A（環境別AgentCore Runtime）
+
+### Generated Artifacts:
+- `aidlc-docs/construction/agentcore-migration/infrastructure-design/infrastructure-design.md` - インフラストラクチャ設計書
+- `aidlc-docs/construction/agentcore-migration/infrastructure-design/deployment-architecture.md` - デプロイメントアーキテクチャ
+
+---
+
+
+## CONSTRUCTION - Infrastructure Design Approval
+**Timestamp**: 2026-01-08T13:30:00Z
+**User Input**: "approve"
+**AI Response**: Infrastructure Designステージを承認。Code Generationステージに進む。
+**Status**: Approved
+**Context**: Infrastructure Design stage completed, proceeding to Code Generation
+
+---
+
