@@ -2,6 +2,18 @@
 セールストレーニング用AI分析エンジンのプロンプトテンプレート
 """
 
+# ============================================================
+# フィードバック分析用プロンプト
+# ============================================================
+
+# フィードバック分析用システムプロンプト - 日本語
+FEEDBACK_SYSTEM_PROMPT_JA = """あなたは営業トレーニングの専門家です。
+会話を分析し、営業担当者のパフォーマンスを詳細に評価してください。"""
+
+# フィードバック分析用システムプロンプト - 英語
+FEEDBACK_SYSTEM_PROMPT_EN = """You are a sales training expert.
+Analyze the conversation and provide detailed evaluation of the sales representative's performance."""
+
 # 分析プロンプトテンプレート - 日本語
 ANALYSIS_PROMPT_JA = """あなたはセールストレーニング用AIシステムの分析エンジンです。ユーザー（営業担当者）とNPC（顧客役）の会話ログを分析し、営業パフォーマンスのフィードバックとスコア評価を提供してください。
 
@@ -9,69 +21,7 @@ ANALYSIS_PROMPT_JA = """あなたはセールストレーニング用AIシステ
 - メトリクス: 怒り={anger_value}/10, 信頼={trust_value}/10, 進捗={progress_value}/10
 - 会話履歴:
 {conversation_text}
-
-## 出力形式
-以下の内容をJSON形式で出力してください:
-
-```json
-{{
-  "strengths": [
-    "ユーザーの強みに関する具体的な説明（複数）"
-  ],
-  "improvements": [
-    "改善点に関する建設的な提案（複数）"
-  ],
-  "keyInsights": [
-    "会話から得られた重要な気づき（複数）"
-  ],
-  "nextSteps": "次回の会話に向けた具体的な提案",
-  "goalFeedback": {{
-    "achievedGoals": [
-      "達成したゴールの具体的説明"
-    ],
-    "partiallyAchievedGoals": [
-      "部分的に達成したゴールの説明"
-    ],
-    "missedGoals": [
-      "未達成ゴールの説明"
-    ],
-    "recommendations": [
-      "ゴール達成のための具体的な改善提案"
-    ]
-  }},
-  "scores": {{
-    "overall": 0-100の整数値,
-    "communication": 0-10の整数値,
-    "needsAnalysis": 0-10の整数値,
-    "proposalQuality": 0-10の整数値,
-    "flexibility": 0-10の整数値,
-    "trustBuilding": 0-10の整数値,
-    "objectionHandling": 0-10の整数値,
-    "closingSkill": 0-10の整数値,
-    "listeningSkill": 0-10の整数値,
-    "productKnowledge": 0-10の整数値,
-    "customerFocus": 0-10の整数値,
-    "goalAchievement": 0-10の整数値
-  }},
-  "detailedAnalysis": {{
-    "communicationPatterns": {{
-      "questionFrequency": 0-10の整数値,
-      "responseQuality": 0-10の整数値,
-      "clarityOfExplanation": 0-10の整数値
-    }},
-    "customerInteraction": {{
-      "empathyLevel": 0-10の整数値,
-      "respectShown": 0-10の整数値,
-      "engagementQuality": 0-10の整数値
-    }},
-    "salesTechniques": {{
-      "valuePropositionClarity": 0-10の整数値,
-      "needsAlignment": 0-10の整数値,
-      "painPointIdentification": 0-10の整数値
-    }}
-  }}
-}}
-```
+{goal_analysis_section}
 
 ## 評価基準
 1. コミュニケーション力: 質問力、傾聴力、明確な説明力
@@ -99,9 +49,7 @@ ANALYSIS_PROMPT_JA = """あなたはセールストレーニング用AIシステ
 3. 営業テクニック
    - 価値提案の明確さ: 顧客にとっての価値を明確に伝えられたか
    - ニーズ適合度: 提案が顧客ニーズに合致しているか
-   - 課題特定能力: 顧客の痛点や課題を見つける能力
-
-必ず上記のJSON形式で出力してください。説明文やコメントは含めないでください。"""
+   - 課題特定能力: 顧客の痛点や課題を見つける能力"""
 
 # 分析プロンプトテンプレート - 英語
 ANALYSIS_PROMPT_EN = """You are the analysis engine of an AI system for sales training. Please analyze the conversation log between the user (sales representative) and the NPC (customer) and provide feedback and score evaluation on sales performance.
@@ -110,69 +58,7 @@ ANALYSIS_PROMPT_EN = """You are the analysis engine of an AI system for sales tr
 - Metrics: Anger={anger_value}/10, Trust={trust_value}/10, Progress={progress_value}/10
 - Conversation History:
 {conversation_text}
-
-## Output Format
-Please output the following content in JSON format:
-
-```json
-{{
-  "strengths": [
-    "Specific explanation of user's strengths (multiple)"
-  ],
-  "improvements": [
-    "Constructive suggestions for improvement points (multiple)"
-  ],
-  "keyInsights": [
-    "Important insights gained from the conversation (multiple)"
-  ],
-  "nextSteps": "Specific suggestions for the next conversation",
-  "goalFeedback": {{
-    "achievedGoals": [
-      "Specific explanation of achieved goals"
-    ],
-    "partiallyAchievedGoals": [
-      "Description of partially achieved goals"
-    ],
-    "missedGoals": [
-      "Description of unachieved goals"
-    ],
-    "recommendations": [
-      "Specific improvement suggestions for goal achievement"
-    ]
-  }},
-  "scores": {{
-    "overall": integer value from 0-100,
-    "communication": integer value from 0-10,
-    "needsAnalysis": integer value from 0-10,
-    "proposalQuality": integer value from 0-10,
-    "flexibility": integer value from 0-10,
-    "trustBuilding": integer value from 0-10,
-    "objectionHandling": integer value from 0-10,
-    "closingSkill": integer value from 0-10,
-    "listeningSkill": integer value from 0-10,
-    "productKnowledge": integer value from 0-10,
-    "customerFocus": integer value from 0-10,
-    "goalAchievement": integer value from 0-10
-  }},
-  "detailedAnalysis": {{
-    "communicationPatterns": {{
-      "questionFrequency": integer value from 0-10,
-      "responseQuality": integer value from 0-10,
-      "clarityOfExplanation": integer value from 0-10
-    }},
-    "customerInteraction": {{
-      "empathyLevel": integer value from 0-10,
-      "respectShown": integer value from 0-10,
-      "engagementQuality": integer value from 0-10
-    }},
-    "salesTechniques": {{
-      "valuePropositionClarity": integer value from 0-10,
-      "needsAlignment": integer value from 0-10,
-      "painPointIdentification": integer value from 0-10
-    }}
-  }}
-}}
-```
+{goal_analysis_section}
 
 ## Evaluation Criteria
 1. Communication Skills: Questioning ability, listening skills, clear explanation ability
@@ -200,9 +86,20 @@ Please output the following content in JSON format:
 3. Sales Techniques
    - Value Proposition Clarity: Whether value for the customer was clearly communicated
    - Needs Alignment: Whether proposals match customer needs
-   - Issue Identification Ability: Ability to find customer pain points or issues
+   - Issue Identification Ability: Ability to find customer pain points or issues"""
 
-Please output only in the JSON format above. Do not include explanatory text or comments."""
+
+# ============================================================
+# リアルタイムスコアリング用プロンプト
+# ============================================================
+
+# リアルタイムスコアリング用システムプロンプト - 日本語
+REALTIME_SCORING_SYSTEM_PROMPT_JA = """あなたは営業トレーニングの専門家です。
+会話を分析し、営業担当者のパフォーマンスを評価してください。"""
+
+# リアルタイムスコアリング用システムプロンプト - 英語
+REALTIME_SCORING_SYSTEM_PROMPT_EN = """You are a sales training expert.
+Analyze the conversation and evaluate the sales representative's performance."""
 
 # リアルタイムスコアリング用プロンプトテンプレート - 日本語
 REALTIME_SCORING_PROMPT_JA = """あなたは営業会話のリアルタイム評価システムです。以下の会話を分析し、3つの基本メトリクスを1-10のスケールで評価してください。
@@ -223,20 +120,7 @@ REALTIME_SCORING_PROMPT_JA = """あなたは営業会話のリアルタイム評
 - 顧客の反応と感情表現
 - 営業担当者のアプローチの適切性
 - 商談の目的達成度
-- 過去の会話履歴からの変化
-
-## 出力形式
-以下のJSON形式で回答してください:
-```json
-{{
-  "angerLevel": <1から10の整数値>,
-  "trustLevel": <1から10の整数値>,
-  "progressLevel": <1から10の整数値>,
-  "analysis": "<簡潔な分析（50文字以内）>"
-}}
-```
-
-注意：必ず上記のJSON形式で回答し、他の説明は含めないでください。すべてのスコアは1から10の整数値にしてください。"""
+- 過去の会話履歴からの変化"""
 
 # リアルタイムスコアリング用プロンプトテンプレート - 英語
 REALTIME_SCORING_PROMPT_EN = """You are a real-time evaluation system for sales conversations. Please analyze the following conversation and evaluate three key metrics on a scale of 1-10:
@@ -257,20 +141,20 @@ REALTIME_SCORING_PROMPT_EN = """You are a real-time evaluation system for sales 
 - Customer reactions and emotional expressions
 - Appropriateness of the sales representative's approach
 - Achievement of sales objectives
-- Changes from previous conversation history
+- Changes from previous conversation history"""
 
-## Output Format
-Please respond in the following JSON format:
-```json
-{{
-  "angerLevel": <integer from 1 to 10>,
-  "trustLevel": <integer from 1 to 10>,
-  "progressLevel": <integer from 1 to 10>,
-  "analysis": "<brief analysis (within 50 characters)>"
-}}
-```
 
-Note: Please respond only in the JSON format above without any additional explanation. All scores must be integer values from 1 to 10."""
+# ============================================================
+# ゴール評価用プロンプト
+# ============================================================
+
+# ゴール評価用システムプロンプト - 日本語
+GOAL_EVALUATION_SYSTEM_PROMPT_JA = """あなたは営業トレーニングの専門家です。
+会話を分析し、各ゴールの達成状況を評価してください。"""
+
+# ゴール評価用システムプロンプト - 英語
+GOAL_EVALUATION_SYSTEM_PROMPT_EN = """You are a sales training expert.
+Analyze the conversation and evaluate the achievement status of each goal."""
 
 # ゴール評価用プロンプトテンプレート - 日本語
 GOAL_EVALUATION_PROMPT_JA = """あなたは営業会話のゴール達成度を評価するシステムです。以下の会話とゴール情報を分析し、各ゴールの進捗度と達成状況を評価してください。
@@ -285,23 +169,7 @@ GOAL_EVALUATION_PROMPT_JA = """あなたは営業会話のゴール達成度を�
 1. 各ゴールの進捗度を0-100%で評価してください
 2. 進捗度が100%に達した場合、ゴールは達成されたと判断します
 3. 不適切な発言や否定的な反応がある場合は、進捗度を下げるか現状維持してください
-4. ゴールの優先度や必須性を考慮して評価してください
-
-## 出力形式
-以下のJSON形式で回答してください：
-```json
-[
-  {{
-    "goalId": "<ゴールID>",
-    "progress": <0-100の整数値>,
-    "achieved": <trueまたはfalse>,
-    "reason": "<評価理由の簡潔な説明>"
-  }},
-  ...
-]
-```
-
-注意：必ずJSON形式のみで回答し、他の説明は含めないでください。"""
+4. ゴールの優先度や必須性を考慮して評価してください"""
 
 # ゴール評価用プロンプトテンプレート - 英語
 GOAL_EVALUATION_PROMPT_EN = """You are a system for evaluating goal achievement in sales conversations. Please analyze the following conversation and goal information to evaluate the progress and achievement status of each goal.
@@ -316,25 +184,13 @@ GOAL_EVALUATION_PROMPT_EN = """You are a system for evaluating goal achievement 
 1. Please evaluate the progress of each goal as a percentage from 0-100%
 2. When progress reaches 100%, the goal is considered achieved
 3. If there are inappropriate statements or negative reactions, lower the progress or maintain the current status
-4. Consider the priority and importance of goals in your evaluation
+4. Consider the priority and importance of goals in your evaluation"""
 
-## Output Format
-Please respond in the following JSON format:
-```json
-[
-  {{
-    "goalId": "<Goal ID>",
-    "progress": <integer value from 0-100>,
-    "achieved": <true or false>,
-    "reason": "<brief explanation of evaluation rationale>"
-  }},
-  ...
-]
-```
 
-Note: Please respond only in JSON format without any other explanations."""
+# ============================================================
+# 後方互換性のためのエイリアス
+# ============================================================
 
-# Default templates to maintain backward compatibility
 ANALYSIS_PROMPT_TEMPLATE = ANALYSIS_PROMPT_JA
 REALTIME_SCORING_PROMPT_TEMPLATE = REALTIME_SCORING_PROMPT_JA
 GOAL_EVALUATION_PROMPT_TEMPLATE = GOAL_EVALUATION_PROMPT_JA
