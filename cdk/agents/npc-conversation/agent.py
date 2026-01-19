@@ -175,7 +175,7 @@ def handle_invocation(payload: Dict[str, Any]) -> Dict[str, Any]:
         return {
             'success': False,
             'error': 'AGENT_ERROR',
-            'message': f'会話処理中にエラーが発生しました: {str(e)}'
+            'message': '会話処理中にエラーが発生しました'
         }
 
 
@@ -208,7 +208,7 @@ async def invoke_agent(request: Request):
         return {"output": result}
     except Exception as e:
         logger.error(f"Invocation error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/ping")

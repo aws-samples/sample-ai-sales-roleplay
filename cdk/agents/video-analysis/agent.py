@@ -151,7 +151,7 @@ def handle_invocation(payload: Dict[str, Any]) -> Dict[str, Any]:
             'sessionId': payload.get('sessionId') if payload else '',
             'videoAnalysis': None,
             'videoAnalyzed': False,
-            'error': str(e)
+            'error': '動画分析処理中にエラーが発生しました'
         }
 
 
@@ -182,7 +182,7 @@ async def invoke_agent(request: Request):
         return {"output": result}
     except Exception as e:
         logger.error(f"Invocation error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/ping")

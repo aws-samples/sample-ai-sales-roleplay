@@ -164,7 +164,7 @@ def handle_invocation(payload: Dict[str, Any]) -> Dict[str, Any]:
             return {
                 'success': False,
                 'sessionId': session_id,
-                'error': f'転写結果の取得に失敗: {e}'
+                'error': '転写結果の取得に失敗しました'
             }
         
         analysis_result = analyze_speakers_and_roles(transcription_data, language)
@@ -183,7 +183,7 @@ def handle_invocation(payload: Dict[str, Any]) -> Dict[str, Any]:
         return {
             'success': False,
             'sessionId': payload.get('sessionId') if payload else '',
-            'error': str(e)
+            'error': '音声分析処理中にエラーが発生しました'
         }
 
 
@@ -214,7 +214,7 @@ async def invoke_agent(request: Request):
         return {"output": result}
     except Exception as e:
         logger.error(f"Invocation error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/ping")
