@@ -22,6 +22,13 @@ logger = Logger(service="session-analysis-reference")
 KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID")
 BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_REFERENCE", "amazon.nova-pro-v1:0")
 
+# 起動時に環境変数をログ出力
+logger.info("Lambda初期化", extra={
+    "knowledge_base_id": KNOWLEDGE_BASE_ID,
+    "bedrock_model_id": BEDROCK_MODEL_ID,
+    "knowledge_base_configured": bool(KNOWLEDGE_BASE_ID)
+})
+
 # Bedrockクライアント（Knowledge Base用のみ）
 bedrock_agent_runtime = boto3.client("bedrock-agent-runtime")
 
@@ -181,6 +188,12 @@ def check_single_message(
 ) -> Dict[str, Any]:
     """単一メッセージの参照資料チェック"""
     
+    logger.info("Knowledge Base検索開始", extra={
+        "knowledge_base_id": KNOWLEDGE_BASE_ID,
+        "user_message": user_message[:100],
+        "scenario_id": scenario_id
+    })
+    
     # Knowledge Baseから関連ドキュメントを検索
     try:
         retrieve_response = bedrock_agent_runtime.retrieve(
@@ -197,12 +210,37 @@ def check_single_message(
         
         retrieved_docs = retrieve_response.get("retrievalResults", [])
         
+        logger.info("Knowledge Base検索完了", extra={
+            "knowledge_base_id": KNOWLEDGE_BASE_ID,
+            "retrieved_docs_count": len(retrieved_docs),
+            "has_results": len(retrieved_docs) > 0
+        })
+        
+        # 検索結果の詳細をログ出力
+        for i, doc in enumerate(retrieved_docs):
+            score = doc.get("score", 0)
+            content_preview = doc.get("content", {}).get("text", "")[:100]
+            location = doc.get("location", {})
+            logger.info(f"検索結果 {i+1}", extra={
+                "score": score,
+                "content_preview": content_preview,
+                "location": location
+            })
+        
     except Exception as e:
-        logger.error(f"Knowledge Base検索エラー: {str(e)}")
+        logger.exception("Knowledge Base検索エラー", extra={
+            "knowledge_base_id": KNOWLEDGE_BASE_ID,
+            "error_type": type(e).__name__,
+            "error": str(e)
+        })
         retrieved_docs = []
     
     # 関連ドキュメントがない場合
     if not retrieved_docs:
+        logger.warning("関連ドキュメントなし", extra={
+            "knowledge_base_id": KNOWLEDGE_BASE_ID,
+            "user_message": user_message[:100]
+        })
         return {
             "message": user_message,
             "relatedDocument": "",
@@ -218,6 +256,11 @@ def check_single_message(
             doc_contents.append(content)
     
     related_document = "\n---\n".join(doc_contents[:2])  # 上位2件
+    
+    logger.info("関連ドキュメント取得完了", extra={
+        "doc_count": len(doc_contents),
+        "total_length": len(related_document)
+    })
     
     # Bedrockで関連性を評価
     evaluation = evaluate_relevance(
@@ -244,6 +287,7 @@ def evaluate_relevance(
     """Strands Agentsで関連性を評価"""
     
     if language == "en":
+        system_prompt = "You are an expert at evaluating whether statements are based on reference documents. Always respond in valid JSON format."
         prompt = f"""Evaluate whether the user's statement is based on the reference document.
 
 User's statement: "{user_message}"
@@ -257,6 +301,7 @@ Conversation context:
 Respond in JSON format:
 {{"related": true/false, "comment": "Brief evaluation comment"}}"""
     else:
+        system_prompt = "あなたは発言が参照資料に基づいているかを評価する専門家です。必ず有効なJSON形式で回答してください。"
         prompt = f"""ユーザーの発言が参照資料に基づいているか評価してください。
 
 ユーザーの発言: "{user_message}"
@@ -271,6 +316,12 @@ JSON形式で回答してください:
 {{"related": true/false, "comment": "簡潔な評価コメント"}}"""
     
     try:
+        logger.info("関連性評価開始", extra={
+            "model_id": BEDROCK_MODEL_ID,
+            "message_length": len(user_message),
+            "document_length": len(related_document)
+        })
+        
         # BedrockModelを作成
         bedrock_model = BedrockModel(
             model_id=BEDROCK_MODEL_ID,
@@ -278,21 +329,38 @@ JSON形式で回答してください:
             max_tokens=256
         )
         
-        # Agentを作成して呼び出し
-        agent = Agent(model=bedrock_model)
+        # Agentを作成して呼び出し（system_promptを追加）
+        agent = Agent(
+            model=bedrock_model,
+            system_prompt=system_prompt
+        )
         result = agent(prompt)
         
         # 応答テキストを取得
         response_text = str(result)
+        logger.debug("Bedrock応答", extra={"response": response_text[:500]})
         
         # JSON解析
         json_start = response_text.find("{")
         json_end = response_text.rfind("}") + 1
         if json_start >= 0 and json_end > json_start:
-            return json.loads(response_text[json_start:json_end])
+            parsed_result = json.loads(response_text[json_start:json_end])
+            logger.info("関連性評価完了", extra={"related": parsed_result.get("related")})
+            return parsed_result
         
+        logger.warning("JSON解析失敗: JSONが見つかりません", extra={"response": response_text[:200]})
+        
+    except json.JSONDecodeError as e:
+        logger.error("JSON解析エラー", extra={
+            "error": str(e),
+            "response_snippet": response_text[:200] if 'response_text' in locals() else "N/A"
+        })
     except Exception as e:
-        logger.error(f"関連性評価エラー: {str(e)}")
+        logger.exception("関連性評価エラー", extra={
+            "error_type": type(e).__name__,
+            "error": str(e),
+            "model_id": BEDROCK_MODEL_ID
+        })
     
     return {
         "related": False,

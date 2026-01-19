@@ -41,6 +41,7 @@ def get_strands_agent() -> Agent:
             temperature=0.3,
             max_tokens=4096,
         )
+        # シンプルな1回の呼び出し（ツールなしでstructured outputのみ使用）
         _strands_agent = Agent(model=model)
     return _strands_agent
 
@@ -197,12 +198,12 @@ def handle_invocation(payload: Dict[str, Any]) -> Dict[str, Any]:
         
         logger.info(f"フィードバック生成: messages={len(messages)}, metrics={final_metrics}")
         
-        # Strands Agentでフィードバック生成（structured output使用）
+        # Strands Agentでフィードバック生成（structured_output_model使用）
         agent = get_strands_agent()
-        response = agent(prompt, output_model=FeedbackAnalysisResult)
+        response = agent(prompt, structured_output_model=FeedbackAnalysisResult)
         
-        # structured_outputから直接結果を取得
-        feedback_result: FeedbackAnalysisResult = response.output
+        # structured_outputから結果を取得
+        feedback_result: FeedbackAnalysisResult = response.structured_output
         feedback_data = feedback_result.model_dump()
         
         logger.info(f"フィードバック生成完了: overall_score={feedback_data.get('scores', {}).get('overall')}")

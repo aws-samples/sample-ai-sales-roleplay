@@ -222,18 +222,31 @@ export class SessionAnalysisLambdaConstruct extends Construct {
       ],
     }));
 
-    // Bedrock権限（参照資料評価用）
+    // Bedrock権限（参照資料評価用 - InvokeModel）
     this.referenceFunction.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: [
         'bedrock:InvokeModel',
+        'bedrock:InvokeModelWithResponseStream',
+      ],
+      resources: [
+        `arn:aws:bedrock:*:${cdk.Aws.ACCOUNT_ID}:inference-profile/*`,
+        'arn:aws:bedrock:*::foundation-model/*',
+      ],
+    }));
+
+    // Bedrock Agent Runtime権限（Knowledge Base検索用）
+    // bedrock-agent-runtime:Retrieve と bedrock:Retrieve の両方が必要
+    this.referenceFunction.addToRolePolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'bedrock-agent-runtime:Retrieve',
+        'bedrock-agent-runtime:RetrieveAndGenerate',
         'bedrock:Retrieve',
         'bedrock:RetrieveAndGenerate',
       ],
       resources: [
         `arn:aws:bedrock:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:knowledge-base/${props.knowledgeBaseId}`,
-        `arn:aws:bedrock:*:${cdk.Aws.ACCOUNT_ID}:inference-profile/*`,
-        'arn:aws:bedrock:*::foundation-model/*',
       ],
     }));
   }

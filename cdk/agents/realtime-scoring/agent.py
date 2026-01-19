@@ -189,18 +189,23 @@ def handle_invocation(payload: Dict[str, Any]) -> Dict[str, Any]:
             payload.get('language', 'ja')
         )
         
-        # Strands Agentでスコアリング（structured output使用）
+        logger.info(f"Building scoring prompt for session: {session_id}")
+        
+        # Strands Agentでスコアリング（structured_output_model使用）
         model = BedrockModel(
             model_id=BEDROCK_MODEL,
             region_name=AWS_REGION,
             temperature=0.3,
-            max_tokens=500,
+            max_tokens=1024,
         )
+        # シンプルな1回の呼び出し（ツールなしでstructured outputのみ使用）
         agent = Agent(model=model)
-        response = agent(prompt, output_model=ScoringResult)
         
-        # structured_outputから直接結果を取得
-        scoring_result: ScoringResult = response.output
+        # 正しいパラメータ名: structured_output_model
+        response = agent(prompt, structured_output_model=ScoringResult)
+        
+        # 正しい属性名: structured_output
+        scoring_result: ScoringResult = response.structured_output
         result_dict = scoring_result.model_dump()
         
         scores = {
@@ -209,6 +214,8 @@ def handle_invocation(payload: Dict[str, Any]) -> Dict[str, Any]:
             'progressLevel': result_dict['progressLevel']
         }
         analysis = result_dict.get('analysis', '')
+        
+        logger.info(f"Scoring completed: {scores}")
         
         # メトリクスをDynamoDBに保存
         message_count = len(previous_messages) + 1
@@ -223,8 +230,8 @@ def handle_invocation(payload: Dict[str, Any]) -> Dict[str, Any]:
             'memoryEnabled': bool(AGENTCORE_MEMORY_ID),
         }
     except Exception as e:
-        logger.error(f"Error: {e}")
-        return {'success': False, 'error': 'AGENT_ERROR', 'message': 'スコアリング処理中にエラーが発生しました'}
+        logger.exception(f"Scoring error: {e}")
+        return {'success': False, 'error': 'AGENT_ERROR', 'message': f'スコアリング処理中にエラーが発生しました: {str(e)}'}
 
 
 

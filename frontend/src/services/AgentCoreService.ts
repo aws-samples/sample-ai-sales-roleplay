@@ -376,12 +376,12 @@ export class AgentCoreService {
     };
 
     try {
-      // AgentCoreレスポンス形式:
+      // AgentCore Runtimeレスポンス形式:
       // {
       //   success: boolean,
       //   scores: { angerLevel, trustLevel, progressLevel },
-      //   analysis: string,  // トップレベル
-      //   goalUpdates: [...],  // goalStatusesではなくgoalUpdates
+      //   analysis: string,
+      //   goalUpdates: [{ goalId, achieved, reason }],
       //   sessionId: string,
       //   memoryEnabled: boolean
       // }
@@ -394,13 +394,10 @@ export class AgentCoreService {
         };
         analysis?: string;
         goalUpdates?: Array<{
-          goal: string;
-          status: string;
-          reason: string;
+          goalId: string;
+          achieved: boolean;
+          reason?: string;
         }>;
-        goal?: {
-          statuses?: GoalStatus[];
-        };
         compliance?: ComplianceCheck;
         sessionId?: string;
         memoryEnabled?: boolean;
@@ -419,23 +416,15 @@ export class AgentCoreService {
       }
 
       if (result.success !== false) {
-        // goalUpdatesをgoalStatusesに変換
+        // goalUpdatesをgoalStatusesに変換（AgentCore Runtime形式: { goalId, achieved, reason }）
         let convertedGoalStatuses: GoalStatus[] | undefined;
-        if (result.goalUpdates && goals) {
-          convertedGoalStatuses = result.goalUpdates.map((update) => {
-            // goalsからマッチするゴールを探す
-            const matchingGoal = goals.find(g =>
-              g.description === update.goal ||
-              g.description?.includes(update.goal) ||
-              update.goal.includes(g.description || '')
-            );
-            return {
-              goalId: matchingGoal?.id || update.goal,
-              progress: update.status === '達成' ? 100 : update.status === '進行中' ? 50 : 0,
-              achieved: update.status === '達成',
-              reason: update.reason,
-            };
-          });
+        if (result.goalUpdates && Array.isArray(result.goalUpdates)) {
+          convertedGoalStatuses = result.goalUpdates.map((update) => ({
+            goalId: update.goalId,
+            progress: update.achieved ? 100 : 0,
+            achieved: update.achieved,
+            reason: update.reason || '',
+          }));
         }
 
         return {
@@ -448,9 +437,8 @@ export class AgentCoreService {
             trustLevel: 1,
             progressLevel: 1,
           },
-          // analysisはトップレベルにある
           analysis: result.analysis || "",
-          goalStatuses: convertedGoalStatuses || result.goal?.statuses,
+          goalStatuses: convertedGoalStatuses,
           ...(result.compliance ? { compliance: result.compliance } : {}),
         };
       }

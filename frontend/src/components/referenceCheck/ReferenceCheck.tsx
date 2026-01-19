@@ -22,7 +22,7 @@ const ReferenceCheck: React.FC<ReferenceCheckProps> = ({
   initialData = null,
 }) => {
   const { data, isLoading, isAnalyzing, error, issuesCount } =
-    useReferenceCheck(sessionId, language, isVisible, initialData);
+    useReferenceCheck(isVisible, initialData);
 
   // コンポーネントが非表示の場合は何も表示しない
   if (!isVisible) {

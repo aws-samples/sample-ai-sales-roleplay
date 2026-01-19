@@ -41,6 +41,7 @@ def get_strands_agent() -> Agent:
             temperature=0.3,
             max_tokens=2048,
         )
+        # シンプルな1回の呼び出し（ツールなしでstructured outputのみ使用）
         _strands_agent = Agent(model=model)
     return _strands_agent
 
@@ -90,14 +91,14 @@ def analyze_speakers_and_roles(
                     "role": "unknown"
                 })
         
-        # Strands Agentで話者役割を特定（structured output使用）
+        # Strands Agentで話者役割を特定（structured_output_model使用）
         utterances_text = format_speaker_utterances(speaker_utterances)
         prompt = get_speaker_analysis_prompt(utterances_text, language)
         agent = get_strands_agent()
-        response = agent(prompt, output_model=SpeakerAnalysisResult)
+        response = agent(prompt, structured_output_model=SpeakerAnalysisResult)
         
-        # structured_outputから直接結果を取得
-        analysis_result: SpeakerAnalysisResult = response.output
+        # structured_outputから結果を取得
+        analysis_result: SpeakerAnalysisResult = response.structured_output
         speakers = [speaker.model_dump() for speaker in analysis_result.speakers]
         
         # 役割情報を会話セグメントに反映
