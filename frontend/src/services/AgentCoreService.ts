@@ -90,12 +90,6 @@ export class AgentCoreService {
     // 正しいエンドポイント形式: /runtimes/{encodedArn}/invocations?qualifier=DEFAULT
     const url = `${AGENTCORE_ENDPOINT}/runtimes/${encodedArn}/invocations?qualifier=DEFAULT`;
 
-    console.log(`AgentCore Runtime呼び出し: ${runtimeArn}`, {
-      sessionId,
-      payloadKeys: Object.keys(payload),
-      url,
-    });
-
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 120000); // 120秒タイムアウト
 
@@ -129,13 +123,11 @@ export class AgentCoreService {
         // 通常のJSONレスポンス
         // AgentCore Runtimeのレスポンスは {"output": {...}} 形式でラップされている
         const rawData = await response.json() as { output?: T } | T;
-        console.log('AgentCore Runtime生レスポンス:', rawData);
 
         // outputラッパーを解除
         const data = (rawData && typeof rawData === 'object' && 'output' in rawData && rawData.output)
           ? rawData.output
           : rawData as T;
-        console.log('AgentCore Runtime応答（パース後）:', data);
         return data;
       }
     } catch (error) {
@@ -182,7 +174,6 @@ export class AgentCoreService {
 
       // 結合してJSONとしてパース
       const fullContent = chunks.join('');
-      console.log('AgentCore Runtime ストリーミング応答:', fullContent);
 
       try {
         const rawData = JSON.parse(fullContent) as { output?: T } | T;
@@ -190,7 +181,6 @@ export class AgentCoreService {
         const data = (rawData && typeof rawData === 'object' && 'output' in rawData && rawData.output)
           ? rawData.output
           : rawData as T;
-        console.log('AgentCore Runtime ストリーミング応答（パース後）:', data);
         return data;
       } catch {
         // JSONパースに失敗した場合、メッセージとして返す
@@ -403,13 +393,6 @@ export class AgentCoreService {
         memoryEnabled?: boolean;
         error?: string;
       }>(REALTIME_SCORING_RUNTIME_ARN, currentSessionId, payload);
-
-      console.log('リアルタイムスコアリング結果:', {
-        success: result.success,
-        scores: result.scores,
-        analysis: result.analysis,
-        goalUpdates: result.goalUpdates,
-      });
 
       if (result.error) {
         throw new Error(result.error);

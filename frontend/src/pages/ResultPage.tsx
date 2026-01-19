@@ -160,7 +160,6 @@ const ResultPage: React.FC = () => {
     const pollInterval = setInterval(async () => {
       try {
         const statusResponse = await apiService.getSessionAnalysisStatus(sessionId);
-        console.log("分析ステータス:", statusResponse);
 
         setAnalysisStatus(statusResponse.status);
 
@@ -171,7 +170,6 @@ const ResultPage: React.FC = () => {
 
           // 完全なセッションデータを再取得
           const completeData = await apiService.getSessionCompleteData(sessionId);
-          console.log("分析完了後のデータ取得:", completeData);
 
           // 詳細フィードバックを設定
           if (completeData.feedback) {
@@ -212,8 +210,6 @@ const ResultPage: React.FC = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleAudioAnalysisSession = (completeData: any, sessionId: string) => {
     try {
-      console.log("音声分析セッションの処理を開始:", completeData);
-
       // 音声分析データから既にメッセージが構築されているのでそのまま使用
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const messages = (completeData.messages || []).map((msg: any) => ({
@@ -258,8 +254,6 @@ const ResultPage: React.FC = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setVideoAnalysisData((completeData as any).videoAnalysis as VideoAnalysisResult);
       }
-
-      console.log("音声分析セッション処理完了:", constructedSession);
     } catch (err) {
       console.error("音声分析セッション処理エラー:", err);
       setError("音声分析結果の読み込み中にエラーが発生しました");
@@ -276,7 +270,6 @@ const ResultPage: React.FC = () => {
         // まず分析ステータスを確認
         try {
           const statusResponse = await apiService.getSessionAnalysisStatus(sessionId);
-          console.log("初期分析ステータス:", statusResponse);
           setAnalysisStatus(statusResponse.status);
 
           if (statusResponse.status === "processing") {
@@ -285,17 +278,11 @@ const ResultPage: React.FC = () => {
             setAnalysisProgress(t("results.analysisInProgress"));
           }
         } catch (statusErr) {
-          console.log("分析ステータス取得スキップ（新規セッションの可能性）:", statusErr);
+          // 分析ステータス取得スキップ（新規セッションの可能性）
         }
 
         // セッション分析結果をAPIから取得
-        console.log(t("results.fetchingCompleteSessionData"), sessionId);
         const completeData = await apiService.getSessionCompleteData(sessionId);
-
-        console.log(
-          t("results.completeSessionDataFetched") + ":",
-          completeData,
-        );
 
         // 音声分析セッションかどうかを判定
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -327,12 +314,6 @@ const ResultPage: React.FC = () => {
         // メッセージにメトリクス変化情報を追加
         const messagesWithMetrics = addMetricsChangesToMessages(messages);
 
-        // 最終メトリクスの決定
-        console.log(
-          t("results.realtimeMetricsData") + ":",
-          completeData.realtimeMetrics,
-        );
-
         // AgentCore移行後: realtimeMetricsが空でもfinalMetricsがあれば使用
         let finalMetrics: Metrics;
 
@@ -340,7 +321,6 @@ const ResultPage: React.FC = () => {
           // リアルタイムメトリクスの最新値を使用
           const latestMetrics =
             completeData.realtimeMetrics[completeData.realtimeMetrics.length - 1];
-          console.log(t("results.latestRealtimeMetrics") + ":", latestMetrics);
 
           finalMetrics = {
             angerLevel: Number(latestMetrics.angerLevel),
@@ -350,7 +330,6 @@ const ResultPage: React.FC = () => {
           };
         } else if (completeData.finalMetrics) {
           // finalMetricsがある場合はそれを使用（AgentCore経由のセッション）
-          console.log("finalMetricsを使用:", completeData.finalMetrics);
           finalMetrics = {
             angerLevel: Number(completeData.finalMetrics.angerLevel) || 1,
             trustLevel: Number(completeData.finalMetrics.trustLevel) || 1,
@@ -359,7 +338,6 @@ const ResultPage: React.FC = () => {
           };
         } else {
           // どちらもない場合はデフォルト値を使用
-          console.log("メトリクスデータがないためデフォルト値を使用");
           finalMetrics = {
             angerLevel: 1,
             trustLevel: 1,
@@ -367,8 +345,6 @@ const ResultPage: React.FC = () => {
             analysis: "",
           };
         }
-
-        console.log(t("results.finalMetricsSet") + ":", finalMetrics);
 
         // ゴール情報を設定（数値文字列を数値に変換）
         let goalStatuses: GoalStatus[] = [];
@@ -446,7 +422,6 @@ const ResultPage: React.FC = () => {
                 priority: Number(goal.priority ?? 1),
                 criteria: goal.criteria ?? [],
               }));
-              console.log("シナリオ情報からゴールを取得:", scenarioGoals);
             }
           } catch (scenarioError) {
             console.error("シナリオ情報からのゴール取得に失敗:", scenarioError);
@@ -463,9 +438,6 @@ const ResultPage: React.FC = () => {
           completeData.feedback.scores.overall
         ) {
           finalScore = completeData.feedback.scores.overall;
-          console.log("Bedrockのoverallスコアを使用:", finalScore);
-        } else {
-          console.log("Bedrockスコアが生成されていません");
         }
 
         // 最終メトリクスの処理（finalMetricsがある場合は使用、なければリアルタイムメトリクスから）
@@ -530,9 +502,6 @@ const ResultPage: React.FC = () => {
         setRealtimeMetricsHistory(processedRealtimeMetrics);
 
         // シナリオゴールを保存
-        console.log("設定するシナリオゴール:", scenarioGoals);
-        console.log("ゴールスタータス:", goalStatuses);
-        console.log("ゴールスコア:", goalScore);
         setScenarioGoals(scenarioGoals);
 
         // レガシーフィードバックは削除（Bedrockで生成されるため不要）
@@ -540,26 +509,16 @@ const ResultPage: React.FC = () => {
 
         // 詳細フィードバックを設定（APIから取得済み - complete-dataで統合）
         if (completeData.feedback) {
-          console.log(
-            "詳細フィードバックをAPIから取得:",
-            completeData.feedback,
-          );
           setDetailedFeedback(completeData.feedback);
-        } else {
-          console.log(
-            "詳細フィードバックが存在しません（complete-data APIで自動生成されるはずです）",
-          );
         }
 
         // リファレンスチェック結果を設定（Step Functionsで取得済み）
         if (completeData.referenceCheck) {
-          console.log("リファレンスチェック結果をAPIから取得:", completeData.referenceCheck);
           setReferenceCheckData(completeData.referenceCheck);
         }
 
         // 動画分析結果を設定（Step Functionsで取得済み）
         if (completeData.videoAnalysis) {
-          console.log("動画分析結果をAPIから取得:", completeData.videoAnalysis);
           setVideoAnalysisData(completeData.videoAnalysis);
         }
       } catch (err) {

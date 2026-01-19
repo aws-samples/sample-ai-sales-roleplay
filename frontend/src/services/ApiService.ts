@@ -276,8 +276,6 @@ export class ApiService {
         isNew: boolean;
       }>("/sessions", requestBody);
 
-      console.log("セッション作成/更新結果:", response);
-
       return {
         success: response.success,
         sessionId: response.sessionId,
@@ -325,7 +323,6 @@ export class ApiService {
       // AgentCore Runtimeが利用可能な場合は直接呼び出し
       const agentCoreService = AgentCoreService.getInstance();
       if (agentCoreService.isAvailable()) {
-        console.log("=== AgentCore Runtime経由でNPC会話を実行 ===");
         return await agentCoreService.chatWithNPC(
           message,
           npc,
@@ -339,8 +336,6 @@ export class ApiService {
       }
 
       // フォールバック: 従来のAPI Gateway経由
-      console.log("=== API Gateway経由でNPC会話を実行（フォールバック） ===");
-
       // リクエストボディの作成
       const requestBody = {
         message,
@@ -378,8 +373,6 @@ export class ApiService {
         // 言語設定を追加
         ...(language ? { language } : {}),
       };
-
-      console.log("requestBody:", requestBody);
 
       // API呼び出し（他のメソッドと同じパターンを使用）
       const data = await this.apiPost<{
@@ -453,7 +446,6 @@ export class ApiService {
       // AgentCore Runtimeが利用可能な場合は直接呼び出し
       const agentCoreService = AgentCoreService.getInstance();
       if (agentCoreService.isAvailable()) {
-        console.log("=== AgentCore Runtime経由でリアルタイム評価を実行 ===");
         return await agentCoreService.getRealtimeEvaluation(
           message,
           previousMessages,
@@ -467,8 +459,6 @@ export class ApiService {
       }
 
       // フォールバック: 従来のAPI Gateway経由
-      console.log("=== API Gateway経由でリアルタイム評価を実行（フォールバック） ===");
-
       // リクエストボディを作成（循環参照対策）
       const requestBody = {
         message,
@@ -816,10 +806,6 @@ export class ApiService {
     contentType: string,
   ): Promise<void> {
     try {
-      console.log(
-        `ファイルアップロード開始: URL=${uploadUrl}, ContentType=${contentType}`,
-      );
-
       // FormDataオブジェクトを作成
       const formDataObj = new FormData();
 
@@ -855,8 +841,6 @@ export class ApiService {
           `HTTP ${response.status}: ${response.statusText}. ${errorText}`,
         );
       }
-
-      console.log("ファイルアップロード成功（S3 POSTフォーム版）");
     } catch (error) {
       console.error("ファイルのアップロードに失敗しました:", error);
 
@@ -1330,26 +1314,7 @@ export class ApiService {
         `/sessions/${sessionId}/analysis-results`,
       );
 
-      console.log("セッション分析結果取得成功:", response);
-
       if (response.success) {
-        if (process.env.NODE_ENV !== "test") {
-          const sessionType = (response as unknown as Record<string, unknown>).sessionType || "regular";
-          console.log("セッション分析結果を返します:", {
-            sessionType: sessionType,
-            hasMessages: response.messages.length > 0,
-            hasRealtimeMetrics: response.realtimeMetrics?.length > 0,
-            hasFeedback: !!response.feedback,
-            hasGoalResults: !!response.goalResults,
-            hasAudioAnalysis: !!(response as unknown as Record<string, unknown>).audioAnalysis,
-            hasComplianceViolations:
-              response.complianceViolations &&
-              response.complianceViolations.length > 0,
-            complianceViolationsCount:
-              response.complianceViolations?.length || 0,
-          });
-        }
-
         return response;
       } else {
         throw new Error("セッション分析結果が正常に取得できませんでした");
@@ -1470,12 +1435,6 @@ export class ApiService {
     limit: number = 10,
   ): Promise<RankingResponse> {
     try {
-      if (process.env.NODE_ENV !== "test") {
-        console.log(
-          `ランキング取得開始: scenarioId=${scenarioId}, period=${period}, limit=${limit}`,
-        );
-      }
-
       // クエリパラメータの作成
       const queryParams: Record<string, string | number> = {
         scenarioId: scenarioId,
