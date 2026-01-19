@@ -15,6 +15,7 @@ import type {
   ImportResponse,
   SessionCompleteDataResponse,
 } from "../types/api";
+import { AgentCoreService } from "./AgentCoreService";
 
 /**
  * API通信サービス - Amazon Bedrockとの通信を処理
@@ -232,6 +233,68 @@ export class ApiService {
   }
 
   /**
+   * セッションを作成または更新する
+   * 
+   * AgentCore Runtime経由で会話する場合、セッションをDynamoDBに保存するために使用
+   * 
+   * @param sessionId セッションID
+   * @param scenarioId シナリオID
+   * @param title セッションタイトル（オプション）
+   * @param npcInfo NPC情報（オプション）
+   * @returns 作成結果
+   */
+  public async createOrUpdateSession(
+    sessionId: string,
+    scenarioId: string,
+    title?: string,
+    npcInfo?: {
+      name: string;
+      role: string;
+      company: string;
+      personality?: string[];
+      description?: string;
+    }
+  ): Promise<{ success: boolean; sessionId: string; isNew: boolean }> {
+    try {
+      const requestBody: Record<string, unknown> = {
+        sessionId,
+        scenarioId,
+      };
+
+      if (title) {
+        requestBody.title = title;
+      }
+
+      if (npcInfo) {
+        requestBody.npcInfo = npcInfo;
+      }
+
+      const response = await this.apiPost<{
+        success: boolean;
+        sessionId: string;
+        message: string;
+        isNew: boolean;
+      }>("/sessions", requestBody);
+
+      console.log("セッション作成/更新結果:", response);
+
+      return {
+        success: response.success,
+        sessionId: response.sessionId,
+        isNew: response.isNew,
+      };
+    } catch (error) {
+      console.error("セッション作成/更新エラー:", error);
+      // エラーが発生しても会話は続行できるようにする
+      return {
+        success: false,
+        sessionId,
+        isNew: false,
+      };
+    }
+  }
+
+  /**
    * NPCと会話する
    *
    * @param message ユーザーメッセージ
@@ -259,6 +322,25 @@ export class ApiService {
     language?: string,
   ): Promise<{ response: string; sessionId: string; messageId: string }> {
     try {
+      // AgentCore Runtimeが利用可能な場合は直接呼び出し
+      const agentCoreService = AgentCoreService.getInstance();
+      if (agentCoreService.isAvailable()) {
+        console.log("=== AgentCore Runtime経由でNPC会話を実行 ===");
+        return await agentCoreService.chatWithNPC(
+          message,
+          npc,
+          previousMessages,
+          sessionId,
+          messageId,
+          emotionParams,
+          scenarioId,
+          language,
+        );
+      }
+
+      // フォールバック: 従来のAPI Gateway経由
+      console.log("=== API Gateway経由でNPC会話を実行（フォールバック） ===");
+
       // リクエストボディの作成
       const requestBody = {
         message,
@@ -340,6 +422,8 @@ export class ApiService {
    * @param goalStatuses 現在のゴール達成状況（オプション）
    * @param goals シナリオのゴール定義（オプション）
    * @param scenarioId シナリオID（コンプライアンスチェック用）
+   * @param language 言語設定（オプション）
+   * @param currentScores 現在のスコア（オプション）
    * @returns メトリクスとゴール状態を含むオブジェクト
    */
   public async getRealtimeEvaluation(
@@ -350,6 +434,11 @@ export class ApiService {
     goals?: Goal[],
     scenarioId?: string,
     language?: string,
+    currentScores?: {
+      angerLevel: number;
+      trustLevel: number;
+      progressLevel: number;
+    },
   ): Promise<{
     scores?: {
       angerLevel: number;
@@ -361,6 +450,25 @@ export class ApiService {
     compliance?: ComplianceCheck; // コンプライアンスチェック結果を追加
   }> {
     try {
+      // AgentCore Runtimeが利用可能な場合は直接呼び出し
+      const agentCoreService = AgentCoreService.getInstance();
+      if (agentCoreService.isAvailable()) {
+        console.log("=== AgentCore Runtime経由でリアルタイム評価を実行 ===");
+        return await agentCoreService.getRealtimeEvaluation(
+          message,
+          previousMessages,
+          sessionId,
+          goalStatuses,
+          goals,
+          scenarioId,
+          language,
+          currentScores,
+        );
+      }
+
+      // フォールバック: 従来のAPI Gateway経由
+      console.log("=== API Gateway経由でリアルタイム評価を実行（フォールバック） ===");
+
       // リクエストボディを作成（循環参照対策）
       const requestBody = {
         message,

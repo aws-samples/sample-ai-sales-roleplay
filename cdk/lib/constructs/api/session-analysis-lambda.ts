@@ -31,6 +31,8 @@ export interface SessionAnalysisLambdaConstructProps {
     video: string;
     reference: string;
   };
+  /** AgentCore Memory ID */
+  agentCoreMemoryId?: string;
 }
 
 /**
@@ -67,6 +69,7 @@ export class SessionAnalysisLambdaConstruct extends Construct {
       BEDROCK_MODEL_REFERENCE: props.bedrockModels.reference,
       POWERTOOLS_LOG_LEVEL: 'DEBUG',
       AWS_MAX_ATTEMPTS: '10',
+      AGENTCORE_MEMORY_ID: props.agentCoreMemoryId || '',
     };
 
     // 1. 分析開始Lambda関数
@@ -173,6 +176,20 @@ export class SessionAnalysisLambdaConstruct extends Construct {
       props.messagesTable.grantReadData(func);
       props.scenariosTable.grantReadData(func);
     });
+
+    // AgentCore Memory権限（start_handlerで会話履歴を取得するため）
+    if (props.agentCoreMemoryId) {
+      this.startFunction.addToRolePolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'bedrock-agentcore:ListEvents',
+          'bedrock-agentcore:GetEvent',
+        ],
+        resources: [
+          `arn:aws:bedrock-agentcore:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:memory/${props.agentCoreMemoryId}`,
+        ],
+      }));
+    }
 
     // S3権限（動画ファイル用）
     [this.startFunction, this.videoFunction].forEach(func => {

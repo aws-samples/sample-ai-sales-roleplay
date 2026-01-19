@@ -14,6 +14,10 @@ export interface WebProps {
   webAclId?: string;
   resourceNamePrefix?: string; // リソース名のプレフィックス
   transcribeWebSocketEndpoint: string; // Transcribe WebSocketエンドポイント
+  // AgentCore Runtime設定
+  agentCoreEnabled?: boolean;
+  npcConversationAgentArn?: string;
+  realtimeScoringAgentArn?: string;
 }
 
 export class Web extends Construct {
@@ -88,12 +92,17 @@ export class Web extends Construct {
       buildEnvironment: {
         VITE_API_GATEWAY_ENDPOINT: props.apiEndpointUrl,
         VITE_API_REGION: Stack.of(this).region,
+        VITE_AWS_REGION: Stack.of(this).region,
         VITE_COGNITO_REGION: Stack.of(this).region,
         VITE_COGNITO_USER_POOL_ID: props.userPoolId,
         VITE_COGNITO_USER_POOL_CLIENT_ID: props.userPoolClientId,
         VITE_COGNITO_IDENTITY_POOL_ID: props.idPoolId,
         VITE_APP_SELF_SIGN_UP_ENABLED: props.selfSignUpEnabled.toString(),
         VITE_TRANSCRIBE_WEBSOCKET_URL: props.transcribeWebSocketEndpoint,
+        // AgentCore Runtime設定
+        VITE_AGENTCORE_ENABLED: (props.agentCoreEnabled ?? false).toString(),
+        VITE_AGENTCORE_NPC_CONVERSATION_ARN: props.npcConversationAgentArn ?? '',
+        VITE_AGENTCORE_REALTIME_SCORING_ARN: props.realtimeScoringAgentArn ?? '',
       },
     });
 

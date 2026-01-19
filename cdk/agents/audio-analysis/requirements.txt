@@ -1,0 +1,5 @@
+strands-agents
+fastapi
+uvicorn[standard]
+pydantic
+boto3

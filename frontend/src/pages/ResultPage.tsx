@@ -327,28 +327,46 @@ const ResultPage: React.FC = () => {
         // メッセージにメトリクス変化情報を追加
         const messagesWithMetrics = addMetricsChangesToMessages(messages);
 
-        // 最終メトリクスの決定（リアルタイムメトリクスのみ使用）
+        // 最終メトリクスの決定
         console.log(
           t("results.realtimeMetricsData") + ":",
           completeData.realtimeMetrics,
         );
 
-        if (completeData.realtimeMetrics.length === 0) {
-          console.error(t("results.realtimeMetricsNotFound"));
-          throw new Error(t("results.incompleteSessionData"));
+        // AgentCore移行後: realtimeMetricsが空でもfinalMetricsがあれば使用
+        let finalMetrics: Metrics;
+
+        if (completeData.realtimeMetrics && completeData.realtimeMetrics.length > 0) {
+          // リアルタイムメトリクスの最新値を使用
+          const latestMetrics =
+            completeData.realtimeMetrics[completeData.realtimeMetrics.length - 1];
+          console.log(t("results.latestRealtimeMetrics") + ":", latestMetrics);
+
+          finalMetrics = {
+            angerLevel: Number(latestMetrics.angerLevel),
+            trustLevel: Number(latestMetrics.trustLevel),
+            progressLevel: Number(latestMetrics.progressLevel),
+            analysis: latestMetrics.analysis,
+          };
+        } else if (completeData.finalMetrics) {
+          // finalMetricsがある場合はそれを使用（AgentCore経由のセッション）
+          console.log("finalMetricsを使用:", completeData.finalMetrics);
+          finalMetrics = {
+            angerLevel: Number(completeData.finalMetrics.angerLevel) || 1,
+            trustLevel: Number(completeData.finalMetrics.trustLevel) || 1,
+            progressLevel: Number(completeData.finalMetrics.progressLevel) || 1,
+            analysis: completeData.finalMetrics.analysis || "",
+          };
+        } else {
+          // どちらもない場合はデフォルト値を使用
+          console.log("メトリクスデータがないためデフォルト値を使用");
+          finalMetrics = {
+            angerLevel: 1,
+            trustLevel: 1,
+            progressLevel: 1,
+            analysis: "",
+          };
         }
-
-        // リアルタイムメトリクスの最新値を使用
-        const latestMetrics =
-          completeData.realtimeMetrics[completeData.realtimeMetrics.length - 1];
-        console.log(t("results.latestRealtimeMetrics") + ":", latestMetrics);
-
-        const finalMetrics: Metrics = {
-          angerLevel: Number(latestMetrics.angerLevel),
-          trustLevel: Number(latestMetrics.trustLevel),
-          progressLevel: Number(latestMetrics.progressLevel),
-          analysis: latestMetrics.analysis,
-        };
 
         console.log(t("results.finalMetricsSet") + ":", finalMetrics);
 
@@ -388,7 +406,7 @@ const ResultPage: React.FC = () => {
               criteria: goal.criteria,
             }),
           );
-        } else if (completeData.realtimeMetrics.length > 0) {
+        } else if (completeData.realtimeMetrics && completeData.realtimeMetrics.length > 0) {
           // リアルタイムメトリクスからゴール情報を取得
           const latestMetricsWithGoals = completeData.realtimeMetrics.find(
             (m) => m.goalStatuses && m.goalStatuses.length > 0,
@@ -491,8 +509,9 @@ const ResultPage: React.FC = () => {
         setSession(constructedSession);
 
         // リアルタイムメトリクス履歴を保存（型変換）
+        // AgentCore移行後: realtimeMetricsが空の場合は空配列を設定
         const processedRealtimeMetrics: RealtimeMetric[] =
-          completeData.realtimeMetrics.map((metric) => ({
+          (completeData.realtimeMetrics || []).map((metric) => ({
             angerLevel: Number(metric.angerLevel),
             trustLevel: Number(metric.trustLevel),
             progressLevel: Number(metric.progressLevel),
@@ -920,33 +939,31 @@ const ResultPage: React.FC = () => {
                     >
                       <Line
                         data={{
-                          labels: [...realtimeMetricsHistory]
-                            .reverse()
-                            .map((_, index) =>
-                              t("results.round", { count: index + 1 }),
-                            ),
+                          labels: realtimeMetricsHistory.map((_, index) =>
+                            t("results.round", { count: index + 1 }),
+                          ),
                           datasets: [
                             {
                               label: t("metrics.angerMeter"),
-                              data: [...realtimeMetricsHistory]
-                                .reverse()
-                                .map((m) => Number(m.angerLevel)),
+                              data: realtimeMetricsHistory.map((m) =>
+                                Number(m.angerLevel),
+                              ),
                               borderColor: "rgba(255, 99, 132, 1)",
                               backgroundColor: "rgba(255, 99, 132, 0.2)",
                             },
                             {
                               label: t("metrics.trustLevel"),
-                              data: [...realtimeMetricsHistory]
-                                .reverse()
-                                .map((m) => Number(m.trustLevel)),
+                              data: realtimeMetricsHistory.map((m) =>
+                                Number(m.trustLevel),
+                              ),
                               borderColor: "rgba(54, 162, 235, 1)",
                               backgroundColor: "rgba(54, 162, 235, 0.2)",
                             },
                             {
                               label: t("metrics.progressLevel"),
-                              data: [...realtimeMetricsHistory]
-                                .reverse()
-                                .map((m) => Number(m.progressLevel)),
+                              data: realtimeMetricsHistory.map((m) =>
+                                Number(m.progressLevel),
+                              ),
                               borderColor: "rgba(75, 192, 192, 1)",
                               backgroundColor: "rgba(75, 192, 192, 0.2)",
                             },

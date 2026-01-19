@@ -5,10 +5,12 @@
 分析結果取得機能を提供します。
 
 通常セッションの分析はStep Functionsで非同期実行されます。
+AgentCore Memoryから会話履歴・メトリクスを取得します。
 """
 
 import os
 import time
+import json
 import boto3
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
@@ -20,9 +22,313 @@ import boto3.dynamodb.conditions
 from utils import get_user_id_from_event, sessions_table, messages_table, scenarios_table, dynamodb
 from feedback_service import generate_feedback_with_bedrock, save_feedback_to_dynamodb
 from realtime_scoring import calculate_realtime_scores
+from datetime import datetime
+from decimal import Decimal
+
+
+def json_serializable(obj):
+    """
+    オブジェクトをJSONシリアライズ可能な形式に変換する再帰関数
+    datetime, Decimal, その他のシリアライズ不可能な型を処理
+    """
+    if obj is None:
+        return None
+    elif isinstance(obj, datetime):
+        return obj.isoformat()
+    elif isinstance(obj, Decimal):
+        # 整数の場合はintに、小数の場合はfloatに変換
+        if obj % 1 == 0:
+            return int(obj)
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {k: json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [json_serializable(item) for item in obj]
+    elif isinstance(obj, (str, int, float, bool)):
+        return obj
+    elif hasattr(obj, 'isoformat'):
+        # datetime以外のisoformat対応オブジェクト
+        return obj.isoformat()
+    else:
+        # その他の型は文字列に変換
+        return str(obj)
 
 # ロガー設定
 logger = Logger(service="analysis-results-handlers")
+
+# AgentCore Memory設定
+AGENTCORE_MEMORY_ID = os.environ.get('AGENTCORE_MEMORY_ID', '')
+AWS_REGION = os.environ.get('AWS_REGION', os.environ.get('AWS_DEFAULT_REGION', 'us-west-2'))
+
+# AgentCore Memory Client（遅延初期化）
+_memory_client = None
+
+
+def get_memory_client():
+    """AgentCore Memory Clientを取得（遅延初期化）"""
+    global _memory_client
+    if _memory_client is not None:
+        return _memory_client
+    
+    if not AGENTCORE_MEMORY_ID:
+        logger.warning("AGENTCORE_MEMORY_ID is not configured")
+        return None
+    
+    try:
+        from bedrock_agentcore.memory import MemoryClient
+        _memory_client = MemoryClient(region_name=AWS_REGION)
+        logger.info("AgentCore Memory Client initialized", extra={
+            "memory_id": AGENTCORE_MEMORY_ID,
+            "region": AWS_REGION
+        })
+        return _memory_client
+    except ImportError:
+        logger.warning("bedrock_agentcore package not available")
+        return None
+    except Exception as e:
+        logger.error("Failed to create AgentCore Memory client", extra={"error": str(e)})
+        return None
+
+
+def get_session_data_from_memory(session_id: str, actor_id: str):
+    """
+    AgentCore Memoryからセッションの会話履歴を取得
+    
+    注意: リアルタイムメトリクスはDynamoDBに保存されるため、
+    この関数では会話履歴のみを取得します。
+    
+    Args:
+        session_id: セッションID
+        actor_id: アクターID（NPC会話エージェントでは'default_user'を使用）
+        
+    Returns:
+        list: 会話メッセージのリスト
+    """
+    client = get_memory_client()
+    if not client or not AGENTCORE_MEMORY_ID:
+        logger.warning("AgentCore Memory not available, returning empty data", extra={
+            "memory_id": AGENTCORE_MEMORY_ID,
+            "client_available": client is not None
+        })
+        return []
+    
+    try:
+        logger.info("Fetching session data from AgentCore Memory", extra={
+            "session_id": session_id,
+            "actor_id": actor_id,
+            "memory_id": AGENTCORE_MEMORY_ID
+        })
+        
+        # AgentCore Memoryからイベントを取得
+        # actor_idは必須パラメータ
+        events = client.list_events(
+            memory_id=AGENTCORE_MEMORY_ID,
+            session_id=session_id,
+            actor_id=actor_id,
+            max_results=100,  # 十分な数のイベントを取得
+        )
+        
+        # レスポンス形式を判定（リストまたは辞書）
+        # bedrock_agentcore MemoryClientはリストを直接返す場合がある
+        if isinstance(events, list):
+            events_list = events
+        elif isinstance(events, dict):
+            events_list = events.get('events', [])
+        else:
+            events_list = []
+        
+        logger.info("AgentCore Memory list_events raw response", extra={
+            "session_id": session_id,
+            "response_type": type(events).__name__,
+            "events_count": len(events_list),
+            "first_event_keys": list(events_list[0].keys()) if events_list and isinstance(events_list[0], dict) else "empty_or_not_dict",
+        })
+        
+        messages = []
+        
+        for event in events_list:
+            # イベントタイプは'eventType'または'event_type'キーで取得
+            event_type = event.get('eventType', event.get('event_type', ''))
+            timestamp_raw = event.get('eventTimestamp', event.get('timestamp', event.get('createdAt', '')))
+            event_id = event.get('eventId', event.get('event_id', ''))
+            
+            # timestampをISO文字列に変換（datetimeオブジェクトの場合）
+            if hasattr(timestamp_raw, 'isoformat'):
+                timestamp = timestamp_raw.isoformat()
+            elif isinstance(timestamp_raw, (int, float)):
+                # Unix timestampの場合
+                from datetime import datetime, timezone
+                timestamp = datetime.fromtimestamp(timestamp_raw / 1000 if timestamp_raw > 1e12 else timestamp_raw, tz=timezone.utc).isoformat()
+            else:
+                timestamp = str(timestamp_raw) if timestamp_raw else ''
+            
+            # ペイロードの取得（リストまたは辞書）
+            payload = event.get('payload', {})
+            
+            # Strands Agents Session Managerのペイロード形式を処理
+            # 形式: [{"conversational": {"content": {"text": "..."}, "role": "USER"}}]
+            role_from_payload = ''
+            content_text = ''
+            
+            if isinstance(payload, list) and len(payload) > 0:
+                first_item = payload[0]
+                if isinstance(first_item, dict):
+                    conversational = first_item.get('conversational', {})
+                    if conversational:
+                        role_from_payload = conversational.get('role', '').upper()
+                        content_obj = conversational.get('content', {})
+                        if isinstance(content_obj, dict):
+                            text_json = content_obj.get('text', '')
+                            # textフィールドにはJSON文字列が入っている
+                            if text_json:
+                                try:
+                                    parsed = json.loads(text_json)
+                                    # Strands Agentsのメッセージ形式: {"message": {"role": "...", "content": [{"text": "..."}]}}
+                                    message_obj = parsed.get('message', parsed)
+                                    if isinstance(message_obj, dict):
+                                        content_list = message_obj.get('content', [])
+                                        if isinstance(content_list, list):
+                                            content_text = ''.join(
+                                                item.get('text', '') if isinstance(item, dict) else str(item)
+                                                for item in content_list
+                                            )
+                                        elif isinstance(content_list, str):
+                                            content_text = content_list
+                                except json.JSONDecodeError:
+                                    content_text = text_json
+            elif isinstance(payload, str):
+                try:
+                    payload = json.loads(payload)
+                except json.JSONDecodeError:
+                    payload = {'content': payload}
+            
+            logger.debug("Processing event from AgentCore Memory", extra={
+                "event_type": event_type,
+                "role_from_payload": role_from_payload,
+                "timestamp": timestamp,
+                "event_id": event_id,
+                "payload_type": type(payload).__name__,
+                "content_text_preview": content_text[:100] if content_text else "empty",
+            })
+            
+            # Strands Agents Session Managerのペイロード形式を優先的に処理
+            if role_from_payload:
+                if role_from_payload in ['USER', 'HUMAN']:
+                    if content_text:
+                        messages.append({
+                            'messageId': event_id,
+                            'sessionId': session_id,
+                            'sender': 'user',
+                            'content': content_text,
+                            'timestamp': timestamp,
+                        })
+                elif role_from_payload in ['ASSISTANT', 'AI', 'AGENT']:
+                    if content_text:
+                        messages.append({
+                            'messageId': event_id,
+                            'sessionId': session_id,
+                            'sender': 'npc',
+                            'content': content_text,
+                            'timestamp': timestamp,
+                        })
+                continue  # ペイロードから処理できた場合は次のイベントへ
+            
+            # 従来のイベントタイプベースの処理（フォールバック）
+            event_type_lower = event_type.lower() if event_type else ''
+            
+            # ユーザーメッセージの判定
+            if event_type_lower in ['user_message', 'usermessage', 'user', 'human', 'human_message', 'humanmessage']:
+                content = _extract_content_from_payload(payload)
+                if content:
+                    messages.append({
+                        'messageId': event_id,
+                        'sessionId': session_id,
+                        'sender': 'user',
+                        'content': content,
+                        'timestamp': timestamp,
+                    })
+            # アシスタント/NPCメッセージの判定
+            elif event_type_lower in ['assistant_message', 'assistantmessage', 'assistant', 'ai', 'ai_message', 'aimessage', 'agent', 'agent_message']:
+                content = _extract_content_from_payload(payload)
+                if content:
+                    messages.append({
+                        'messageId': event_id,
+                        'sessionId': session_id,
+                        'sender': 'npc',
+                        'content': content,
+                        'timestamp': timestamp,
+                    })
+            # 汎用MESSAGEタイプの処理（roleフィールドで判定）
+            elif event_type_lower in ['message', 'chat', 'conversation']:
+                role = payload.get('role', payload.get('sender', '')).lower()
+                content = _extract_content_from_payload(payload)
+                if content:
+                    if role in ['user', 'human', 'customer']:
+                        messages.append({
+                            'messageId': event_id,
+                            'sessionId': session_id,
+                            'sender': 'user',
+                            'content': content,
+                            'timestamp': timestamp,
+                        })
+                    elif role in ['assistant', 'ai', 'npc', 'agent', 'bot']:
+                        messages.append({
+                            'messageId': event_id,
+                            'sessionId': session_id,
+                            'sender': 'npc',
+                            'content': content,
+                            'timestamp': timestamp,
+                        })
+        
+        # メッセージをタイムスタンプでソート
+        messages.sort(key=lambda x: x.get('timestamp', ''))
+        
+        logger.info("Session data retrieved from AgentCore Memory", extra={
+            "session_id": session_id,
+            "messages_count": len(messages),
+            "message_senders": [m.get('sender') for m in messages[:5]]  # 最初の5件のsenderをログ
+        })
+        
+        return messages
+        
+    except Exception as e:
+        logger.error("Failed to get session data from AgentCore Memory", extra={
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "session_id": session_id,
+            "actor_id": actor_id
+        })
+        import traceback
+        logger.error("Traceback", extra={"traceback": traceback.format_exc()})
+        return []
+
+
+
+def _extract_content_from_payload(payload: dict) -> str:
+    """ペイロードからコンテンツを抽出"""
+    if not isinstance(payload, dict):
+        return str(payload) if payload else ''
+    
+    # 様々なキー名に対応
+    for key in ['content', 'message', 'text', 'body', 'data']:
+        value = payload.get(key)
+        if value:
+            if isinstance(value, str):
+                return value
+            elif isinstance(value, list):
+                # Bedrockのcontent形式（リスト）に対応
+                texts = []
+                for item in value:
+                    if isinstance(item, dict):
+                        texts.append(item.get('text', ''))
+                    elif isinstance(item, str):
+                        texts.append(item)
+                return ''.join(texts)
+            elif isinstance(value, dict):
+                # ネストされた構造に対応
+                return value.get('text', str(value))
+    
+    return ''
 
 def calculate_audio_analysis_metrics(messages, scenario_goals, session_id, language):
     """
@@ -196,11 +502,18 @@ def handle_audio_analysis_session(session_id: str, user_id: str, audio_analysis_
     try:
         logger.info("音声分析セッションデータを構築中", extra={
             "session_id": session_id,
-            "user_id": user_id
+            "user_id": user_id,
+            "item_user_id": audio_analysis_item.get("userId")
         })
         
         # ユーザーの所有権を確認
-        if audio_analysis_item.get("userId") != user_id:
+        item_user_id = audio_analysis_item.get("userId")
+        if item_user_id != user_id:
+            logger.warning("ユーザーID不一致", extra={
+                "session_id": session_id,
+                "request_user_id": user_id,
+                "item_user_id": item_user_id
+            })
             raise NotFoundError("指定されたセッションが見つかりません")
         
         # 音声分析データを取得
@@ -260,29 +573,47 @@ def handle_audio_analysis_session(session_id: str, user_id: str, audio_analysis_
         salesperson_speaker = next((s for s in speakers if s.get("identified_role") == "salesperson"), None)
         
         # 音声分析メッセージに対してリアルタイムスコアリングを実行してメトリクスを取得
-        final_metrics = calculate_audio_analysis_metrics(messages, scenario_goals, session_id, language)
+        # （Step Functionsで既に生成されているため、ここでは実行しない）
         
-        # 取得したメトリクスを使用してBedrockでフィードバック生成
-        logger.info("音声分析データでAIフィードバック生成開始", extra={
-            "session_id": session_id,
-            "messages_count": len(messages),
-            "scenario_goals_count": len(scenario_goals),
-            "final_metrics": final_metrics
-        })
+        # 既に保存されているfinal-feedbackを取得
+        session_feedback_table_name = os.environ.get('SESSION_FEEDBACK_TABLE', 'dev-AISalesRolePlay-SessionFeedback')
+        feedback_table = dynamodb.Table(session_feedback_table_name)
+        existing_feedback = None
+        existing_metrics = None
+        try:
+            feedback_response = feedback_table.query(
+                KeyConditionExpression=boto3.dynamodb.conditions.Key('sessionId').eq(session_id),
+                FilterExpression=boto3.dynamodb.conditions.Attr('dataType').eq('final-feedback'),
+                ScanIndexForward=False,
+                Limit=1
+            )
+            feedback_items = feedback_response.get('Items', [])
+            if feedback_items:
+                existing_feedback = feedback_items[0].get('feedbackData')
+                existing_metrics = feedback_items[0].get('finalMetrics')
+                logger.info("既存のフィードバックを使用", extra={
+                    "session_id": session_id,
+                    "overall_score": existing_feedback.get("scores", {}).get("overall") if existing_feedback else None
+                })
+            else:
+                logger.warning("フィードバックが見つかりません（Step Functionsで生成されるはずです）", extra={
+                    "session_id": session_id
+                })
+        except Exception as e:
+            logger.error("既存フィードバックの取得に失敗", extra={"error": str(e)})
         
-        feedback_data = generate_feedback_with_bedrock(
-            session_id=session_id,
-            metrics=final_metrics,
-            messages=messages,
-            goal_statuses=None,  # 音声分析では事前の達成状況なし
-            scenario_goals=scenario_goals,
-            language=language
-        )
-        
-        logger.info("音声分析AIフィードバック生成完了", extra={
-            "session_id": session_id,
-            "overall_score": feedback_data.get("scores", {}).get("overall")
-        })
+        # フィードバックデータを決定
+        if existing_feedback:
+            feedback_data = existing_feedback
+            final_metrics = existing_metrics or {
+                "angerLevel": 5,
+                "trustLevel": 5,
+                "progressLevel": 5,
+                "analysis": ""
+            }
+        else:
+            # フィードバックが存在しない場合はエラー
+            raise InternalServerError("音声分析のフィードバックが生成されていません。Step Functionsの実行を確認してください。")
         
         # NPCキャラクター情報を構築
         npc_info = {
@@ -322,44 +653,12 @@ def handle_audio_analysis_session(session_id: str, user_id: str, audio_analysis_
             "session_id": session_id,
             "speakers_count": len(speakers),
             "segments_count": len(segments),
-            "messages_count": len(messages)
+            "messages_count": len(messages),
+            "feedback_source": "existing" if existing_feedback else "default"
         })
         
-        # 音声分析結果をDynamoDBに保存（リファレンスチェックAPI用）
-        try:
-            
-            # ゴール結果を取得
-            goal_results = create_goal_results_from_feedback(
-                feedback_data, scenario_goals, session_id
-            ) if scenario_goals else None
-            
-            # final-feedbackとしてDynamoDBに保存
-            save_success = save_feedback_to_dynamodb(
-                session_id=session_id,
-                feedback_data=feedback_data,
-                final_metrics=final_metrics,
-                messages=messages,
-                goal_data=goal_results
-            )
-            
-            if save_success:
-                logger.info("音声分析結果をDynamoDBに保存完了", extra={
-                    "session_id": session_id,
-                    "overall_score": feedback_data.get("scores", {}).get("overall")
-                })
-            else:
-                logger.warning("音声分析結果のDynamoDB保存に失敗", extra={
-                    "session_id": session_id
-                })
-                
-        except Exception as save_error:
-            logger.error("音声分析結果の保存中にエラー", extra={
-                "error": str(save_error),
-                "session_id": session_id
-            })
-            # 保存エラーでもレスポンスは返す
-        
-        return response_data
+        # JSONシリアライズ可能な形式に変換して返す
+        return json_serializable(response_data)
         
     except Exception as e:
         logger.exception("音声分析セッションデータ構築エラー", extra={
@@ -421,11 +720,12 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                     "user_id": user_id
                 })
                 
+                # Limitを削除してFilterExpressionが正しく機能するようにする
+                # FilterExpressionはLimit適用後に評価されるため、Limitがあると結果が0件になる可能性がある
                 audio_analysis_response = feedback_table.query(
                     KeyConditionExpression=boto3.dynamodb.conditions.Key('sessionId').eq(session_id),
                     FilterExpression=boto3.dynamodb.conditions.Attr('dataType').eq('audio-analysis-result'),
-                    ScanIndexForward=False,
-                    Limit=1
+                    ScanIndexForward=False
                 )
                 
                 audio_analysis_items = audio_analysis_response.get('Items', [])
@@ -435,7 +735,7 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                 })
                 
                 if audio_analysis_items:
-                    # 音声分析セッションの場合
+                    # 音声分析セッションの場合（最新の1件を使用）
                     logger.info("音声分析セッション処理開始", extra={"session_id": session_id})
                     return handle_audio_analysis_session(session_id, user_id, audio_analysis_items[0])
                 else:
@@ -448,7 +748,7 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                 })
                 raise InternalServerError(f"音声分析セッション判定エラー: {str(audio_query_error)}")
             
-            # 通常のセッション処理（Step Functionsで分析済みの結果を取得）
+            # 通常のセッション処理（AgentCore Memoryから会話履歴・メトリクスを取得）
             if not sessions_table:
                 raise InternalServerError("セッションテーブル未定義")
                 
@@ -463,18 +763,27 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
             
             session_info = session_items[0]
             
-            # 通常セッションのメッセージ履歴を取得
-            if not messages_table:
-                raise InternalServerError("メッセージテーブル未定義")
-                
-            messages_response = messages_table.query(
-                KeyConditionExpression=boto3.dynamodb.conditions.Key('sessionId').eq(session_id),
-                ScanIndexForward=True  # 時系列順
-            )
+            # AgentCore Memoryから会話履歴を取得
+            # user_idをactor_idとして使用（フォールバック: default_user）
+            # start_handler.pyと同じロジックを使用
+            actor_id = user_id if user_id else "default_user"
+            messages = get_session_data_from_memory(session_id, actor_id)
             
-            messages = messages_response.get('Items', [])
+            # フォールバック: 既存セッション互換性のためdefault_userで再試行
+            if not messages and user_id and actor_id != "default_user":
+                logger.warning("user_idで取得できなかったため、default_userで再試行", extra={
+                    "session_id": session_id,
+                    "user_id": user_id
+                })
+                messages = get_session_data_from_memory(session_id, "default_user")
             
-            # 通常セッションのフィードバックデータを取得
+            logger.info("AgentCore Memoryからデータ取得完了", extra={
+                "session_id": session_id,
+                "actor_id": actor_id,
+                "messages_count": len(messages)
+            })
+            
+            # フィードバックデータをDynamoDBから取得（Step Functionsで生成済み）
             feedback_response = feedback_table.query(
                 KeyConditionExpression=boto3.dynamodb.conditions.Key('sessionId').eq(session_id),
                 ScanIndexForward=False  # 降順ソート（最新が先頭）
@@ -482,9 +791,9 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
             
             feedback_items = feedback_response.get('Items', [])
             
-            # 通常セッション用のデータ分類
+            # フィードバックデータを分類
             final_feedback = None
-            realtime_metrics = []
+            dynamodb_realtime_metrics = []
             
             for item in feedback_items:
                 data_type = item.get('dataType')
@@ -492,11 +801,11 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                 if data_type == 'final-feedback':
                     final_feedback = item
                 elif data_type == 'realtime-metrics':
-                    realtime_metrics.append(item)
+                    dynamodb_realtime_metrics.append(item)
             
-            # コンプライアンス違反データを抽出
+            # コンプライアンス違反データを抽出（DynamoDBのメトリクスから）
             compliance_violations = []
-            for metric in realtime_metrics:
+            for metric in dynamodb_realtime_metrics:
                 compliance_data = metric.get('complianceData', {})
                 violations = compliance_data.get('violations', [])
                 for violation in violations:
@@ -520,15 +829,36 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                 "session_id": session_id,
                 "violations_count": len(compliance_violations)
             })
+            # DynamoDBのリアルタイムメトリクスをレスポンス形式に変換
+            formatted_realtime_metrics = []
+            for metric in dynamodb_realtime_metrics:
+                formatted_realtime_metrics.append({
+                    'sessionId': session_id,
+                    'timestamp': metric.get('createdAt', ''),
+                    'messageNumber': int(metric.get('messageNumber', 0)),
+                    'angerLevel': int(metric.get('angerLevel', 1)),
+                    'trustLevel': int(metric.get('trustLevel', 5)),
+                    'progressLevel': int(metric.get('progressLevel', 5)),
+                    'analysis': metric.get('analysis', ''),
+                    'dataType': 'realtime-metrics',
+                })
             
-            # レスポンスデータを構築（Step Functionsで生成済みのフィードバックを使用）
+            # タイムスタンプでソート（古い順）
+            formatted_realtime_metrics.sort(key=lambda x: x.get('timestamp', ''))
+            
+            logger.info("リアルタイムメトリクス取得完了", extra={
+                "session_id": session_id,
+                "dynamodb_metrics_count": len(formatted_realtime_metrics),
+            })
+            
+            # レスポンスデータを構築（DynamoDBからのメトリクスを使用）
             response_data = {
                 "success": True,
                 "sessionType": "regular",
                 "sessionId": session_id,
                 "sessionInfo": session_info,
                 "messages": messages,
-                "realtimeMetrics": realtime_metrics,
+                "realtimeMetrics": formatted_realtime_metrics,
                 "complianceViolations": compliance_violations
             }
             
@@ -552,9 +882,9 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                     "session_id": session_id
                 })
                 
-                # リアルタイムメトリクスから最終メトリクスを取得
-                if realtime_metrics:
-                    latest_metric = realtime_metrics[0]
+                # DynamoDBのリアルタイムメトリクスから最終メトリクスを取得
+                if formatted_realtime_metrics:
+                    latest_metric = formatted_realtime_metrics[-1]  # 最新のメトリクス（ソート済み）
                     response_data["finalMetrics"] = {
                         "angerLevel": int(latest_metric.get("angerLevel", 1)),
                         "trustLevel": int(latest_metric.get("trustLevel", 5)),
@@ -565,11 +895,12 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
             logger.info("通常セッション分析結果取得成功", extra={
                 "session_id": session_id,
                 "messages_count": len(messages),
-                "realtime_metrics_count": len(realtime_metrics),
+                "realtime_metrics_count": len(formatted_realtime_metrics),
                 "has_feedback": "feedback" in response_data
             })
             
-            return response_data
+            # JSONシリアライズ可能な形式に変換して返す
+            return json_serializable(response_data)
             
         except NotFoundError:
             raise
