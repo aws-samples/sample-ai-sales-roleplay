@@ -16,11 +16,14 @@ interface ReferenceCheckProps {
  * リファレンスチェック結果表示コンポーネント
  */
 const ReferenceCheck: React.FC<ReferenceCheckProps> = ({
-  sessionId,
-  language = "ja",
+  sessionId: _sessionId,
+  language: _language = "ja",
   isVisible = true,
   initialData = null,
 }) => {
+  // sessionIdとlanguageは将来の拡張用に保持（現在はinitialDataを使用）
+  void _sessionId;
+  void _language;
   const { data, isLoading, isAnalyzing, error, issuesCount } =
     useReferenceCheck(isVisible, initialData);
 

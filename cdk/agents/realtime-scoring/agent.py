@@ -231,7 +231,7 @@ def handle_invocation(payload: Dict[str, Any]) -> Dict[str, Any]:
         }
     except Exception as e:
         logger.exception(f"Scoring error: {e}")
-        return {'success': False, 'error': 'AGENT_ERROR', 'message': f'スコアリング処理中にエラーが発生しました: {str(e)}'}
+        return {'success': False, 'error': 'AGENT_ERROR', 'message': 'スコアリング処理中にエラーが発生しました。'}
 
 
 

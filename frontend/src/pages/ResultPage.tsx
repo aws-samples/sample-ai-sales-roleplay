@@ -277,7 +277,7 @@ const ResultPage: React.FC = () => {
             setIsPolling(true);
             setAnalysisProgress(t("results.analysisInProgress"));
           }
-        } catch (statusErr) {
+        } catch {
           // 分析ステータス取得スキップ（新規セッションの可能性）
         }
 
