@@ -25,4 +25,4 @@ cdk/.env.devApNorthEast1
 cdk/cdk.context.json
 scripts
 memory-bank
-
+*.pyc

@@ -38,6 +38,8 @@ export interface ApiGatewayConstructProps {
 export class ApiGatewayConstruct extends Construct {
   /** API Gateway REST API */
   public readonly api: apigateway.RestApi;
+  /** Cognito Authorizer */
+  public readonly authorizer: apigateway.IAuthorizer;
 
   constructor(scope: Construct, id: string, props: ApiGatewayConstructProps) {
     super(scope, id);
@@ -104,6 +106,9 @@ export class ApiGatewayConstruct extends Construct {
       authorizerName: 'AIRolePlayApiAuthorizer',
       identitySource: 'method.request.header.Authorization',
     });
+
+    // Authorizerを公開プロパティに設定
+    this.authorizer = auth;
 
     // APIリソースとメソッドの作成
     const bedrockResource = this.api.root.addResource('bedrock');
@@ -185,6 +190,16 @@ export class ApiGatewayConstruct extends Construct {
     // GET /sessions - セッション一覧取得
     sessionsResource.addMethod(
       'GET',
+      new apigateway.LambdaIntegration(props.sessionFunction),
+      {
+        authorizer: auth,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    // POST /sessions - セッション作成
+    sessionsResource.addMethod(
+      'POST',
       new apigateway.LambdaIntegration(props.sessionFunction),
       {
         authorizer: auth,

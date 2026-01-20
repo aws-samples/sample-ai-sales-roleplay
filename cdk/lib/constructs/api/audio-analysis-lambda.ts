@@ -134,15 +134,18 @@ export class AudioAnalysisLambdaConstruct extends Construct {
       environment: commonEnvironment,
     });
 
-    // 5. 結果保存Lambda関数
+    // 5. 結果保存Lambda関数（フィードバック生成を含むため、タイムアウトとメモリを増加）
     this.saveResultsFunction = this.createFunction('SaveResults', {
       entry: path.join(__dirname, '../../../lambda/audioAnalysis'),
       handler: 'lambda_handler',
       indexFile: 'save_handler.py',
-      description: '音声分析結果の保存・状態更新',
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 256,
-      environment: commonEnvironment,
+      description: '音声分析結果の保存・フィードバック生成・状態更新',
+      timeout: cdk.Duration.minutes(5), // フィードバック生成のため5分に延長
+      memorySize: 1024, // フィードバック生成のため1024MBに増加
+      environment: {
+        ...commonEnvironment,
+        BEDROCK_MODEL_FEEDBACK: props.bedrockModels.analysis, // フィードバック生成用モデル
+      },
     });
 
     // 6. 音声分析API用Lambda関数（API Gateway統合用）
@@ -238,18 +241,25 @@ export class AudioAnalysisLambdaConstruct extends Construct {
       props.audioBucket.grantWrite(func);
     });
 
-    // Bedrock権限（AI分析処理用）
-    this.processAnalysisFunction.addToRolePolicy(new iam.PolicyStatement({
-      effect: iam.Effect.ALLOW,
-      actions: [
-        'bedrock:InvokeModel',
-        'bedrock:InvokeModelWithResponseStream',
-      ],
-      resources: [
-        `arn:aws:bedrock:*:${cdk.Aws.ACCOUNT_ID}:inference-profile/*`,
-        'arn:aws:bedrock:*::foundation-model/*',
-      ],
-    }));
+    // Bedrock権限（AI分析処理とフィードバック生成用）
+    const bedrockFunctions = [
+      this.processAnalysisFunction,
+      this.saveResultsFunction, // フィードバック生成用
+    ];
+
+    bedrockFunctions.forEach(func => {
+      func.addToRolePolicy(new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'bedrock:InvokeModel',
+          'bedrock:InvokeModelWithResponseStream',
+        ],
+        resources: [
+          `arn:aws:bedrock:*:${cdk.Aws.ACCOUNT_ID}:inference-profile/*`,
+          'arn:aws:bedrock:*::foundation-model/*',
+        ],
+      }));
+    });
 
     // Knowledge Base権限
     this.processAnalysisFunction.addToRolePolicy(new iam.PolicyStatement({

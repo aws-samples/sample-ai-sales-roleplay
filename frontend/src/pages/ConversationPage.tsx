@@ -325,6 +325,27 @@ const ConversationPage: React.FC = () => {
     // セッションIDを先に設定し、状態更新を確実に行う
     setSessionId(newSessionId);
 
+    // DynamoDBにセッションを保存（AgentCore経由の会話でも評価画面で参照できるように）
+    const apiService = ApiService.getInstance();
+    try {
+      await apiService.createOrUpdateSession(
+        newSessionId,
+        scenario.id,
+        `${scenario.npc.name}との会話`,
+        {
+          name: scenario.npc.name,
+          role: scenario.npc.role,
+          company: scenario.npc.company,
+          personality: scenario.npc.personality,
+          description: scenario.npc.description,
+        }
+      );
+      console.log("セッションをDynamoDBに保存しました:", newSessionId);
+    } catch (error) {
+      console.error("セッション保存エラー（会話は続行）:", error);
+      // エラーが発生しても会話は続行できるようにする
+    }
+
     // Transcribe WebSocketの初期化
     if (transcribeServiceRef.current) {
       transcribeServiceRef.current.initializeConnection(newSessionId, scenario?.language || 'ja')
@@ -636,6 +657,12 @@ const ConversationPage: React.FC = () => {
                 cleanGoals,
                 String(scenario.id), // 安全な文字列に変換
                 String(scenario.language || "ja"), // 安全な文字列に変換
+                // 現在のスコアを渡す（エージェントが差分を計算するため）
+                {
+                  angerLevel: currentMetrics.angerLevel,
+                  trustLevel: currentMetrics.trustLevel,
+                  progressLevel: currentMetrics.progressLevel,
+                },
               );
 
               // コンプライアンスチェック結果の確認

@@ -1,10 +1,12 @@
 """
 セッション関連のAPIハンドラー
 
-セッション一覧取得、セッション詳細取得などの機能を提供します。
+セッション一覧取得、セッション詳細取得、セッション作成などの機能を提供します。
 """
 
 import json
+import uuid
+from datetime import datetime, timedelta
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.exceptions import (
@@ -15,6 +17,12 @@ from utils import get_user_id_from_event, sessions_table, SESSIONS_TABLE
 
 # ロガー設定
 logger = Logger(service="session-handlers")
+
+
+def calculate_expiration_time(days: int = 90) -> int:
+    """TTL用の有効期限を計算（UNIXタイムスタンプ）"""
+    expiry_date = datetime.now() + timedelta(days=days)
+    return int(expiry_date.timestamp())
 
 def register_session_routes(app: APIGatewayRestResolver):
     """
@@ -190,3 +198,136 @@ def register_session_routes(app: APIGatewayRestResolver):
         except Exception as e:
             logger.exception("セッション詳細取得エラー", extra={"error": str(e), "session_id": session_id})
             raise InternalServerError(f"セッション詳細の取得中にエラーが発生しました: {str(e)}")
+
+    @app.post("/sessions")
+    def create_session():
+        """
+        新しいセッションを作成
+
+        リクエストボディ:
+        - sessionId: セッションID（オプション、指定しない場合は自動生成）
+        - scenarioId: シナリオID（必須）
+        - title: セッションタイトル（オプション）
+        - npcInfo: NPC情報（オプション）
+
+        Returns:
+            dict: 作成されたセッション情報
+        """
+        try:
+            # ユーザーIDを取得
+            user_id = get_user_id_from_event(app)
+            
+            # リクエストボディを取得
+            body = app.current_event.json_body or {}
+            
+            # セッションIDの取得または生成
+            session_id = body.get('sessionId') or str(uuid.uuid4())
+            scenario_id = body.get('scenarioId')
+            title = body.get('title')
+            npc_info = body.get('npcInfo')
+            
+            # シナリオIDは必須
+            if not scenario_id:
+                raise BadRequestError("シナリオIDが指定されていません")
+            
+            # DynamoDBテーブルが存在するか確認
+            if not sessions_table:
+                logger.error("セッションテーブル未定義", extra={"table_name": SESSIONS_TABLE})
+                raise InternalServerError("システムエラーが発生しました")
+            
+            # 現在の日時を取得
+            current_time = datetime.now().isoformat()
+            
+            # セッションが既に存在するかチェック
+            try:
+                response = sessions_table.get_item(
+                    Key={
+                        'userId': user_id,
+                        'sessionId': session_id
+                    }
+                )
+                existing_session = response.get('Item')
+            except Exception as e:
+                logger.warning("セッション存在チェック中にエラーが発生しました", extra={
+                    "error": str(e),
+                    "session_id": session_id
+                })
+                existing_session = None
+            
+            if existing_session:
+                # 既存セッションを更新
+                update_expression_parts = ['updatedAt = :time', 'expireAt = :exp']
+                expression_values = {
+                    ':time': current_time,
+                    ':exp': calculate_expiration_time()
+                }
+                
+                if title:
+                    update_expression_parts.append('title = :title')
+                    expression_values[':title'] = title
+                
+                if npc_info:
+                    update_expression_parts.append('npcInfo = :npc')
+                    expression_values[':npc'] = npc_info
+                
+                sessions_table.update_item(
+                    Key={
+                        'userId': user_id,
+                        'sessionId': session_id
+                    },
+                    UpdateExpression='SET ' + ', '.join(update_expression_parts),
+                    ExpressionAttributeValues=expression_values
+                )
+                
+                logger.info("既存セッションを更新しました", extra={
+                    "session_id": session_id,
+                    "user_id": user_id
+                })
+                
+                return {
+                    'success': True,
+                    'sessionId': session_id,
+                    'message': 'セッションを更新しました',
+                    'isNew': False
+                }
+            else:
+                # 新規セッションを作成
+                # セッションタイトルのデフォルト設定
+                if not title and npc_info:
+                    title = f"{npc_info.get('name', 'NPC')}との会話"
+                
+                session_item = {
+                    'userId': user_id,
+                    'sessionId': session_id,
+                    'scenarioId': scenario_id,
+                    'title': title or '新規会話セッション',
+                    'status': 'active',
+                    'createdAt': current_time,
+                    'updatedAt': current_time,
+                    'expireAt': calculate_expiration_time()
+                }
+                
+                # NPC情報があれば追加
+                if npc_info:
+                    session_item['npcInfo'] = npc_info
+                
+                sessions_table.put_item(Item=session_item)
+                
+                logger.info("新規セッションを作成しました", extra={
+                    "session_id": session_id,
+                    "user_id": user_id,
+                    "scenario_id": scenario_id
+                })
+                
+                return {
+                    'success': True,
+                    'sessionId': session_id,
+                    'message': 'セッションを作成しました',
+                    'isNew': True
+                }
+                
+        except BadRequestError:
+            raise
+        except Exception as e:
+            logger.exception("セッション作成エラー", extra={"error": str(e)})
+            raise InternalServerError(f"セッションの作成中にエラーが発生しました: {str(e)}")

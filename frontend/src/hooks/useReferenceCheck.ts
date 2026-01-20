@@ -15,8 +15,6 @@ export interface ReferenceCheckState {
  * リファレンスチェック用カスタムフック
  * Step Functionsで取得済みのリファレンスチェック結果を表示するためのフック
  * 
- * @param _sessionId セッションID（未使用、互換性のため残す）
- * @param _language 言語設定（未使用、互換性のため残す）
  * @param isVisible コンポーネントが表示されているかどうか
  * @param initialData Step Functionsで取得済みのリファレンスチェック結果
  * @returns リファレンスチェックの状態

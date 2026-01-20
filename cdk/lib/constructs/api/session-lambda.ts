@@ -41,7 +41,12 @@ export interface SessionLambdaConstructProps {
   /**
    * knowledgeBaseId ID
    */
-  knowledgeBaseId: string
+  knowledgeBaseId: string;
+
+  /**
+   * AgentCore Memory ID（会話履歴・メトリクス取得用）
+   */
+  agentCoreMemoryId?: string;
 }
 
 /**
@@ -86,7 +91,9 @@ export class SessionLambdaConstruct extends Construct {
         KNOWLEDGE_BASE_ID: props.knowledgeBaseId,
         AWS_MAX_ATTEMPTS: "10",
         // セッションフィードバックテーブル
-        ...(props.sessionFeedbackTableName && { SESSION_FEEDBACK_TABLE: props.sessionFeedbackTableName })
+        ...(props.sessionFeedbackTableName && { SESSION_FEEDBACK_TABLE: props.sessionFeedbackTableName }),
+        // AgentCore Memory ID（会話履歴・メトリクス取得用）
+        ...(props.agentCoreMemoryId && { AGENTCORE_MEMORY_ID: props.agentCoreMemoryId })
       },
       description: 'セッション履歴管理API実装Lambda関数',
     });
@@ -153,12 +160,13 @@ export class SessionLambdaConstruct extends Construct {
       );
     }
 
-    // Bedrockアクセス権限を付与（フィードバック生成用）
+    // Bedrockアクセス権限を付与（フィードバック生成・音声分析用）
     this.function.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: [
           'bedrock:InvokeModel',
+          'bedrock:InvokeModelWithResponseStream', // ストリーミングAPI用（音声分析で使用）
           'bedrock:Retrieve',
         ],
         resources: [
@@ -195,5 +203,22 @@ export class SessionLambdaConstruct extends Construct {
         ],
       })
     );
+
+    // AgentCore Memoryへのアクセス権限を付与（会話履歴・メトリクス取得用）
+    if (props.agentCoreMemoryId) {
+      this.function.addToRolePolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: [
+            'bedrock-agentcore:ListEvents',
+            'bedrock-agentcore:GetMemory',
+            'bedrock-agentcore:CreateEvent',
+          ],
+          resources: [
+            `arn:aws:bedrock-agentcore:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:memory/${props.agentCoreMemoryId}`,
+          ],
+        })
+      );
+    }
   }
 }

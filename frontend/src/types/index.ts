@@ -112,6 +112,7 @@ export interface GoalStatus {
   progress: number; // 進捗度（0-100%）
   achieved: boolean; // 達成済みかどうか
   achievedAt?: Date; // 達成日時
+  reason?: string; // 達成/未達成の理由
 }
 
 // 感情状態
