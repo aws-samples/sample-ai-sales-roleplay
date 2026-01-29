@@ -25,7 +25,7 @@
     "@fontsource/roboto": "^5.2.9",
     "@mui/icons-material": "^7.3.6",
     "@mui/material": "^7.3.6",
-    "aws-amplify": "^6.15.9",
+    "aws-amplify": "^6.16.0",
     "chart.js": "^4.5.1",
     "i18next": "^25.7.2",
     "i18next-browser-languagedetector": "^8.2.0",
