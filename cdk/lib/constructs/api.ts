@@ -30,13 +30,14 @@ import { SessionAnalysisStepFunctionsConstruct } from './session-analysis-stepfu
 export interface BackendApiProps {
   userPool?: cognito.UserPool;
   userPoolClient?: cognito.UserPoolClient;
-  envId: string; // 環境識別子
+  envId: string;
   guardrails?: GuardrailsConstruct;
-  resourceNamePrefix: string; // リソース名のプレフィックス
-  knowledgeBaseId: string; // Knowledge Base ID
-  databaseTables: DatabaseTables; // 必須：DynamoDBテーブル
-  pdfStorageBucket: s3.IBucket; // PDF資料保存用S3バケット
-  bedrockModels: BedrockModelsConfig; // Bedrockモデル設定（フラット化済み）
+  resourceNamePrefix: string;
+  knowledgeBaseId: string;
+  databaseTables: DatabaseTables;
+  pdfStorageBucket: s3.IBucket;
+  bedrockModels: BedrockModelsConfig;
+  agentCoreMemoryId?: string;
 }
 
 export class Api extends Construct {
@@ -113,11 +114,12 @@ export class Api extends Construct {
     this.sessionLambda = new SessionLambdaConstruct(this, 'SessionLambda', {
       sessionsTableName: this.databaseTables.sessionsTable.tableName,
       messagesTableName: this.databaseTables.messagesTable.tableName,
-      scenariosTableName: this.databaseTables.scenariosTable.tableName, // シナリオテーブル名は必要 (完全データ取得時に使用)
+      scenariosTableName: this.databaseTables.scenariosTable.tableName,
       bedrockModels: bedrockModels,
       knowledgeBaseId: props.knowledgeBaseId,
-      videoBucketName: this.videoStorage.bucket.bucketName, // ビデオファイル検索用
-      sessionFeedbackTableName: this.databaseTables.sessionFeedbackTable.tableName // ビデオ分析結果保存用
+      videoBucketName: this.videoStorage.bucket.bucketName,
+      sessionFeedbackTableName: this.databaseTables.sessionFeedbackTable.tableName,
+      agentCoreMemoryId: props.agentCoreMemoryId,
     });
 
     // シナリオ管理Lambda関数
@@ -211,7 +213,7 @@ export class Api extends Construct {
       audioBucket: this.audioStorage.bucket,
       knowledgeBaseId: props.knowledgeBaseId,
       bedrockModels: {
-        analysis: bedrockModels.scoring // 分析用モデル
+        analysis: bedrockModels.scoring
       }
     });
 
@@ -228,7 +230,6 @@ export class Api extends Construct {
     );
 
     // セッション分析Lambda関数を作成
-    // Cross-region inference profileを使用するため、videoModelRegionは不要
     this.sessionAnalysisLambda = new SessionAnalysisLambdaConstruct(this, 'SessionAnalysisLambda', {
       sessionFeedbackTable: this.databaseTables.sessionFeedbackTable,
       sessionsTable: this.databaseTables.sessionsTable,
@@ -240,7 +241,8 @@ export class Api extends Construct {
         feedback: bedrockModels.feedback,
         video: bedrockModels.video,
         reference: bedrockModels.scoring
-      }
+      },
+      agentCoreMemoryId: props.agentCoreMemoryId,
     });
 
     // セッション分析Step Functionsを作成
@@ -274,16 +276,12 @@ export class Api extends Construct {
       scoringFunction: this.scoringLambdaConstruct.function,
       sessionFunction: this.sessionLambda.function,
       scenarioFunction: this.scenarioLambda.function,
-      rankingFunction: this.rankingsLambdaConstruct.function, // 新しいランキングLambdaを使用
-      videosFunction: this.videosLambda.function, // 動画管理Lambda関数を追加
-      guardrailsFunction: this.guardrailsLambda.function, // 新しいガードレールLambdaを使用
-      audioAnalysisFunction: this.audioAnalysisLambda.apiFunction, // 音声分析API関数を追加
-      sessionAnalysisFunction: this.sessionAnalysisLambda.apiFunction, // セッション分析API関数を追加
+      rankingFunction: this.rankingsLambdaConstruct.function,
+      videosFunction: this.videosLambda.function,
+      guardrailsFunction: this.guardrailsLambda.function,
+      audioAnalysisFunction: this.audioAnalysisLambda.apiFunction,
+      sessionAnalysisFunction: this.sessionAnalysisLambda.apiFunction,
     });
-
-    // スコアリングAPIエンドポイントを設定
-    const apiEndpoint = `https://${this.api.api.restApiId}.execute-api.${cdk.Stack.of(this).region}.amazonaws.com/api`;
-
 
     // BedrockLambdaに各テーブル名を環境変数として設定
     this.bedrockLambda.function.addEnvironment('SCENARIOS_TABLE', this.databaseTables.scenariosTable.tableName);
@@ -296,6 +294,5 @@ export class Api extends Construct {
     this.databaseTables.sessionsTable.grantReadWriteData(this.bedrockLambda.function);
     this.databaseTables.messagesTable.grantReadWriteData(this.bedrockLambda.function);
     this.databaseTables.sessionFeedbackTable.grantReadWriteData(this.bedrockLambda.function);
-
   }
 }

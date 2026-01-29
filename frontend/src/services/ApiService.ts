@@ -15,6 +15,7 @@ import type {
   ImportResponse,
   SessionCompleteDataResponse,
 } from "../types/api";
+import { AgentCoreService } from "./AgentCoreService";
 
 /**
  * API通信サービス - Amazon Bedrockとの通信を処理
@@ -232,6 +233,66 @@ export class ApiService {
   }
 
   /**
+   * セッションを作成または更新する
+   * 
+   * AgentCore Runtime経由で会話する場合、セッションをDynamoDBに保存するために使用
+   * 
+   * @param sessionId セッションID
+   * @param scenarioId シナリオID
+   * @param title セッションタイトル（オプション）
+   * @param npcInfo NPC情報（オプション）
+   * @returns 作成結果
+   */
+  public async createOrUpdateSession(
+    sessionId: string,
+    scenarioId: string,
+    title?: string,
+    npcInfo?: {
+      name: string;
+      role: string;
+      company: string;
+      personality?: string[];
+      description?: string;
+    }
+  ): Promise<{ success: boolean; sessionId: string; isNew: boolean }> {
+    try {
+      const requestBody: Record<string, unknown> = {
+        sessionId,
+        scenarioId,
+      };
+
+      if (title) {
+        requestBody.title = title;
+      }
+
+      if (npcInfo) {
+        requestBody.npcInfo = npcInfo;
+      }
+
+      const response = await this.apiPost<{
+        success: boolean;
+        sessionId: string;
+        message: string;
+        isNew: boolean;
+      }>("/sessions", requestBody);
+
+      return {
+        success: response.success,
+        sessionId: response.sessionId,
+        isNew: response.isNew,
+      };
+    } catch (error) {
+      console.error("セッション作成/更新エラー:", error);
+      // エラーが発生しても会話は続行できるようにする
+      return {
+        success: false,
+        sessionId,
+        isNew: false,
+      };
+    }
+  }
+
+  /**
    * NPCと会話する
    *
    * @param message ユーザーメッセージ
@@ -259,6 +320,22 @@ export class ApiService {
     language?: string,
   ): Promise<{ response: string; sessionId: string; messageId: string }> {
     try {
+      // AgentCore Runtimeが利用可能な場合は直接呼び出し
+      const agentCoreService = AgentCoreService.getInstance();
+      if (agentCoreService.isAvailable()) {
+        return await agentCoreService.chatWithNPC(
+          message,
+          npc,
+          previousMessages,
+          sessionId,
+          messageId,
+          emotionParams,
+          scenarioId,
+          language,
+        );
+      }
+
+      // フォールバック: 従来のAPI Gateway経由
       // リクエストボディの作成
       const requestBody = {
         message,
@@ -296,8 +373,6 @@ export class ApiService {
         // 言語設定を追加
         ...(language ? { language } : {}),
       };
-
-      console.log("requestBody:", requestBody);
 
       // API呼び出し（他のメソッドと同じパターンを使用）
       const data = await this.apiPost<{
@@ -340,6 +415,8 @@ export class ApiService {
    * @param goalStatuses 現在のゴール達成状況（オプション）
    * @param goals シナリオのゴール定義（オプション）
    * @param scenarioId シナリオID（コンプライアンスチェック用）
+   * @param language 言語設定（オプション）
+   * @param currentScores 現在のスコア（オプション）
    * @returns メトリクスとゴール状態を含むオブジェクト
    */
   public async getRealtimeEvaluation(
@@ -350,6 +427,11 @@ export class ApiService {
     goals?: Goal[],
     scenarioId?: string,
     language?: string,
+    currentScores?: {
+      angerLevel: number;
+      trustLevel: number;
+      progressLevel: number;
+    },
   ): Promise<{
     scores?: {
       angerLevel: number;
@@ -361,6 +443,22 @@ export class ApiService {
     compliance?: ComplianceCheck; // コンプライアンスチェック結果を追加
   }> {
     try {
+      // AgentCore Runtimeが利用可能な場合は直接呼び出し
+      const agentCoreService = AgentCoreService.getInstance();
+      if (agentCoreService.isAvailable()) {
+        return await agentCoreService.getRealtimeEvaluation(
+          message,
+          previousMessages,
+          sessionId,
+          goalStatuses,
+          goals,
+          scenarioId,
+          language,
+          currentScores,
+        );
+      }
+
+      // フォールバック: 従来のAPI Gateway経由
       // リクエストボディを作成（循環参照対策）
       const requestBody = {
         message,
@@ -708,10 +806,6 @@ export class ApiService {
     contentType: string,
   ): Promise<void> {
     try {
-      console.log(
-        `ファイルアップロード開始: URL=${uploadUrl}, ContentType=${contentType}`,
-      );
-
       // FormDataオブジェクトを作成
       const formDataObj = new FormData();
 
@@ -747,8 +841,6 @@ export class ApiService {
           `HTTP ${response.status}: ${response.statusText}. ${errorText}`,
         );
       }
-
-      console.log("ファイルアップロード成功（S3 POSTフォーム版）");
     } catch (error) {
       console.error("ファイルのアップロードに失敗しました:", error);
 
@@ -1222,26 +1314,7 @@ export class ApiService {
         `/sessions/${sessionId}/analysis-results`,
       );
 
-      console.log("セッション分析結果取得成功:", response);
-
       if (response.success) {
-        if (process.env.NODE_ENV !== "test") {
-          const sessionType = (response as unknown as Record<string, unknown>).sessionType || "regular";
-          console.log("セッション分析結果を返します:", {
-            sessionType: sessionType,
-            hasMessages: response.messages.length > 0,
-            hasRealtimeMetrics: response.realtimeMetrics?.length > 0,
-            hasFeedback: !!response.feedback,
-            hasGoalResults: !!response.goalResults,
-            hasAudioAnalysis: !!(response as unknown as Record<string, unknown>).audioAnalysis,
-            hasComplianceViolations:
-              response.complianceViolations &&
-              response.complianceViolations.length > 0,
-            complianceViolationsCount:
-              response.complianceViolations?.length || 0,
-          });
-        }
-
         return response;
       } else {
         throw new Error("セッション分析結果が正常に取得できませんでした");
@@ -1362,12 +1435,6 @@ export class ApiService {
     limit: number = 10,
   ): Promise<RankingResponse> {
     try {
-      if (process.env.NODE_ENV !== "test") {
-        console.log(
-          `ランキング取得開始: scenarioId=${scenarioId}, period=${period}, limit=${limit}`,
-        );
-      }
-
       // クエリパラメータの作成
       const queryParams: Record<string, string | number> = {
         scenarioId: scenarioId,
