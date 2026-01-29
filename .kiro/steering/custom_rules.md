@@ -22,6 +22,11 @@
 
 ## 開発制限事項
 - **CDKのnpm run buildは実行禁止**: CDKディレクトリでの`npm run build`コマンドは実行しないこと
+- **AWS環境更新はCDKのみ**: AWS環境（Lambda、DynamoDB、S3等）の更新は必ずCDKを通して行うこと
+  - AWS CLIでの直接的なLambda関数更新は禁止
+  - AWS CLIでのリソース作成・削除は禁止
+  - AWS環境の変更は必ず`npm run deploy:dev`等のCDKコマンドを使用すること
+  - 調査目的でのAWS CLI使用（describe、list、get等の読み取り専用コマンド）は許可
 - **API認証**: すべてのAPI呼び出しでCognito IDトークンによる認証を必須とすること
 - **エラーハンドリング**: フロントエンドでは必ずtry-catchでエラーを適切に処理すること
 - **型安全性**: TypeScriptの型定義を厳密に行い、anyの使用を避けること
