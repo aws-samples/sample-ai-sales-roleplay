@@ -4,7 +4,7 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
-import { Runtime } from 'aws-cdk-lib/aws-lambda';
+import { Runtime, Architecture } from 'aws-cdk-lib/aws-lambda';
 import { BedrockLambdaConstruct } from './api/bedrock-lambda';
 import { ApiGatewayConstruct } from './api/api-gateway';
 import { AudioStorageConstruct } from './storage/audio-storage';
@@ -147,6 +147,7 @@ export class Api extends Construct {
       entry: 'lambda/textToSpeech/app.ts',
       handler: 'handler',
       runtime: Runtime.NODEJS_22_X,
+      architecture: Architecture.ARM_64,
       memorySize: 256,
       timeout: cdk.Duration.seconds(30),
       environment: {

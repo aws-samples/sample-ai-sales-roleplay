@@ -30,6 +30,7 @@ export class ScenarioInitializer extends Construct {
     // シナリオデータをDynamoDBに登録するためのLambda関数
     const initializerFunction = new lambdaNodejs.NodejsFunction(this, 'ScenarioInitializer', {
       runtime: lambda.Runtime.NODEJS_22_X,
+      architecture: lambda.Architecture.ARM_64,
       entry: path.join(__dirname, 'scenario-initializer-handler.ts'),
       handler: 'handler',
       timeout: cdk.Duration.minutes(5),

@@ -7,7 +7,7 @@ import {
 import { IdentityPool, UserPoolAuthenticationProvider } from 'aws-cdk-lib/aws-cognito-identitypool';
 import { Effect, Policy, PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
-import { Runtime } from 'aws-cdk-lib/aws-lambda';
+import { Runtime, Architecture } from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 
 export interface AuthProps {
@@ -101,6 +101,7 @@ export class Auth extends Construct {
         'CheckEmailDomain',
         {
           runtime: Runtime.NODEJS_22_X,
+          architecture: Architecture.ARM_64,
           entry: 'lambda/checkEmailDomain.ts',
           timeout: Duration.minutes(15),
           environment: {
