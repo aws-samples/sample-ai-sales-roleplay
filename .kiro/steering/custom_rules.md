@@ -52,11 +52,25 @@
 - **テスト**: Jest + React Testing Library + Playwrightによる包括的なテストを実装すること
 
 ## Git操作・CI/CDガイドライン
-- **プッシュ前のローカルチェック必須**: `git push`する前に必ず以下のCIチェックをローカルで実行すること
+- **プッシュ前のローカルチェック推奨**: `git push`する前に以下のCIチェックをローカルで実行することを推奨
   1. フロントエンドリント: `cd frontend && npm run lint`
-  2. フロントエンドテスト: `cd frontend && npm run test`
+  2. フロントエンドユニットテスト: `cd frontend && npm run test`
   3. TypeScript型チェック: getDiagnosticsツールで変更ファイルを確認
+- **E2Eテスト実行確認**: フロントエンドの変更がある場合、プッシュ前にE2Eテストを実行するかユーザーに確認すること
+  - 確認メッセージ例: 「E2Eテストを実行しますか？（実行コマンド: `cd frontend && npx playwright test --project=chromium`）」
+  - 実行コマンド: `cd frontend && npx playwright test --project=chromium`
+  - 特定のテストのみ実行: `cd frontend && npx playwright test scenario-execution.spec.ts --project=chromium`
+  - テスト結果レポート確認: `frontend/playwright-report/index.html`
 - **リントエラーゼロ**: リントエラーが残っている状態でプッシュしないこと
-- **テスト通過必須**: すべてのテストが通過してからプッシュすること
+- **テスト通過推奨**: ユニットテストの通過を推奨、E2Eテストはユーザー判断に委ねる
 - **PRレビュー対応**: PRのコメントやセキュリティ指摘は必ず対応してからマージすること
 - **コミットメッセージ**: 日本語で簡潔かつ明確なコミットメッセージを記述すること
+
+## E2Eテストガイドライン
+- **テストファイル配置**: `frontend/src/tests/e2e/` ディレクトリに配置すること
+- **ヘルパー関数**: 共通処理は `frontend/src/tests/e2e/helpers/` に配置すること
+- **テスト環境**: ステージング環境（CloudFront経由）に対して実行すること
+- **認証情報**: テスト用ユーザー認証情報は `.env.test` ファイルで管理すること
+- **タイムアウト設定**: 長時間かかるテストは `test.setTimeout()` で適切なタイムアウトを設定すること
+- **セレクター**: `data-testid` 属性を優先し、テキストベースのセレクターは多言語対応を考慮すること
+- **待機処理**: 明示的な待機（`waitForTimeout`）より、要素の表示待機（`expect().toBeVisible()`）を優先すること
