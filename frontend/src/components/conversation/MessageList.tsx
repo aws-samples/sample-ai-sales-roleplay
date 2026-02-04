@@ -14,6 +14,7 @@ interface MessageListProps {
   scenario: Scenario;
   onStartConversation: () => void;
   isCameraInitialized?: boolean; // カメラ初期化状態
+  cameraError?: boolean; // カメラエラー状態
 }
 
 /**
@@ -28,6 +29,7 @@ const MessageList: React.FC<MessageListProps> = ({
   scenario,
   onStartConversation,
   isCameraInitialized = false,
+  cameraError = false,
 }) => {
   const { t } = useTranslation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -55,30 +57,53 @@ const MessageList: React.FC<MessageListProps> = ({
           <Typography variant="body2" color="text.secondary" mb={3}>
             {scenario.description}
           </Typography>
-          
-          {!isCameraInitialized && (
-            <Typography 
-              variant="caption" 
-              color="warning.main" 
+
+          {!isCameraInitialized && !cameraError && (
+            <Typography
+              variant="caption"
+              color="warning.main"
               sx={{ display: "block", mb: 2 }}
+              role="status"
+              aria-live="polite"
             >
-              📹 カメラを初期化しています。しばらくお待ちください...
+              {t("conversation.cameraInitializingMessage")}
             </Typography>
           )}
-          
+
+          {cameraError && (
+            <Typography
+              variant="caption"
+              color="error.main"
+              sx={{ display: "block", mb: 2 }}
+              role="alert"
+            >
+              {t("conversation.cameraAccessFailed")}
+            </Typography>
+          )}
+
           <Button
             variant="contained"
             size="large"
             onClick={onStartConversation}
             startIcon={<SendIcon />}
-            disabled={!isCameraInitialized}
+            disabled={!isCameraInitialized && !cameraError}
+            data-testid="start-conversation-button"
+            aria-label={
+              isCameraInitialized
+                ? t("conversation.startButton")
+                : cameraError
+                  ? t("conversation.startButtonNoRecording")
+                  : t("conversation.cameraInitializing")
+            }
             sx={{
-              opacity: isCameraInitialized ? 1 : 0.6,
+              opacity: (isCameraInitialized || cameraError) ? 1 : 0.6,
             }}
           >
-            {isCameraInitialized 
-              ? t("conversation.startButton") 
-              : "カメラ初期化中..."}
+            {isCameraInitialized
+              ? t("conversation.startButton")
+              : cameraError
+                ? t("conversation.startButtonNoRecording")
+                : t("conversation.cameraInitializing")}
           </Button>
         </Box>
       ) : (

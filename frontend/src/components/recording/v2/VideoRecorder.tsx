@@ -51,14 +51,22 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
         console.log(t("recording.cameraAccessRequested"));
         setError("");
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            facingMode: "user",
-          },
-          audio: true,
+        // タイムアウト処理を追加（10秒）
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("カメラ初期化タイムアウト")), 10000);
         });
+
+        const stream = await Promise.race([
+          navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              facingMode: "user",
+            },
+            audio: true,
+          }),
+          timeoutPromise
+        ]);
 
         // ストリームをrefに保存
         streamRef.current = stream;
