@@ -4,8 +4,7 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
-import { Runtime } from 'aws-cdk-lib/aws-lambda';
-import { BedrockLambdaConstruct } from './api/bedrock-lambda';
+import { Runtime, Architecture } from 'aws-cdk-lib/aws-lambda';
 import { ApiGatewayConstruct } from './api/api-gateway';
 import { AudioStorageConstruct } from './storage/audio-storage';
 import { VideoStorageConstruct } from './storage/video-storage';
@@ -45,9 +44,6 @@ export class Api extends Construct {
 
   /** WebSocket API for Transcribe */
   public readonly transcribeWebSocket: TranscribeWebSocketConstruct;
-
-  /** Bedrock Lambda Construct */
-  public readonly bedrockLambda: BedrockLambdaConstruct;
 
   /** 音声ストレージ */
   public readonly audioStorage: AudioStorageConstruct;
@@ -135,18 +131,12 @@ export class Api extends Construct {
     // SessionLambdaにDynamoDBテーブルへのアクセス権限を付与
     this.databaseTables.sessionFeedbackTable.grantReadWriteData(this.sessionLambda.function);
 
-    // Amazon Bedrock Lambda関数
-    this.bedrockLambda = new BedrockLambdaConstruct(this, 'BedrockLambda', {
-      sessionsTableName: this.databaseTables.sessionsTable.tableName,
-      messagesTableName: this.databaseTables.messagesTable.tableName,
-      bedrockModels: bedrockModels
-    });
-
     // テキスト→音声変換Lambda関数
     this.textToSpeechFunction = new NodejsFunction(this, 'TextToSpeechFunction', {
       entry: 'lambda/textToSpeech/app.ts',
       handler: 'handler',
       runtime: Runtime.NODEJS_22_X,
+      architecture: Architecture.ARM_64,
       memorySize: 256,
       timeout: cdk.Duration.seconds(30),
       environment: {
@@ -271,7 +261,6 @@ export class Api extends Construct {
     this.api = new ApiGatewayConstruct(this, 'ApiGateway', {
       userPool: props.userPool!,
       userPoolClient: props.userPoolClient!,
-      bedrockFunction: this.bedrockLambda.function,
       textToSpeechFunction: this.textToSpeechFunction,
       scoringFunction: this.scoringLambdaConstruct.function,
       sessionFunction: this.sessionLambda.function,
@@ -282,17 +271,5 @@ export class Api extends Construct {
       audioAnalysisFunction: this.audioAnalysisLambda.apiFunction,
       sessionAnalysisFunction: this.sessionAnalysisLambda.apiFunction,
     });
-
-    // BedrockLambdaに各テーブル名を環境変数として設定
-    this.bedrockLambda.function.addEnvironment('SCENARIOS_TABLE', this.databaseTables.scenariosTable.tableName);
-    this.bedrockLambda.function.addEnvironment('SESSIONS_TABLE', this.databaseTables.sessionsTable.tableName);
-    this.bedrockLambda.function.addEnvironment('MESSAGES_TABLE', this.databaseTables.messagesTable.tableName);
-    this.bedrockLambda.function.addEnvironment('SESSION_FEEDBACK_TABLE', this.databaseTables.sessionFeedbackTable.tableName);
-
-    // BedrockLambdaにDynamoDBテーブルへのアクセス権限を付与
-    this.databaseTables.scenariosTable.grantReadWriteData(this.bedrockLambda.function);
-    this.databaseTables.sessionsTable.grantReadWriteData(this.bedrockLambda.function);
-    this.databaseTables.messagesTable.grantReadWriteData(this.bedrockLambda.function);
-    this.databaseTables.sessionFeedbackTable.grantReadWriteData(this.bedrockLambda.function);
   }
 }

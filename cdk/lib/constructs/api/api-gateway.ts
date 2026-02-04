@@ -13,8 +13,6 @@ export interface ApiGatewayConstructProps {
   userPool: cognito.UserPool;
   /** Cognito App Client */
   userPoolClient: cognito.UserPoolClient;
-  /** Bedrock用Lambda関数 */
-  bedrockFunction: lambda.Function;
   /** ランキングLambda関数 (オプション) */
   rankingFunction: lambda.Function;
   /** テキスト→音声変換Lambda関数 */
@@ -109,22 +107,6 @@ export class ApiGatewayConstruct extends Construct {
 
     // Authorizerを公開プロパティに設定
     this.authorizer = auth;
-
-    // APIリソースとメソッドの作成
-    const bedrockResource = this.api.root.addResource('bedrock');
-    const conversationResource = bedrockResource.addResource('conversation');
-
-    // POST /bedrock/conversation - NPCとの対話APIエンドポイント
-    conversationResource.addMethod(
-      'POST',
-      new apigateway.LambdaIntegration(props.bedrockFunction, {
-        proxy: true,
-      }),
-      {
-        authorizer: auth,
-        authorizationType: apigateway.AuthorizationType.COGNITO,
-      }
-    );
 
     // Polly API endpoints (テキスト→音声変換)
     const pollyResource = this.api.root.addResource('polly');

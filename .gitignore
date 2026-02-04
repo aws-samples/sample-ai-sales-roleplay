@@ -26,3 +26,4 @@ cdk/cdk.context.json
 scripts
 memory-bank
 *.pyc
+frontend/.env.test

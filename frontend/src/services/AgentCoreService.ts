@@ -16,8 +16,10 @@ const AGENTCORE_ENABLED = import.meta.env.VITE_AGENTCORE_ENABLED === 'true';
 const AWS_REGION = import.meta.env.VITE_AWS_REGION || 'us-west-2';
 
 // AgentCore Runtime ARNs
-const NPC_CONVERSATION_RUNTIME_ARN = import.meta.env.VITE_NPC_CONVERSATION_RUNTIME_ARN || '';
-const REALTIME_SCORING_RUNTIME_ARN = import.meta.env.VITE_REALTIME_SCORING_RUNTIME_ARN || '';
+// CDKデプロイ時: VITE_AGENTCORE_NPC_CONVERSATION_ARN / VITE_AGENTCORE_REALTIME_SCORING_ARN
+// ローカル開発時: VITE_NPC_CONVERSATION_RUNTIME_ARN / VITE_REALTIME_SCORING_RUNTIME_ARN
+const NPC_CONVERSATION_RUNTIME_ARN = import.meta.env.VITE_AGENTCORE_NPC_CONVERSATION_ARN || import.meta.env.VITE_NPC_CONVERSATION_RUNTIME_ARN || '';
+const REALTIME_SCORING_RUNTIME_ARN = import.meta.env.VITE_AGENTCORE_REALTIME_SCORING_ARN || import.meta.env.VITE_REALTIME_SCORING_RUNTIME_ARN || '';
 
 // AgentCore Data Plane エンドポイント
 const AGENTCORE_ENDPOINT = `https://bedrock-agentcore.${AWS_REGION}.amazonaws.com`;
@@ -87,8 +89,15 @@ export class AgentCoreService {
 
     // ARNをURLエンコード
     const encodedArn = encodeURIComponent(runtimeArn);
-    // 正しいエンドポイント形式: /runtimes/{encodedArn}/invocations?qualifier=DEFAULT
-    const url = `${AGENTCORE_ENDPOINT}/runtimes/${encodedArn}/invocations?qualifier=DEFAULT`;
+    // エンドポイント形式: /runtimes/{encodedArn}/invocations
+    // 注意: qualifierパラメータは不要（エンドポイントが見つからないエラーの原因）
+    const url = `${AGENTCORE_ENDPOINT}/runtimes/${encodedArn}/invocations`;
+
+    console.log('AgentCore Runtime呼び出し:', {
+      url,
+      runtimeArn,
+      sessionId,
+    });
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 120000); // 120秒タイムアウト

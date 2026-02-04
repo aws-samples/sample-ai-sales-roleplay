@@ -43,6 +43,7 @@ export class ScenarioLambdaConstruct extends Construct {
     // PythonFunctionを使用して依存関係を自動的にインストール
     this.function = new PythonFunction(this, 'Function', {
       runtime: lambda.Runtime.PYTHON_3_13,
+      architecture: lambda.Architecture.ARM_64,
       entry: path.join(__dirname, '../../../lambda/scenarios'),
       index: 'index.py',
       handler: 'lambda_handler',

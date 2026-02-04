@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as agentcore from '@aws-cdk/aws-bedrock-agentcore-alpha';
+import * as ecr_assets from 'aws-cdk-lib/aws-ecr-assets';
 import * as path from 'path';
 import { Construct } from 'constructs';
 
@@ -52,7 +53,9 @@ export class AgentCoreRuntime extends Construct {
     const runtime = new agentcore.Runtime(this, 'Runtime', {
       runtimeName: runtimeName,
       description: props.description,
-      agentRuntimeArtifact: agentcore.AgentRuntimeArtifact.fromAsset(props.agentCodePath),
+      agentRuntimeArtifact: agentcore.AgentRuntimeArtifact.fromAsset(props.agentCodePath, {
+        platform: ecr_assets.Platform.LINUX_ARM64, // arm64プラットフォームを明示的に指定
+      }),
       authorizerConfiguration,
       environmentVariables: {
         AWS_DEFAULT_REGION: region,

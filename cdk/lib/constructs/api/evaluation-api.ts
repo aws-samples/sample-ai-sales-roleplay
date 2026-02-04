@@ -64,6 +64,7 @@ export class EvaluationApi extends Construct {
     this.lambda = new PythonFunction(this, 'EvaluationApiLambda', {
       functionName: `${props.resourceNamePrefix}evaluation-api`,
       runtime: lambda.Runtime.PYTHON_3_13,
+      architecture: lambda.Architecture.ARM_64,
       entry: path.join(__dirname, '../../../lambda/evaluation-api'),
       index: 'index.py',
       handler: 'lambda_handler',

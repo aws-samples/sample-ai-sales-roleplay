@@ -103,6 +103,8 @@ const ConversationPage: React.FC = () => {
     useState<boolean>(false);
   // カメラ初期化状態管理
   const [isCameraInitialized, setIsCameraInitialized] = useState<boolean>(false);
+  // カメラエラー状態管理
+  const [cameraError, setCameraError] = useState<boolean>(false);
 
 
   // コンポーネントの初期マウント時のフラグ設定
@@ -1080,6 +1082,10 @@ const ConversationPage: React.FC = () => {
   const handleCameraInitialized = useCallback((initialized: boolean) => {
     console.log("カメラ初期化状態変更:", initialized);
     setIsCameraInitialized(initialized);
+    // カメラ初期化に失敗した場合はエラー状態を設定
+    if (!initialized) {
+      setCameraError(true);
+    }
   }, []);
 
   // ゴール達成時の通知表示
@@ -1204,6 +1210,7 @@ const ConversationPage: React.FC = () => {
             scenario={scenario}
             onStartConversation={startConversation}
             isCameraInitialized={isCameraInitialized}
+            cameraError={cameraError}
           />
 
           {/* メッセージ入力エリア */}

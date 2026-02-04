@@ -50,6 +50,7 @@ export class GuardrailsLambdaConstruct extends Construct {
     // Lambda関数の作成
     this.function = new PythonFunction(this, 'Function', {
       runtime: lambda.Runtime.PYTHON_3_13,
+      architecture: lambda.Architecture.ARM_64,
       entry: path.join(__dirname, '../../../lambda/guardrails'),
       index: 'index.py',  // Lambda関数のエントリポイント
       handler: 'lambda_handler',  // ハンドラー関数名
