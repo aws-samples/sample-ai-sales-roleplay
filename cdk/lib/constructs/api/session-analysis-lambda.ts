@@ -147,6 +147,7 @@ export class SessionAnalysisLambdaConstruct extends Construct {
 
     return new PythonFunction(this, `${suffix}Function`, {
       runtime: lambda.Runtime.PYTHON_3_13,
+      architecture: lambda.Architecture.ARM_64,
       entry: path.join(__dirname, '../../../lambda/sessionAnalysis'),
       index: options.indexFile,
       handler: 'lambda_handler',

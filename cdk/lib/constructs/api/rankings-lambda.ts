@@ -77,6 +77,7 @@ export class RankingsLambdaConstruct extends Construct {
     // Python Lambda関数の作成
     this.function = new PythonFunction(this, 'Function', {
       runtime: lambda.Runtime.PYTHON_3_13,
+      architecture: lambda.Architecture.ARM_64,
       entry: path.join(__dirname, '../../../lambda/rankings'),
       index: 'index.py',
       handler: 'lambda_handler',

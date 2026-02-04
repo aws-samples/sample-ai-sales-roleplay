@@ -182,6 +182,7 @@ export class AudioAnalysisLambdaConstruct extends Construct {
 
     return new PythonFunction(this, `${suffix}Function`, {
       runtime: lambda.Runtime.PYTHON_3_13,
+      architecture: lambda.Architecture.ARM_64,
       entry: options.entry,
       index: options.indexFile,
       handler: options.handler,
