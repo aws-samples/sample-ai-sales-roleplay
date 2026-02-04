@@ -295,9 +295,12 @@ export class ApiService {
   /**
    * NPCと会話する
    *
+   * AgentCore Runtimeを使用してNPCとの会話を行います。
+   * 会話履歴はAgentCore Memoryで管理されます。
+   *
    * @param message ユーザーメッセージ
    * @param npc NPCの情報
-   * @param previousMessages 過去のメッセージ履歴
+   * @param previousMessages 過去のメッセージ履歴（AgentCore Memoryで管理されるため未使用）
    * @param sessionId セッションID
    * @param messageId メッセージID
    * @param emotionParams 感情パラメータ（怒りレベル、信頼レベル、進捗レベル）
@@ -320,72 +323,22 @@ export class ApiService {
     language?: string,
   ): Promise<{ response: string; sessionId: string; messageId: string }> {
     try {
-      // AgentCore Runtimeが利用可能な場合は直接呼び出し
+      // AgentCore Runtimeを使用（会話履歴はAgentCore Memoryで管理）
       const agentCoreService = AgentCoreService.getInstance();
-      if (agentCoreService.isAvailable()) {
-        return await agentCoreService.chatWithNPC(
-          message,
-          npc,
-          previousMessages,
-          sessionId,
-          messageId,
-          emotionParams,
-          scenarioId,
-          language,
-        );
+      if (!agentCoreService.isAvailable()) {
+        throw new Error("AgentCore Runtimeが利用できません。環境設定を確認してください。");
       }
 
-      // フォールバック: 従来のAPI Gateway経由
-      // リクエストボディの作成
-      const requestBody = {
+      return await agentCoreService.chatWithNPC(
         message,
-        npcInfo: {
-          name: npc.name,
-          role: npc.role,
-          company: npc.company,
-          personality: npc.personality,
-          description: npc.description,
-        },
-        previousMessages: previousMessages.map((msg) => ({
-          sender: msg.sender,
-          content: msg.content,
-          timestamp:
-            msg.timestamp instanceof Date
-              ? msg.timestamp.toISOString()
-              : typeof msg.timestamp === "string"
-                ? msg.timestamp
-                : new Date().toISOString(),
-        })),
-        sessionId: sessionId || "",
-        messageId: messageId || "",
-        // シナリオIDを追加
-        ...(scenarioId ? { scenarioId } : {}),
-        // 感情パラメータがある場合は追加
-        ...(emotionParams
-          ? {
-            emotionParams: {
-              angerLevel: emotionParams.angerLevel || 1,
-              trustLevel: emotionParams.trustLevel || 1,
-              progressLevel: emotionParams.progressLevel || 1,
-            },
-          }
-          : {}),
-        // 言語設定を追加
-        ...(language ? { language } : {}),
-      };
-
-      // API呼び出し（他のメソッドと同じパターンを使用）
-      const data = await this.apiPost<{
-        message: string;
-        sessionId: string;
-        messageId: string;
-      }>("/bedrock/conversation", requestBody);
-
-      return {
-        response: data.message,
-        sessionId: data.sessionId,
-        messageId: data.messageId,
-      };
+        npc,
+        previousMessages,
+        sessionId,
+        messageId,
+        emotionParams,
+        scenarioId,
+        language,
+      );
     } catch (error: unknown) {
       console.error("=== NPCとの会話中にエラーが発生 ===");
       console.error("エラー詳細:", error);
@@ -407,11 +360,13 @@ export class ApiService {
   /**
    * リアルタイム評価を取得する
    *
-   * ユーザーの発言をリアルタイムで評価し、メトリクスとゴール達成状況を更新します。
+   * AgentCore Runtimeを使用してユーザーの発言をリアルタイムで評価し、
+   * メトリクスとゴール達成状況を更新します。
+   * 会話履歴はAgentCore Memoryで管理されます。
    *
    * @param message ユーザーメッセージ
-   * @param previousMessages 過去のメッセージ履歴
-   * @param sessionId セッションID（DynamoDB保存用）
+   * @param previousMessages 過去のメッセージ履歴（AgentCore Memoryで管理されるため未使用）
+   * @param sessionId セッションID
    * @param goalStatuses 現在のゴール達成状況（オプション）
    * @param goals シナリオのゴール定義（オプション）
    * @param scenarioId シナリオID（コンプライアンスチェック用）
@@ -440,118 +395,25 @@ export class ApiService {
     };
     analysis?: string;
     goalStatuses?: GoalStatus[];
-    compliance?: ComplianceCheck; // コンプライアンスチェック結果を追加
+    compliance?: ComplianceCheck;
   }> {
     try {
-      // AgentCore Runtimeが利用可能な場合は直接呼び出し
+      // AgentCore Runtimeを使用（会話履歴はAgentCore Memoryで管理）
       const agentCoreService = AgentCoreService.getInstance();
-      if (agentCoreService.isAvailable()) {
-        return await agentCoreService.getRealtimeEvaluation(
-          message,
-          previousMessages,
-          sessionId,
-          goalStatuses,
-          goals,
-          scenarioId,
-          language,
-          currentScores,
-        );
+      if (!agentCoreService.isAvailable()) {
+        throw new Error("AgentCore Runtimeが利用できません。環境設定を確認してください。");
       }
 
-      // フォールバック: 従来のAPI Gateway経由
-      // リクエストボディを作成（循環参照対策）
-      const requestBody = {
+      return await agentCoreService.getRealtimeEvaluation(
         message,
-        previousMessages: previousMessages.map((msg) => ({
-          sender: msg.sender,
-          content: msg.content,
-          timestamp:
-            msg.timestamp instanceof Date
-              ? msg.timestamp.toISOString()
-              : typeof msg.timestamp === "string"
-                ? msg.timestamp
-                : new Date().toISOString(),
-        })),
-        // セッションIDを含める
-        ...(sessionId ? { sessionId } : {}),
-        // ゴール達成状況が指定されていれば含める（循環参照対策）
-        ...(goalStatuses ? {
-          goalStatuses: goalStatuses.map(status => ({
-            goalId: status.goalId,
-            progress: typeof status.progress === "number" ? status.progress : 0,
-            achieved: Boolean(status.achieved),
-            ...(status.achievedAt ? {
-              achievedAt: status.achievedAt instanceof Date
-                ? status.achievedAt.toISOString()
-                : typeof status.achievedAt === "string"
-                  ? status.achievedAt
-                  : undefined
-            } : {})
-          }))
-        } : {}),
-        // ゴール定義が指定されていれば含める（循環参照対策）
-        ...(goals ? {
-          goals: goals.map(goal => ({
-            id: goal.id,
-            description: goal.description || "",
-            priority: typeof goal.priority === "number" ? goal.priority : 3,
-            criteria: Array.isArray(goal.criteria) ? goal.criteria : [],
-            isRequired: Boolean(goal.isRequired)
-          }))
-        } : {}),
-        // シナリオIDを含める（コンプライアンスチェック用）
-        ...(scenarioId ? { scenarioId } : {}),
-        // 言語設定を含める（多言語対応用）
-        ...(language ? { language } : {}),
-      };
-
-      // API呼び出し
-      const data = await this.apiPost<{
-        success: boolean;
-        scores?: {
-          angerLevel: number;
-          trustLevel: number;
-          progressLevel: number;
-          analysis?: string;
-        };
-        goal?: {
-          statuses?: GoalStatus[];
-        };
-        compliance?: ComplianceCheck; // コンプライアンスチェック結果を追加
-      }>("/scoring/realtime", requestBody);
-
-      // 結果を返す
-      if (data.success) {
-        return {
-          scores: data.scores
-            ? {
-              angerLevel: data.scores.angerLevel || 1,
-              trustLevel: data.scores.trustLevel || 1,
-              progressLevel: data.scores.progressLevel || 1,
-            }
-            : {
-              angerLevel: 1,
-              trustLevel: 1,
-              progressLevel: 1,
-            },
-          analysis: data.scores?.analysis || "",
-          goalStatuses: data.goal?.statuses,
-          // コンプライアンスチェック結果があれば含める
-          ...(data.compliance ? { compliance: data.compliance } : {}),
-        };
-      }
-
-      // デフォルトの結果を返す
-      return {
-        scores: {
-          angerLevel: 1,
-          trustLevel: 1,
-          progressLevel: 1,
-        },
-        analysis: "",
-        // コンプライアンスチェックはデフォルトでnull
-        compliance: undefined,
-      };
+        previousMessages,
+        sessionId,
+        goalStatuses,
+        goals,
+        scenarioId,
+        language,
+        currentScores,
+      );
     } catch (error) {
       console.error("リアルタイム評価API呼び出しエラー:", error);
 
@@ -571,7 +433,6 @@ export class ApiService {
           progressLevel: 1,
         },
         analysis: "",
-        // コンプライアンスチェックはエラー時はundefined
         compliance: undefined,
       };
     }
