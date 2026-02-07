@@ -41,6 +41,7 @@ const VRMAvatarContainer: React.FC<VRMAvatarContainerProps> = ({
   progressLevel,
   isSpeaking,
   directEmotion,
+  gesture,
   onEmotionChange,
 }) => {
   const { t } = useTranslation();
@@ -55,18 +56,28 @@ const VRMAvatarContainer: React.FC<VRMAvatarContainerProps> = ({
   // 感情変更通知のフラグ（無限ループ防止）
   const emotionChangeNotifiedRef = useRef<EmotionState>('neutral');
 
+  // loadAvatar/getDefaultAvatarIdをRefで保持（useEffect依存を避ける）
+  const loadAvatarRef = useRef(loadAvatar);
+  const getDefaultAvatarIdRef = useRef(getDefaultAvatarId);
+
+  useEffect(() => {
+    loadAvatarRef.current = loadAvatar;
+  }, [loadAvatar]);
+
+  useEffect(() => {
+    getDefaultAvatarIdRef.current = getDefaultAvatarId;
+  }, [getDefaultAvatarId]);
+
   // アバターの読み込み
   useEffect(() => {
     const initializeAvatar = async () => {
       try {
         if (avatarId) {
-          // 指定されたアバターIDを読み込み
-          await loadAvatar(avatarId);
+          await loadAvatarRef.current(avatarId);
         } else {
-          // デフォルトアバターを読み込み
-          const defaultId = await getDefaultAvatarId();
+          const defaultId = await getDefaultAvatarIdRef.current();
           if (defaultId) {
-            await loadAvatar(defaultId);
+            await loadAvatarRef.current(defaultId);
           }
         }
       } catch (error) {
@@ -75,7 +86,7 @@ const VRMAvatarContainer: React.FC<VRMAvatarContainerProps> = ({
     };
 
     initializeAvatar();
-  }, [avatarId, loadAvatar, getDefaultAvatarId]);
+  }, [avatarId]);
 
   // 感情状態の計算（directEmotionが指定されていない場合のみ使用）
   const currentEmotion = useMemo<EmotionState>(() => {
@@ -117,7 +128,6 @@ const VRMAvatarContainer: React.FC<VRMAvatarContainerProps> = ({
   const handleModelLoad = useCallback(() => {
     setIsModelLoading(false);
     setModelError(null);
-    console.log('VRMモデルの読み込みが完了しました');
   }, []);
 
   // モデル読み込みエラーハンドラー
@@ -262,6 +272,7 @@ const VRMAvatarContainer: React.FC<VRMAvatarContainerProps> = ({
           isSpeaking={isSpeaking}
           visemeData={visemeData}
           directEmotion={directEmotion}
+          gesture={gesture}
           onLoad={handleModelLoad}
           onError={handleModelError}
         />

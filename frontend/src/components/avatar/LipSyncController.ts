@@ -40,6 +40,7 @@ export class LipSyncController {
   private currentMouthOpen: number = 0;
   private isConnected: boolean = false;
   private useVisemeMode: boolean = false;
+  private mutationObserver: MutationObserver | null = null;
 
   constructor(vrm: VRM) {
     this.vrm = vrm;
@@ -56,7 +57,6 @@ export class LipSyncController {
     }));
     this.currentVisemeIndex = 0;
     this.useVisemeMode = true;
-    console.log(`LipSyncController: ${this.visemeData.length}件のvisemeデータを設定`);
   }
 
   /**
@@ -67,7 +67,6 @@ export class LipSyncController {
     this.visemeStartTime = performance.now();
     this.isVisemePlaying = true;
     this.currentVisemeIndex = 0;
-    console.log('LipSyncController: Viseme再生開始');
   }
 
   /**
@@ -93,14 +92,13 @@ export class LipSyncController {
       this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
       this.setupAudioMonitoring();
       this.isConnected = true;
-      console.log('LipSyncController: AudioServiceに接続しました');
     } catch (error) {
       console.error('LipSyncController: 接続エラー:', error);
     }
   }
 
   private setupAudioMonitoring(): void {
-    const observer = new MutationObserver((mutations) => {
+    this.mutationObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
           if (node instanceof HTMLAudioElement) {
@@ -109,7 +107,7 @@ export class LipSyncController {
         });
       });
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    this.mutationObserver.observe(document.body, { childList: true, subtree: true });
     document.querySelectorAll('audio').forEach((audio) => {
       this.connectToAudioElement(audio);
     });
@@ -155,8 +153,9 @@ export class LipSyncController {
       this.currentVisemeIndex++;
     }
 
-    // 再生完了チェック
-    if (this.currentVisemeIndex >= this.visemeData.length) {
+    // 再生完了チェック: 最後のvisemeから一定時間経過したら終了
+    const lastViseme = this.visemeData[this.visemeData.length - 1];
+    if (this.currentVisemeIndex >= this.visemeData.length - 1 && elapsed > lastViseme.time + 200) {
       this.stopVisemePlayback();
       return;
     }
@@ -233,6 +232,8 @@ export class LipSyncController {
    * リソース解放
    */
   dispose(): void {
+    this.mutationObserver?.disconnect();
+    this.mutationObserver = null;
     this.disconnect();
   }
 }

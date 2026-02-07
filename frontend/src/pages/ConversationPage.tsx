@@ -33,6 +33,7 @@ import VideoManager from "../components/recording/v2/VideoManager";
 import ConversationHeader from "../components/conversation/ConversationHeader";
 import NPCInfoCard from "../components/conversation/NPCInfoCard";
 import { VRMAvatarContainer, AvatarProvider } from "../components/avatar";
+import type { GestureType } from "../types/avatar";
 import MessageList from "../components/conversation/MessageList";
 import MessageInput from "../components/conversation/MessageInput";
 // クリーンアップ用のuseEffectを追加
@@ -73,6 +74,8 @@ const ConversationPage: React.FC = () => {
   const [currentEmotion, setCurrentEmotion] = useState<string>("neutral");
   // NPC感情状態（リアルタイム評価から取得、アバターに直接渡す）
   const [npcDirectEmotion, setNpcDirectEmotion] = useState<EmotionState | undefined>(undefined);
+  // NPCジェスチャー状態（リアルタイム評価から取得、アバターに渡す）
+  const [npcGesture, setNpcGesture] = useState<GestureType>('none');
   // シナリオに紐づくアバターID
   const [scenarioAvatarId, setScenarioAvatarId] = useState<string | undefined>(undefined);
   const [audioEnabled, setAudioEnabled] = useState(true);
@@ -95,6 +98,8 @@ const ConversationPage: React.FC = () => {
   const userInputRef = useRef<string>("");
   // ゴールの達成スコア（セッション終了時に使用）
   const [goalScore, setGoalScore] = useState<number>(0);
+  // ジェスチャーリセット用タイマー
+  const gestureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // userInputの変更をrefに同期
   useEffect(() => {
@@ -139,6 +144,11 @@ const ConversationPage: React.FC = () => {
       // コンポーネントのアンマウント時にリソース解放
       if (transcribeServiceRef.current) {
         transcribeServiceRef.current.dispose();
+      }
+
+      // ジェスチャータイマーのクリーンアップ
+      if (gestureTimerRef.current) {
+        clearTimeout(gestureTimerRef.current);
       }
 
       // 音声認識関連の状態もクリアする
@@ -716,6 +726,18 @@ const ConversationPage: React.FC = () => {
                   }
                 }
 
+                // NPCジェスチャーをアバターに反映
+                if (evaluationResult.gesture) {
+                  const validGestures: GestureType[] = ['nod', 'headTilt', 'none'];
+                  const gesture = evaluationResult.gesture as GestureType;
+                  if (validGestures.includes(gesture)) {
+                    if (gestureTimerRef.current) clearTimeout(gestureTimerRef.current);
+                    setNpcGesture(gesture);
+                    // ジェスチャー実行後にリセット
+                    gestureTimerRef.current = setTimeout(() => setNpcGesture('none'), 1500);
+                  }
+                }
+
                 // 新しいメトリクスを設定
                 setCurrentMetrics((prevMetrics) => ({
                   ...prevMetrics,
@@ -1205,6 +1227,7 @@ const ConversationPage: React.FC = () => {
                     progressLevel={currentMetrics.progressLevel}
                     isSpeaking={isSpeaking}
                     directEmotion={npcDirectEmotion}
+                    gesture={npcGesture}
                     onEmotionChange={handleEmotionChange}
                   />
                 </AvatarProvider>

@@ -48,6 +48,7 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
   isSpeaking,
   visemeData,
   directEmotion,
+  gesture,
   onLoad,
   onError,
 }) => {
@@ -71,7 +72,8 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
   const animationFrameRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
   const clockRef = useRef<THREE.Clock>(new THREE.Clock());
-  const cleanupTimerRef = useRef<number | null>(null);
+  const isMountedRef = useRef<boolean>(false);
+  const cleanupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 状態追跡 Refs
   const previousEmotionRef = useRef<EmotionState>(emotion);
@@ -194,36 +196,37 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
   /**
    * メインの初期化・クリーンアップ useEffect
    * 依存配列を空にして、マウント時に1回だけ実行
+   *
+   * StrictMode対策:
+   * React StrictModeでは マウント→クリーンアップ→再マウント の順で実行される。
+   * Three.js/VRMリソースの即時破棄→再生成はコストが高いため、以下の戦略で回避する:
+   * - クリーンアップではsetTimeout(0)で遅延破棄をスケジュール
+   * - 再マウント時にclearTimeoutで遅延破棄をキャンセル
+   * - rendererRef.currentが残っていれば初期化をスキップ
+   * - isMountedRefで非同期処理(loadModel)完了時のアンマウント判定を行う
    */
   useEffect(() => {
-    // 前回のクリーンアップタイマーをキャンセル（StrictMode再マウント時）
+    isMountedRef.current = true;
+
+    // StrictMode再マウント時: 遅延クリーンアップをキャンセル
     if (cleanupTimerRef.current !== null) {
       clearTimeout(cleanupTimerRef.current);
       cleanupTimerRef.current = null;
     }
 
     // 既にRendererが存在する場合はスキップ（StrictMode再マウント対策）
-    // StrictModeでは: マウント→クリーンアップ(遅延)→再マウント の順で実行される
-    // 再マウント時にrendererRef.currentがまだ存在するのでスキップされ、
-    // 遅延クリーンアップもキャンセルされるため、1つのインスタンスだけが維持される
     if (rendererRef.current) {
-      // レンダリングループを再開（クリーンアップで停止されている場合）
       if (animationFrameRef.current === null && renderLoopRef.current) {
         animationFrameRef.current = requestAnimationFrame(renderLoopRef.current);
       }
       window.addEventListener('resize', handleResize);
       return () => {
+        isMountedRef.current = false;
         window.removeEventListener('resize', handleResize);
         if (animationFrameRef.current !== null) {
           cancelAnimationFrame(animationFrameRef.current);
           animationFrameRef.current = null;
         }
-        const currentRenderer = rendererRef.current;
-        cleanupTimerRef.current = window.setTimeout(() => {
-          if (rendererRef.current === currentRenderer) {
-            cleanup();
-          }
-        }, 50);
       };
     }
 
@@ -279,12 +282,10 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
         const loader = new VRMLoader();
         vrmLoaderRef.current = loader;
 
-        const vrm = await loader.load(modelUrlRef.current, (progress) => {
-          console.log(`VRM読み込み進捗: ${progress.toFixed(1)}%`);
-        });
+        const vrm = await loader.load(modelUrlRef.current, () => {});
 
         // クリーンアップ済みの場合は読み込んだリソースを破棄
-        if (!sceneRef.current) {
+        if (!isMountedRef.current) {
           vrm.scene.traverse((object) => {
             if (object instanceof THREE.Mesh) {
               object.geometry?.dispose();
@@ -300,12 +301,6 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
 
         vrmRef.current = vrm;
         sceneRef.current.add(vrm.scene);
-
-        // 利用可能な表情をログ出力（デバッグ用）
-        if (vrm.expressionManager) {
-          const expressions = vrm.expressionManager.expressions;
-          console.log('利用可能なVRM表情:', expressions.map(e => e.expressionName));
-        }
 
         // コントローラーを初期化
         expressionControllerRef.current = new ExpressionController(vrm);
@@ -346,23 +341,24 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
 
     // クリーンアップ
     return () => {
+      isMountedRef.current = false;
       window.removeEventListener('resize', handleResize);
 
-      // アニメーションフレームをキャンセル（即座に停止）
+      // アニメーションフレームをキャンセル
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
 
-      // StrictModeの偽アンマウント対策:
-      // 遅延してクリーンアップを実行し、再マウントされた場合はキャンセルする
+      // StrictMode対策: setTimeout(0)で遅延クリーンアップをスケジュール。
+      // 再マウント時にclearTimeoutでキャンセルされるため、StrictModeの偽アンマウントでは
+      // リソースが破棄されず、実際のアンマウント時のみcleanup()が実行される。
       const currentRenderer = rendererRef.current;
-      cleanupTimerRef.current = window.setTimeout(() => {
-        // rendererRef.currentがまだ同じインスタンスなら実際のアンマウント
+      cleanupTimerRef.current = setTimeout(() => {
         if (rendererRef.current === currentRenderer) {
           cleanup();
         }
-      }, 50);
+      }, 0);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- マウント時に1回だけ実行。rendererRef.currentのガードでStrictModeの二重初期化を防止
   }, []);
@@ -393,9 +389,18 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
       } else {
         lipSyncControllerRef.current?.disconnect();
       }
+      // AnimationControllerに発話状態を通知（アイドルモーション抑制用）
+      animationControllerRef.current?.setIsSpeaking(isSpeaking);
       previousIsSpeakingRef.current = isSpeaking;
     }
   }, [isSpeaking]);
+
+  // ジェスチャーの変更を監視
+  useEffect(() => {
+    if (gesture && gesture !== 'none' && animationControllerRef.current) {
+      animationControllerRef.current.triggerGesture(gesture);
+    }
+  }, [gesture]);
 
   return (
     <div

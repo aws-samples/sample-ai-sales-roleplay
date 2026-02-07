@@ -8,6 +8,7 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useRef,
   ReactNode,
 } from 'react';
 import { AvatarInfo, AvatarManifest, AvatarContextState } from '../../types/avatar';
@@ -45,17 +46,11 @@ const AvatarContext = createContext<AvatarContextValue>(defaultContextValue);
 const MANIFEST_PATH = '/models/avatars/manifest.json';
 
 /**
- * マニフェストキャッシュ
- */
-let manifestCache: AvatarManifest | null = null;
-
-/**
  * マニフェストファイルを取得する
  */
-const fetchManifest = async (): Promise<AvatarManifest> => {
-  // キャッシュがあればそれを返す
-  if (manifestCache) {
-    return manifestCache;
+const fetchManifest = async (cache: React.MutableRefObject<AvatarManifest | null>): Promise<AvatarManifest> => {
+  if (cache.current) {
+    return cache.current;
   }
 
   try {
@@ -67,13 +62,11 @@ const fetchManifest = async (): Promise<AvatarManifest> => {
 
     const manifest: AvatarManifest = await response.json();
 
-    // バリデーション
     if (!manifest.avatars || !Array.isArray(manifest.avatars)) {
       throw new Error('マニフェストの形式が不正です: avatars配列が見つかりません');
     }
 
-    // キャッシュに保存
-    manifestCache = manifest;
+    cache.current = manifest;
 
     return manifest;
   } catch (error) {
@@ -101,6 +94,7 @@ export const AvatarProvider: React.FC<AvatarProviderProps> = ({ children }) => {
   const [avatarInfo, setAvatarInfo] = useState<AvatarInfo | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
+  const manifestCacheRef = useRef<AvatarManifest | null>(null);
 
   /**
    * アバターを読み込む
@@ -116,7 +110,7 @@ export const AvatarProvider: React.FC<AvatarProviderProps> = ({ children }) => {
     setError(null);
 
     try {
-      const manifest = await fetchManifest();
+      const manifest = await fetchManifest(manifestCacheRef);
 
       // 指定されたIDのアバターを検索
       const avatar = manifest.avatars.find((a) => a.id === avatarId);
@@ -143,7 +137,7 @@ export const AvatarProvider: React.FC<AvatarProviderProps> = ({ children }) => {
    */
   const getAvatarList = useCallback(async (): Promise<AvatarInfo[]> => {
     try {
-      const manifest = await fetchManifest();
+      const manifest = await fetchManifest(manifestCacheRef);
       return manifest.avatars;
     } catch (err) {
       console.error('アバター一覧取得エラー:', err);
@@ -156,7 +150,7 @@ export const AvatarProvider: React.FC<AvatarProviderProps> = ({ children }) => {
    */
   const getDefaultAvatarId = useCallback(async (): Promise<string | null> => {
     try {
-      const manifest = await fetchManifest();
+      const manifest = await fetchManifest(manifestCacheRef);
       return manifest.defaultAvatarId || null;
     } catch (err) {
       console.error('デフォルトアバターID取得エラー:', err);

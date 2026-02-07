@@ -105,6 +105,11 @@ export const EMOTION_TO_VRM_EXPRESSION: Record<EmotionState, ExpressionMapping> 
 };
 
 /**
+ * ジェスチャータイプ
+ */
+export type GestureType = 'nod' | 'headTilt' | 'none';
+
+/**
  * VRMAvatarコンポーネントのプロパティ
  */
 export interface VRMAvatarProps {
@@ -113,6 +118,7 @@ export interface VRMAvatarProps {
   isSpeaking: boolean;
   visemeData?: VisemeData[];
   directEmotion?: EmotionState;
+  gesture?: GestureType;
   onLoad?: () => void;
   onError?: (error: Error) => void;
 }
@@ -127,5 +133,6 @@ export interface VRMAvatarContainerProps {
   progressLevel: number;
   isSpeaking: boolean;
   directEmotion?: EmotionState;
+  gesture?: GestureType;
   onEmotionChange?: (emotion: EmotionState) => void;
 }
