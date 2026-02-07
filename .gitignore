@@ -27,3 +27,4 @@ scripts
 memory-bank
 *.pyc
 frontend/.env.test
+reviewed/

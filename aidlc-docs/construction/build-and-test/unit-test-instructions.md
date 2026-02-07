@@ -1,26 +1,4 @@
-# Unit Test Instructions - 3Dアバター機能 Phase 2
-
-## テスト対象コンポーネント
-
-### Phase 1（既存）
-| コンポーネント | テスト内容 |
-|---------------|-----------|
-| VRMLoader | VRMファイルの読み込み、エラーハンドリング |
-| ExpressionController | 感情→表情マッピング、トランジション |
-| AnimationController | 瞬き・呼吸アニメーション |
-| AvatarContext | 状態管理、アバター読み込み |
-| VRMAvatar | Three.jsシーン管理、レンダリング |
-| VRMAvatarContainer | WebGLチェック、エラー表示 |
-
-### Phase 2（新規・変更）
-| コンポーネント | テスト内容 |
-|---------------|-----------|
-| LipSyncController | visemeベースリップシンク、母音マッピング、フォールバック |
-| PollyService | synthesizeSpeechWithViseme、visemeデータ取得 |
-| AudioService | visemeデータ伝搬、CustomEvent配信 |
-| VRMAvatar | visemeData/directEmotionプロパティ受け渡し |
-| VRMAvatarContainer | directEmotion優先制御、visemeイベントリスナー |
-| ConversationPage | npcEmotion取得、avatarId渡し |
+# Unit Test Execution - 3Dアバター機能 Phase 3（拡張実装）
 
 ## テスト実行
 
@@ -30,50 +8,57 @@ cd frontend
 npm run test
 ```
 
-### 2. アバター関連テストのみ実行
+### 2. Phase 3関連テストのみ実行
 ```bash
 cd frontend
-npm run test -- --testPathPattern="avatar"
+npx jest --testPathPattern="avatar|Avatar" --run
 ```
 
-### 3. カバレッジ付きテスト
-```bash
-cd frontend
-npm run test:coverage
-```
+## Phase 3 テストケース
 
-## Phase 2 テストケース
+### AnimationController テスト
+- `triggerNod()`: headボーンのX軸回転が発生すること
+- `triggerHeadTilt()`: headボーンのZ軸回転が発生すること
+- `triggerGesture('nod')`: nodジェスチャーが正しくトリガーされること
+- `triggerGesture('headTilt')`: headTiltジェスチャーが正しくトリガーされること
+- `triggerGesture('none')`: ジェスチャーがトリガーされないこと
+- `setIsSpeaking(true)`: 発話中にアイドルモーションが抑制されること
+- アイドルモーション: 視線移動（lookAt）と体の揺れ（spine）が動作すること
 
-### LipSyncController（visemeモード）
-- ✅ setVisemeData()でPolly visemeが日本語母音に変換される
-- ✅ startVisemePlayback()で再生が開始される
-- ✅ stopVisemePlayback()で口形状がリセットされる
-- ✅ visemeタイミングに合わせて正しいブレンドシェイプが適用される
-- ✅ visemeデータが空の場合、再生が開始されない
-- ✅ Phase 1の音量ベースリップシンクがフォールバックとして動作する
+### ExpressionController テスト
+- 感情間の中間状態トランジションが正しく適用されること
+- 感情種類に応じたトランジション速度が異なること
+- `angry` → `happy`のトランジションで中間状態を経由すること
 
-### PollyService（viseme対応）
-- ✅ synthesizeSpeechWithViseme()がaudioUrlとvisemesを返す
-- ✅ visemesが未返却の場合、undefinedが返る
-- ✅ エラー時に適切な例外がスローされる
+### VRMAvatar / VRMAvatarContainer テスト
+- `gesture`プロパティが正しくAnimationControllerに渡されること
+- gestureが変更された時にtriggerGestureが呼ばれること
 
-### VRMAvatarContainer（directEmotion）
-- ✅ directEmotionが指定された場合、メトリクスベースの感情計算より優先される
-- ✅ directEmotionがundefinedの場合、従来のメトリクスベース計算が使用される
-- ✅ visemeデータのCustomEventを受信してVRMAvatarに渡す
+### ConversationPage テスト
+- リアルタイム評価レスポンスからgestureが抽出されること
+- gestureが1500ms後にリセットされること
+- VRMAvatarContainerにgestureが渡されること
 
-### アバター切り替え
-- ✅ manifest.jsonから複数アバターが読み込まれる
-- ✅ avatarId変更時にモデルURLが正しく解決される
-- ✅ 存在しないavatarIdの場合、デフォルトアバターが使用される
+### AvatarService テスト
+- `listAvatars()`: API呼び出しが正しいパスで行われること
+- `createAvatar()`: リクエストボディが正しいこと
+- `uploadVrmFile()`: FormDataが正しく構築されること
+- `confirmUpload()`: PUTリクエストが正しいパスで行われること
+- `deleteAvatar()`: DELETEリクエストが正しいパスで行われること
 
-## 期待される結果
-- **テスト数**: Phase 2追加分 約15-20テスト
-- **カバレッジ目標**: 80%以上
-- **テストレポート**: `frontend/coverage/`
+### AvatarUpload テスト
+- .vrm以外のファイルが拒否されること
+- 50MBを超えるファイルが拒否されること
+- アップロードフロー（作成→アップロード→確認）が正しく動作すること
+- エラー時にエラーメッセージが表示されること
 
-## 失敗時の対応
-1. テスト出力を確認
-2. 失敗したテストケースを特定
-3. コードを修正
-4. テストを再実行
+### AvatarManagement テスト
+- アバター一覧が正しく表示されること
+- 削除確認ダイアログが表示されること
+- 削除後にリストが更新されること
+- アバター選択時にonSelectが呼ばれること
+
+## テスト結果の確認
+- **期待結果**: 全テスト通過
+- **カバレッジ**: `npm run test:coverage`で確認
+- **テストレポート**: コンソール出力

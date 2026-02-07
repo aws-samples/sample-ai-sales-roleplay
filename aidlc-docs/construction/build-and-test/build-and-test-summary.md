@@ -1,65 +1,72 @@
-# Build and Test Summary - 3Dアバター機能 Phase 2（標準実装）
+# Build and Test Summary - 3Dアバター機能 Phase 3（拡張実装）
 
 ## ビルドステータス
 - ビルドツール: Vite 7.1.3（フロントエンド）、AWS CDK 2.1026.0（バックエンド）
-- リントステータス: エラー0件、warning 1件（許容）
+- リントステータス: エラー0件
 - 型チェック: エラー0件
 - ビルド成果物: `frontend/dist/`
 
-## Phase 2 変更サマリー
+## Phase 3 変更サマリー
 
 ### 新機能
-1. Amazon Polly Visemeによる母音リップシンク
-2. AI感情分析（npcEmotion）による表情連動
-3. 複数アバター対応（manifest.json v2.0.0）
-4. シナリオ管理統合（avatarId渡し）
+1. AI駆動ジェスチャー（うなずき・首かしげ）- realtime-scoringからgesture推定
+2. プロシージャルアイドルモーション（視線移動・体揺れ）
+3. 感情トランジション高度化（中間状態・速度調整）
+4. VRMアバターアップロード管理（S3 + DynamoDB）
+5. アバター管理UI（アップロード・一覧・削除）
+6. レスポンシブレイアウト対応
 
-### 変更ファイル（11ファイル）
+### 変更ファイル（19ファイル + i18n 2ファイル）
 
-バックエンド（3ファイル）:
-- `cdk/lambda/textToSpeech/app.ts` - Speech Marks API追加
-- `cdk/agents/realtime-scoring/models.py` - npcEmotionフィールド追加
-- `cdk/agents/realtime-scoring/prompts.py` - 感情推定プロンプト追加
+バックエンド（7ファイル）:
+- `cdk/agents/realtime-scoring/models.py` - gestureフィールド追加
+- `cdk/agents/realtime-scoring/prompts.py` - ジェスチャー推定プロンプト追加
+- `cdk/lib/constructs/storage/avatar-storage.ts` - 新規: S3 + DynamoDB
+- `cdk/lib/constructs/api/avatar-lambda.ts` - 新規: Lambda構成
+- `cdk/lambda/avatars/index.py` - 新規: CRUD Lambda
+- `cdk/lib/constructs/api.ts` - アバターストレージ・API統合
+- `cdk/lib/constructs/api/api-gateway.ts` - アバターAPIルート追加
 
-フロントエンド（8ファイル）:
-- `frontend/src/types/avatar.ts` - viseme型、directEmotion型追加
-- `frontend/src/services/PollyService.ts` - visemeデータ取得メソッド追加
-- `frontend/src/services/ApiService.ts` - callPollyAPIレスポンスにvisemes追加
-- `frontend/src/services/AudioService.ts` - visemeデータ伝搬
-- `frontend/src/components/avatar/LipSyncController.ts` - visemeベースリップシンク
-- `frontend/src/components/avatar/VRMAvatar.tsx` - viseme/directEmotion受け渡し
-- `frontend/src/components/avatar/VRMAvatarContainer.tsx` - directEmotion対応
-- `frontend/src/pages/ConversationPage.tsx` - directEmotion連携、avatarId渡し
+フロントエンド（10ファイル）:
+- `frontend/src/types/avatar.ts` - GestureType型追加
+- `frontend/src/components/avatar/AnimationController.ts` - ジェスチャー + アイドルモーション
+- `frontend/src/components/avatar/ExpressionController.ts` - 感情トランジション高度化
+- `frontend/src/components/avatar/VRMAvatar.tsx` - gesture受け渡し
+- `frontend/src/components/avatar/VRMAvatarContainer.tsx` - gesture受け渡し
+- `frontend/src/pages/ConversationPage.tsx` - gestureデータフロー
+- `frontend/src/services/AgentCoreService.ts` - gesture型追加
+- `frontend/src/services/ApiService.ts` - gesture型追加
+- `frontend/src/services/AvatarService.ts` - 新規: アバター管理API
+- `frontend/src/components/avatar/AvatarUpload.tsx` - 新規: VRMアップロード
 
-その他（1ファイル）:
-- `frontend/public/models/avatars/manifest.json` - 複数アバター構造
+i18n（2ファイル）:
+- `frontend/src/i18n/locales/ja.json` - アバター管理キー追加
+- `frontend/src/i18n/locales/en.json` - アバター管理キー追加
 
 ### リントエラー修正（Build and Test中に実施）
-- `frontend/src/services/PollyService.ts` - `any`型をvisemes型に修正
-- `frontend/src/services/ApiService.ts` - callPollyAPIレスポンスにvisemesフィールド追加
-- `frontend/src/tests/e2e/avatar-emotion-test.spec.ts` - 未使用import削除
+- `frontend/src/components/avatar/VRMAvatarContainer.tsx` - 未使用GestureTypeインポート削除、Ref更新をuseEffectに移動
+- `frontend/src/services/AvatarService.ts` - 未使用error変数削除
 
 ## テスト実行サマリー
 
 ### ユニットテスト
-- テスト対象: LipSyncController、PollyService、VRMAvatarContainer等
-- ステータス: 手順書作成完了（テストファイル作成推奨）
+- テスト対象: AnimationController、ExpressionController、AvatarService、AvatarUpload、AvatarManagement等
+- ステータス: 手順書作成完了
 
 ### 統合テスト
-- テストシナリオ: 4シナリオ定義（Viseme統合、AI感情連動、アバター切り替え、回帰テスト）
-- テストページ: /avatar-test でPhase 2機能の手動検証可能
-- ステータス: 手順書作成完了、テストページ動作確認済み
+- テストシナリオ: 5シナリオ定義（ジェスチャーデータフロー、アバターアップロードフロー、アイドルモーション統合、レスポンシブ、回帰テスト）
+- ステータス: 手順書作成完了
 
 ### パフォーマンステスト
-- フレームレート: 目標 30fps以上
-- アバター切り替え時間: 目標 5秒以内
-- Speech Marks追加レイテンシー: 目標 500ms以内
+- フレームレート: 目標 30fps以上（アイドル）、25fps以上（ジェスチャー中）
+- ジェスチャー応答時間: 目標 200ms以下
+- アバターアップロード時間: 目標 10秒以下（10MB）
 - ステータス: 手順書作成完了
 
 ### E2Eテスト
-- テストファイル: `avatar-emotion-test.spec.ts`
+- 既存テストファイル: `avatar-emotion-test.spec.ts`
 - 実行コマンド: `cd frontend && npx playwright test avatar-emotion-test.spec.ts --project=chromium`
-- ステータス: テストファイル存在、実行はユーザー判断
+- ステータス: 実行はユーザー判断
 
 ## 生成ドキュメント
 1. build-instructions.md - ビルド手順
@@ -69,8 +76,7 @@
 5. build-and-test-summary.md - テストサマリー（本ファイル）
 
 ## 全体ステータス
-- ビルド: 準備完了（リントエラー0件）
-- コード生成: 完了（Phase 2全11ステップ）
+- ビルド: 準備完了（リントエラー0件、型エラー0件）
+- コード生成: 完了（Phase 3全10ステップ）
 - テスト手順書: 完了
-- テストページ動作確認: 完了
 - Operationsへの準備: 完了

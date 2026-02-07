@@ -1,4 +1,4 @@
-# Build Instructions - 3Dアバター機能 Phase 2（標準実装）
+# Build Instructions - 3Dアバター機能 Phase 3（拡張実装）
 
 ## 前提条件
 - **Node.js**: 18.x以上
@@ -9,7 +9,7 @@
 
 ## 依存パッケージ
 
-### フロントエンド
+### フロントエンド（Phase 1から継続）
 ```json
 {
   "three": "^0.182.0",
@@ -18,9 +18,8 @@
 }
 ```
 
-### バックエンド（Lambda）
-- boto3（AWS SDK for Python）
-- Amazon Polly Speech Marks API対応
+### バックエンド（Lambda - 新規）
+- `cdk/lambda/avatars/requirements.txt`: boto3, aws-lambda-powertools
 
 ## ビルド手順
 
@@ -41,7 +40,7 @@ npx tsc --noEmit
 cd frontend
 npm run lint
 ```
-- **期待結果**: エラー0件（warning 1件はAvatarContext.tsxのreact-refresh警告で許容）
+- **期待結果**: エラー0件
 
 ### 4. フロントエンドビルド実行
 ```bash
@@ -59,44 +58,53 @@ cd cdk
 npm run deploy:dev
 ```
 - **注意**: `npm run build`は実行禁止（カスタムルール）
-- **変更対象Lambda**: textToSpeech（Speech Marks対応）、realtime-scoring（npcEmotion追加）
+- **新規Lambda**: avatars（VRMアバターCRUD）
+- **変更対象Lambda**: realtime-scoring（gestureフィールド追加）
+- **新規リソース**: S3バケット（アバターストレージ）、DynamoDBテーブル（アバターメタデータ）
 
-## Phase 2 変更ファイル一覧
+## Phase 3 変更ファイル一覧
 
-### バックエンド（3ファイル）
+### バックエンド（7ファイル）
 | ファイル | 変更内容 |
 |----------|----------|
-| `cdk/lambda/textToSpeech/app.ts` | Speech Marks API追加、visemeレスポンス |
-| `cdk/agents/realtime-scoring/models.py` | npcEmotionフィールド追加 |
-| `cdk/agents/realtime-scoring/prompts.py` | 感情推定プロンプト追加 |
+| `cdk/agents/realtime-scoring/models.py` | gestureフィールド追加 |
+| `cdk/agents/realtime-scoring/prompts.py` | ジェスチャー推定プロンプト追加 |
+| `cdk/lib/constructs/storage/avatar-storage.ts` | 新規: S3 + DynamoDB |
+| `cdk/lib/constructs/api/avatar-lambda.ts` | 新規: Lambda構成 |
+| `cdk/lambda/avatars/index.py` | 新規: CRUD Lambdaハンドラー |
+| `cdk/lib/constructs/api.ts` | アバターストレージ・API統合 |
+| `cdk/lib/constructs/api/api-gateway.ts` | アバターAPIルート追加 |
 
-### フロントエンド（8ファイル）
+### フロントエンド（10ファイル）
 | ファイル | 変更内容 |
 |----------|----------|
-| `frontend/src/types/avatar.ts` | viseme型、directEmotion型追加 |
-| `frontend/src/services/PollyService.ts` | visemeデータ取得メソッド追加 |
-| `frontend/src/services/ApiService.ts` | callPollyAPIレスポンスにvisemes追加 |
-| `frontend/src/services/AudioService.ts` | visemeデータ伝搬 |
-| `frontend/src/components/avatar/LipSyncController.ts` | visemeベースリップシンク |
-| `frontend/src/components/avatar/VRMAvatar.tsx` | viseme/directEmotion受け渡し |
-| `frontend/src/components/avatar/VRMAvatarContainer.tsx` | directEmotion対応 |
-| `frontend/src/pages/ConversationPage.tsx` | directEmotion連携、avatarId渡し |
+| `frontend/src/types/avatar.ts` | GestureType型追加 |
+| `frontend/src/components/avatar/AnimationController.ts` | ジェスチャー + アイドルモーション |
+| `frontend/src/components/avatar/ExpressionController.ts` | 感情トランジション高度化 |
+| `frontend/src/components/avatar/VRMAvatar.tsx` | gesture受け渡し |
+| `frontend/src/components/avatar/VRMAvatarContainer.tsx` | gesture受け渡し |
+| `frontend/src/pages/ConversationPage.tsx` | gestureデータフロー |
+| `frontend/src/services/AgentCoreService.ts` | gesture型追加 |
+| `frontend/src/services/ApiService.ts` | gesture型追加 |
+| `frontend/src/services/AvatarService.ts` | 新規: アバター管理API |
+| `frontend/src/components/avatar/AvatarUpload.tsx` | 新規: VRMアップロード |
 
-### その他（1ファイル）
+### i18n（2ファイル）
 | ファイル | 変更内容 |
 |----------|----------|
-| `frontend/public/models/avatars/manifest.json` | 複数アバター構造（v2.0.0） |
+| `frontend/src/i18n/locales/ja.json` | アバター管理キー追加 |
+| `frontend/src/i18n/locales/en.json` | アバター管理キー追加 |
 
 ## トラブルシューティング
 
-### Speech Marks APIエラー
-- **原因**: Polly APIのSpeechMarkTypes設定不正
-- **解決策**: textToSpeech Lambdaのログを確認、OutputFormat: 'json'が設定されているか確認
+### gestureフィールドが返されない
+- **原因**: realtime-scoringエージェントのプロンプト更新がデプロイされていない
+- **解決策**: `cd cdk && npm run deploy:dev`でバックエンドを再��プロイ
 
-### visemeデータが空
-- **原因**: Polly APIがvisemeを返さない場合がある（短いテキスト等）
-- **解決策**: Phase 1の音量ベースリップシンクにフォールバックされるため動作に影響なし
+### アバターアップロードAPI 403エラー
+- **原因**: API GatewayにアバターAPIルートが追加されていない
+- **解決策**: CDKデプロイが完了しているか確認
 
-### アバター切り替え時のエラー
-- **原因**: VRMファイルが存在しない
-- **解決策**: `public/models/avatars/`に対応するVRMファイルを配置
+### AnimationControllerでジェスチャーが動作しない
+- **原因**: VRMモデルにheadボーンが存在しない
+- **解決策**: VRoid Studioで作成したモデルを使用（humanoidボーン対応）

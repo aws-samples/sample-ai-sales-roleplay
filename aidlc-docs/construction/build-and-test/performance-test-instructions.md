@@ -1,84 +1,61 @@
-# Performance Test Instructions - 3Dアバター機能 Phase 2
+# Performance Test Instructions - 3Dアバター機能 Phase 3（拡張実装）
+
+## 目的
+Phase 3で追加されたアニメーション・アバター管理機能のパフォーマンスを検証する。
 
 ## パフォーマンス要件
-- フレームレート: 30fps以上（visemeリップシンク動作中含む）
-- VRMロード時間: 5秒以内
-- アバター切り替え時間: 5秒以内（モデルリロード含む）
-- メモリ使用量: 200MB以下（アバター部分）
-- CPU使用率: 30%以下（アイドル時）
-- Visemeレイテンシー: 音声再生との同期ずれ100ms以内
-- Speech Marks API追加レイテンシー: 500ms以内（並列実行）
 
-## Phase 2 追加テスト項目
-
-### 1. Visemeリップシンクのフレームレート影響
-- テスト内容: visemeベースリップシンク動作中のフレームレート
-- 手順: テストページで「こんにちは」再生中にFPSを計測
-- 目標: 30fps以上を維持
-
-### 2. アバター切り替え時間
-- テスト内容: アバター切り替え時のモデルリロード時間
-- 手順: テストページでアバターを切り替え、ローディング完了までの時間を計測
-- 目標: 5秒以内
-
-### 3. Speech Marks API追加レイテンシー
-- テスト内容: Speech Marks取得による音声合成の追加遅延
-- 手順: CloudWatch LogsでTextToSpeech Lambdaの実行時間を確認
-- 目標: 並列実行により追加レイテンシー500ms以内
-
-### 4. メモリリーク確認（アバター切り替え）
-- テスト内容: アバター切り替えを繰り返した際のメモリリーク
-- 手順: テストページでアバターを10回切り替え、メモリ使用量を確認
-- 目標: メモリ使用量が安定（増加し続けない）
+| 項目 | 目標値 |
+|------|--------|
+| フレームレート（アイドルモーション中） | 30fps以上 |
+| フレームレート（ジェスチャー実行中） | 25fps以上 |
+| ジェスチャー応答時間 | 200ms以下（gesture受信→アニメーション開始） |
+| 感情トランジション時間 | 300-800ms（感情種類による） |
+| VRMアップロード時間（10MB） | 10秒以下 |
+| アバター一覧取得時間 | 2秒以下 |
+| アバター切り替え時間 | 5秒以下 |
 
 ## テスト手順
 
-### フレームレート測定（Chrome DevTools Console）
+### 1. フレームレートテスト
 ```javascript
-let frameCount = 0;
+// DevTools Consoleで実行
+let frames = 0;
 let lastTime = performance.now();
-function measureFPS() {
-  frameCount++;
+function countFrames() {
+  frames++;
   const now = performance.now();
   if (now - lastTime >= 1000) {
-    console.log('FPS: ' + frameCount);
-    frameCount = 0;
+    console.log(`FPS: ${frames}`);
+    frames = 0;
     lastTime = now;
   }
-  requestAnimationFrame(measureFPS);
+  requestAnimationFrame(countFrames);
 }
-measureFPS();
+countFrames();
 ```
+- アイドルモーション中: 30fps以上を確認
+- ジェスチャー実行中: 25fps以上を確認
+- 感情トランジション中: 25fps以上を確認
 
-### パフォーマンスプロファイリング
-1. Chrome DevToolsを開く
-2. Performanceタブを選択
-3. 記録を開始
-4. テストページでPhase 2機能を操作
-5. 30秒間操作
-6. 記録を停止して結果を分析
+### 2. ジェスチャー応答時間テスト
+- DevTools Networkでリアルタイム評価APIのレスポンスタイミングを記録
+- アバターのアニメーション開始タイミングを目視確認
+- 差分が200ms以下であることを確認
 
-### 結果記録テンプレート
-| 項目 | 目標 | 実測値 | 判定 |
-|------|------|--------|------|
-| フレームレート（通常） | 30fps以上 | - | - |
-| フレームレート（viseme中） | 30fps以上 | - | - |
-| VRMロード時間 | 5秒以内 | - | - |
-| アバター切り替え時間 | 5秒以内 | - | - |
-| メモリ使用量 | 200MB以下 | - | - |
-| CPU使用率（アイドル） | 30%以下 | - | - |
-| Speech Marks追加レイテンシー | 500ms以内 | - | - |
+### 3. アバターアップロードパフォーマンス
+- 10MBのVRMファイルでアップロード時間を計測
+- S3署名付きURLの取得時間を確認（1秒以下）
+- ファイルアップロード時間を確認（ネットワーク速度依存）
 
-## 最適化のヒント
+### 4. メモリ使用量テスト
+- DevTools Memory タブでヒープスナップショットを取得
+- セッション開始前後のメモリ増加量を確認
+- アバター切り替え時のメモリリークがないことを確認
+- 長時間セッション（10分以上）でメモリが安定していることを確認
 
-### Visemeリップシンクが重い場合
-- MOUTH_TRANSITION_SPEEDの値を調整（現在12.0）
-- visemeデータの間引き処理を追加
-
-### アバター切り替えが遅い場合
-- VRMファイルのプリロードを実装
-- モデルキャッシュの導入を検討
-
-### Speech Marks APIが遅い場合
-- 音声合成とSpeech Marks取得の並列実行を確認
-- Lambda関数のメモリ割り当てを増加
+## パフォーマンス最適化のポイント
+- AnimationController: requestAnimationFrameベースの更新
+- ExpressionController: 感情変化時のみ更新処理実行
+- アイドルモーション: 発話中・ジェスチャー中は抑制
+- VRMモデル: キャッシュによる再ロード防止
