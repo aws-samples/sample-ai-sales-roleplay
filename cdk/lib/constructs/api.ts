@@ -8,7 +8,9 @@ import { Runtime, Architecture } from 'aws-cdk-lib/aws-lambda';
 import { ApiGatewayConstruct } from './api/api-gateway';
 import { AudioStorageConstruct } from './storage/audio-storage';
 import { VideoStorageConstruct } from './storage/video-storage';
+import { AvatarStorageConstruct } from './storage/avatar-storage';
 import { VideosLambdaConstruct } from './api/videos-lambda';
+import { AvatarLambdaConstruct } from './api/avatar-lambda';
 import { ScoringLambdaConstruct } from './api/scoring-lambda';
 import { SessionLambdaConstruct } from './api/session-lambda';
 import { ScenarioLambdaConstruct } from './api/scenario-lambda';
@@ -50,6 +52,12 @@ export class Api extends Construct {
 
   /** 動画ストレージ */
   public readonly videoStorage: VideoStorageConstruct;
+
+  /** アバターストレージ */
+  public readonly avatarStorage: AvatarStorageConstruct;
+
+  /** アバター管理Lambda */
+  public readonly avatarLambda: AvatarLambdaConstruct;
 
   /** 動画分析Lambda */
   public readonly videosLambda: VideosLambdaConstruct;
@@ -191,6 +199,17 @@ export class Api extends Construct {
       videoAnalysisModelId: bedrockModels.video // 環境設定から動画分析モデルIDを取得
     });
 
+    // アバターストレージの作成（VRMファイル + メタデータ）
+    this.avatarStorage = new AvatarStorageConstruct(this, 'AvatarStorage', {
+      resourceNamePrefix: props.resourceNamePrefix,
+    });
+
+    // アバター管理Lambda関数
+    this.avatarLambda = new AvatarLambdaConstruct(this, 'AvatarLambda', {
+      avatarBucket: this.avatarStorage.bucket,
+      avatarTable: this.avatarStorage.table,
+    });
+
     // ガードレールLambda関数を作成
     this.guardrailsLambda = new GuardrailsLambdaConstruct(this, 'GuardrailsLambda', {
       envId: props.envId
@@ -270,6 +289,7 @@ export class Api extends Construct {
       guardrailsFunction: this.guardrailsLambda.function,
       audioAnalysisFunction: this.audioAnalysisLambda.apiFunction,
       sessionAnalysisFunction: this.sessionAnalysisLambda.apiFunction,
+      avatarFunction: this.avatarLambda.function,
     });
   }
 }

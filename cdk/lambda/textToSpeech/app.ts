@@ -1,6 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { PollyClient, SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
+import { PollyClient, SynthesizeSpeechCommand, TextType, Engine, OutputFormat, SpeechMarkType } from '@aws-sdk/client-polly';
 import * as crypto from 'crypto';
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
@@ -45,6 +45,12 @@ interface TextToSpeechResponse {
 /**
  * 音声合成を実行（フォールバック機能付き）
  */
+function getLexiconName(languageCode: string): string {
+  if (languageCode.startsWith('ja')) return `${envId}ja`;
+  if (languageCode.startsWith('en')) return `${envId}en`;
+  return 'ja';
+}
+
 async function synthesizeSpeech(
   text: string,
   requestedVoiceId: string,
@@ -52,39 +58,30 @@ async function synthesizeSpeech(
   languageCode: string,
   textType: string,
   outputFormat: string
-): Promise<{ success: true; audioStream: any; finalVoiceId: string; finalEngine: string } | { success: false; error: string }> {
-
-  // まず希望の音声・エンジンを試行
-  const initialStrategy = { voiceId: requestedVoiceId, engine: requestedEngine };
+): Promise<{ success: true; audioStream: NodeJS.ReadableStream; finalVoiceId: string; finalEngine: string } | { success: false; error: string }> {
 
   try {
     console.log(`音声合成試行: ${requestedVoiceId} + ${requestedEngine}`);
 
-    let lexiconName = "ja"
-    if (languageCode.startsWith('ja')) lexiconName = `${envId}ja`
-    if (languageCode.startsWith('en')) lexiconName = `${envId}en`
-
-    const pollyParams = {
-      Engine: requestedEngine as 'standard' | 'neural',
-      OutputFormat: outputFormat as 'json' | 'mp3' | 'ogg_vorbis' | 'pcm',
+    const pollyCommand = new SynthesizeSpeechCommand({
+      Engine: requestedEngine as Engine,
+      OutputFormat: outputFormat as OutputFormat,
       Text: text,
-      TextType: textType as any,
+      TextType: textType as TextType,
       VoiceId: requestedVoiceId,
       LanguageCode: languageCode,
-      // 言語コードに基づいて適切なLexiconを適用
-      LexiconNames: [lexiconName],
-    } as any;
+      LexiconNames: [getLexiconName(languageCode)],
+    });
 
-    console.log('Pollyパラメータ:', JSON.stringify(pollyParams));
+    console.log('Pollyパラメータ:', JSON.stringify(pollyCommand.input));
 
-    const pollyCommand = new SynthesizeSpeechCommand(pollyParams);
     const pollyResponse = await pollyClient.send(pollyCommand);
 
     if (pollyResponse.AudioStream) {
       console.log(`音声合成成功: ${requestedVoiceId} + ${requestedEngine}`);
       return {
         success: true,
-        audioStream: pollyResponse.AudioStream,
+        audioStream: pollyResponse.AudioStream as unknown as NodeJS.ReadableStream,
         finalVoiceId: requestedVoiceId,
         finalEngine: requestedEngine
       };
@@ -109,22 +106,17 @@ async function getSpeechMarks(
   textType: string
 ): Promise<VisemeEntry[]> {
   try {
-    let lexiconName = "ja";
-    if (languageCode.startsWith('ja')) lexiconName = `${envId}ja`;
-    if (languageCode.startsWith('en')) lexiconName = `${envId}en`;
-
-    const params = {
-      Engine: engine as 'standard' | 'neural',
-      OutputFormat: 'json' as const,
+    const command = new SynthesizeSpeechCommand({
+      Engine: engine as Engine,
+      OutputFormat: 'json' as OutputFormat,
       Text: text,
-      TextType: textType as any,
+      TextType: textType as TextType,
       VoiceId: voiceId,
       LanguageCode: languageCode,
-      LexiconNames: [lexiconName],
-      SpeechMarkTypes: ['viseme'] as any,
-    } as any;
+      LexiconNames: [getLexiconName(languageCode)],
+      SpeechMarkTypes: ['viseme' as SpeechMarkType],
+    });
 
-    const command = new SynthesizeSpeechCommand(params);
     const response = await pollyClient.send(command);
 
     if (!response.AudioStream) return [];
@@ -215,18 +207,17 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const textType = body.textType || 'text'; // text または ssml
     const outputFormat = 'mp3';
 
-    const synthesisResult = await synthesizeSpeech(
-      text, requestedVoiceId, requestedEngine, languageCode, textType, outputFormat
-    );
-
-    // Speech Marks（viseme）を並列取得（失敗しても音声合成は続行）
-    let visemes: VisemeEntry[] = [];
-    const visemePromise = getSpeechMarks(
-      text, requestedVoiceId, requestedEngine, languageCode, textType
-    ).then(v => { visemes = v; }).catch(() => { /* viseme取得失敗は無視 */ });
-
-    // viseme取得を待つ（最大2秒）
-    await Promise.race([visemePromise, new Promise(resolve => setTimeout(resolve, 2000))]);
+    const [synthesisResult, visemes] = await Promise.all([
+      synthesizeSpeech(
+        text, requestedVoiceId, requestedEngine, languageCode, textType, outputFormat
+      ),
+      getSpeechMarks(
+        text, requestedVoiceId, requestedEngine, languageCode, textType
+      ).catch((error) => {
+        console.error('Viseme取得エラー（音声合成は続行）:', error);
+        return [] as VisemeEntry[];
+      }),
+    ]);
 
     if (!synthesisResult.success) {
       return createResponse(500, {
