@@ -22,6 +22,7 @@ export class AudioService {
     id: string;
     audio: HTMLAudioElement;
     text: string;
+    visemes?: Array<{ time: number; type: string; value: string }>;
   }> = [];
   private isPlaying: boolean = false;
   private audioEnabled: boolean = true;
@@ -137,14 +138,7 @@ export class AudioService {
 
         // タスクがキャンセルされていない場合のみ続行
         if (!controller.signal.aborted) {
-          // visemeデータをCustomEventで配信
-          if (result.visemes && result.visemes.length > 0) {
-            window.dispatchEvent(new CustomEvent('visemeData', {
-              detail: { messageId, visemes: result.visemes }
-            }));
-          }
-
-          // 音声をキューに追加
+          // 音声をキューに追加（visemeデータも一緒に保持）
           const audio = new Audio(result.audioUrl);
           audio.volume = this.audioVolume;
 
@@ -152,6 +146,7 @@ export class AudioService {
             id: messageId,
             audio,
             text: chunk,
+            visemes: result.visemes && result.visemes.length > 0 ? result.visemes : undefined,
           });
 
           console.log(`音声をキューに追加: ${chunk.substring(0, 20)}...`);
@@ -324,7 +319,14 @@ export class AudioService {
     };
 
     // 再生開始
-    nextAudio.audio.play().catch((error) => {
+    nextAudio.audio.play().then(() => {
+      // 音声再生開始成功時にvisemeデータを配信（音声と同期）
+      if (nextAudio.visemes) {
+        window.dispatchEvent(new CustomEvent('visemeData', {
+          detail: { messageId: nextAudio.id, visemes: nextAudio.visemes }
+        }));
+      }
+    }).catch((error) => {
       console.error("音声再生開始エラー:", error);
       const failedMessageId = nextAudio.id;
       this.audioQueue.shift();
