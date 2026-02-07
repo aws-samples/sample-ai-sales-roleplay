@@ -6,7 +6,30 @@
     "loading": "Loading avatar...",
     "loadError": "Failed to load avatar",
     "webglNotSupported": "Your browser does not support WebGL. Please use a WebGL-compatible browser to display the 3D avatar.",
-    "speaking": "Speaking"
+    "speaking": "Speaking",
+    "upload": {
+      "selectFile": "Select VRM File",
+      "start": "Start Upload",
+      "progress": "Upload Progress",
+      "uploading": "Uploading...",
+      "invalidFormat": "Only VRM files can be uploaded",
+      "tooLarge": "File size must be 50MB or less",
+      "success": "Avatar upload completed",
+      "error": "Upload failed"
+    },
+    "management": {
+      "title": "Avatar Management",
+      "upload": "Upload New Avatar",
+      "empty": "No uploaded avatars",
+      "loading": "Loading",
+      "select": "Select",
+      "selected": "Selected",
+      "delete": "Delete",
+      "deleteConfirmTitle": "Delete Avatar",
+      "deleteConfirmMessage": "Delete \"{{name}}\"? This action cannot be undone.",
+      "statusActive": "Available",
+      "statusUploading": "Uploading"
+    }
   },
   "home": {
     "title": "AI Sales Role-Play",

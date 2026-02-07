@@ -398,6 +398,7 @@ export class ApiService {
     compliance?: ComplianceCheck;
     npcEmotion?: string;
     npcEmotionIntensity?: number;
+    gesture?: string;
   }> {
     try {
       // AgentCore Runtimeを使用（会話履歴はAgentCore Memoryで管理）
