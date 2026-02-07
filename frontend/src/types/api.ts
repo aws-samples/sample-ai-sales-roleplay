@@ -289,6 +289,7 @@ export interface ScenarioInfo {
   createdAt?: number; // 作成日時（タイムスタンプ）
   updatedAt?: number; // 更新日時（タイムスタンプ）
   pdfFiles?: PdfFileInfo[]; // PDF資料情報
+  avatarId?: string; // 使用するアバターのID（未指定時はデフォルトアバターを使用）
 }
 
 /**

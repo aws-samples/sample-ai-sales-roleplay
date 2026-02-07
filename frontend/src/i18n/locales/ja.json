@@ -1,4 +1,13 @@
 {
+  "avatar": {
+    "label": "3Dアバター表示エリア",
+    "description": "現在の感情状態を3Dアバターで表現しています",
+    "emotion": "感情",
+    "loading": "アバターを読み込み中...",
+    "loadError": "アバターの読み込みに失敗しました",
+    "webglNotSupported": "お使いのブラウザはWebGLをサポートしていません。3Dアバターを表示するには、WebGL対応のブラウザをご使用ください。",
+    "speaking": "発話中"
+  },
   "home": {
     "title": "AI営業ロールプレイ",
     "subtitle": "AIと対話しながら営業スキルを磨こう",

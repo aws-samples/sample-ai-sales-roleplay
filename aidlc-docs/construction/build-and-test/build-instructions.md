@@ -1,115 +1,102 @@
-# Build Instructions: AgentCore Runtime Migration
-
-## 概要
-AgentCore Runtime移行のビルド手順を記載します。
-
----
+# Build Instructions - 3Dアバター機能 Phase 2（標準実装）
 
 ## 前提条件
+- **Node.js**: 18.x以上
+- **npm**: 9.x以上
+- **Python**: 3.9以上（バックエンドLambda）
+- **ブラウザ**: Chrome最新版（WebGL対応）
+- **AWS CLI**: 最新版（デプロイ時）
 
-- Node.js 22+
-- Python 3.9+
-- AWS CLI 2+ (設定済み)
-- AWS CDK 2+
+## 依存パッケージ
 
----
+### フロントエンド
+```json
+{
+  "three": "^0.182.0",
+  "@pixiv/three-vrm": "^3.4.5",
+  "@types/three": "^0.182.0"
+}
+```
+
+### バックエンド（Lambda）
+- boto3（AWS SDK for Python）
+- Amazon Polly Speech Marks API対応
 
 ## ビルド手順
 
-### Step 1: 依存関係インストール
-
+### 1. フロントエンド依存関係のインストール
 ```bash
-# CDK依存関係
-cd cdk
-npm install
-
-# フロントエンド依存関係
-cd ../frontend
+cd frontend
 npm install
 ```
 
-### Step 2: TypeScript型チェック（CDK）
-
+### 2. TypeScript型チェック
 ```bash
-cd cdk
+cd frontend
 npx tsc --noEmit
 ```
 
-**注意**: `npm run build`は実行禁止です。
-
-### Step 3: CDK Synth（テンプレート生成）
-
+### 3. リントチェック
 ```bash
-cd cdk
-npm run synth:dev
+cd frontend
+npm run lint
 ```
+- **期待結果**: エラー0件（warning 1件はAvatarContext.tsxのreact-refresh警告で許容）
 
-### Step 4: フロントエンドビルド
-
+### 4. フロントエンドビルド実行
 ```bash
 cd frontend
 npm run build:full
 ```
 
-### Step 5: Lint実行
+### 5. ビルド成功の確認
+- **期待される出力**: `dist/`ディレクトリにビルド成果物が生成される
+- **ビルド成果物**: `dist/index.html`, `dist/assets/*.js`, `dist/assets/*.css`
 
+### 6. バックエンドデプロイ（CDK）
 ```bash
-# CDK
 cd cdk
-npm run lint
-
-# フロントエンド
-cd ../frontend
-npm run lint
+npm run deploy:dev
 ```
+- **注意**: `npm run build`は実行禁止（カスタムルール）
+- **変更対象Lambda**: textToSpeech（Speech Marks対応）、realtime-scoring（npcEmotion追加）
 
----
+## Phase 2 変更ファイル一覧
 
-## 段階的統合手順
+### バックエンド（3ファイル）
+| ファイル | 変更内容 |
+|----------|----------|
+| `cdk/lambda/textToSpeech/app.ts` | Speech Marks API追加、visemeレスポンス |
+| `cdk/agents/realtime-scoring/models.py` | npcEmotionフィールド追加 |
+| `cdk/agents/realtime-scoring/prompts.py` | 感情推定プロンプト追加 |
 
-### Phase 1: AgentCore Runtime CDKコンストラクト検証
+### フロントエンド（8ファイル）
+| ファイル | 変更内容 |
+|----------|----------|
+| `frontend/src/types/avatar.ts` | viseme型、directEmotion型追加 |
+| `frontend/src/services/PollyService.ts` | visemeデータ取得メソッド追加 |
+| `frontend/src/services/ApiService.ts` | callPollyAPIレスポンスにvisemes追加 |
+| `frontend/src/services/AudioService.ts` | visemeデータ伝搬 |
+| `frontend/src/components/avatar/LipSyncController.ts` | visemeベースリップシンク |
+| `frontend/src/components/avatar/VRMAvatar.tsx` | viseme/directEmotion受け渡し |
+| `frontend/src/components/avatar/VRMAvatarContainer.tsx` | directEmotion対応 |
+| `frontend/src/pages/ConversationPage.tsx` | directEmotion連携、avatarId渡し |
 
-1. `cdk/lib/constructs/agentcore/agentcore-runtime.ts`の型チェック
-2. `cdk/lib/constructs/agentcore/index.ts`のエクスポート確認
-
-### Phase 2: InfrastructureStack統合
-
-1. `cdk/lib/infrastructure-stack.ts`にAgentCoreRuntimeをインポート
-2. 各エージェント用のAgentCoreRuntimeインスタンスを作成
-3. 既存のApiコンストラクトとの依存関係を確認
-
-### Phase 3: Step Functions更新
-
-1. `cdk/lib/constructs/session-analysis-stepfunctions.ts`を更新
-2. Lambda呼び出しをAgentCore Runtime呼び出しに変更
-
-### Phase 4: フロントエンド統合
-
-1. `AgentCoreService.ts`の型チェック
-2. 既存サービスとの統合テスト
-
----
+### その他（1ファイル）
+| ファイル | 変更内容 |
+|----------|----------|
+| `frontend/public/models/avatars/manifest.json` | 複数アバター構造（v2.0.0） |
 
 ## トラブルシューティング
 
-### CfnRuntime型エラー
+### Speech Marks APIエラー
+- **原因**: Polly APIのSpeechMarkTypes設定不正
+- **解決策**: textToSpeech Lambdaのログを確認、OutputFormat: 'json'が設定されているか確認
 
-```
-Property 'CfnRuntime' does not exist on type 'typeof import("aws-cdk-lib/aws-bedrockagentcore")'
-```
+### visemeデータが空
+- **原因**: Polly APIがvisemeを返さない場合がある（短いテキスト等）
+- **解決策**: Phase 1の音量ベースリップシンクにフォールバックされるため動作に影響なし
 
-**解決策**: AWS CDKバージョンを確認し、最新版にアップデート
-
-```bash
-npm update aws-cdk-lib
-```
-
-### AgentCore Memory API未対応
-
-AgentCore Memory APIがまだSDKに含まれていない場合、S3フォールバックを使用します。
-
----
-
-## 次のステップ
-
-ビルドが成功したら、`unit-test-instructions.md`に従ってテストを実行してください。
+### アバター切り替え時のエラー
+- **原因**: VRMファイルが存在しない
+- **解決策**: `public/models/avatars/`に対応するVRMファイルを配置

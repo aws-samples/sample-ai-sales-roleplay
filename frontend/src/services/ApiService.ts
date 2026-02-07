@@ -396,6 +396,8 @@ export class ApiService {
     analysis?: string;
     goalStatuses?: GoalStatus[];
     compliance?: ComplianceCheck;
+    npcEmotion?: string;
+    npcEmotionIntensity?: number;
   }> {
     try {
       // AgentCore Runtimeを使用（会話履歴はAgentCore Memoryで管理）
@@ -1355,6 +1357,7 @@ export class ApiService {
     voiceId?: string;
     engine?: string;
     fileName?: string;
+    visemes?: Array<{ time: number; type: string; value: string }>;
     error?: string;
     message?: string;
   }> {
@@ -1367,6 +1370,7 @@ export class ApiService {
         voiceId?: string;
         engine?: string;
         fileName?: string;
+        visemes?: Array<{ time: number; type: string; value: string }>;
         error?: string;
         message?: string;
       }>("/polly/convert", requestBody);

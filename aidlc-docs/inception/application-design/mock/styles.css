@@ -1,0 +1,728 @@
+/* ========================================
+   3Dアバター機能モック - スタイルシート
+   ======================================== */
+
+:root {
+  /* カラーパレット（ライトテーマ） */
+  --bg-primary: #f5f5f5;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e8e8e8;
+  --text-primary: #333333;
+  --text-secondary: #666666;
+  --accent-primary: #1976d2;
+  --accent-secondary: #42a5f5;
+  --success: #2e7d32;
+  --warning: #ed6c02;
+  --error: #d32f2f;
+  --border: #ddd;
+  --shadow: rgba(0, 0, 0, 0.1);
+
+  /* サイズ */
+  --header-height: 60px;
+  --sidebar-width: 280px;
+  --footer-height: 150px;
+  --border-radius: 8px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+}
+
+/* ダークテーマ */
+[data-theme="dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --bg-tertiary: #3d3d3d;
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0b0;
+  --border: #444;
+  --shadow: rgba(0, 0, 0, 0.3);
+}
+
+/* リセット */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+/* ========================================
+   レイアウト
+   ======================================== */
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.header {
+  height: var(--header-height);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--spacing-lg);
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - var(--header-height) - var(--footer-height));
+}
+
+/* ========================================
+   サイドバー（コントロールパネル）
+   ======================================== */
+
+.control-panel {
+  width: var(--sidebar-width);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  padding: var(--spacing-md);
+  overflow-y: auto;
+}
+
+.control-panel h2 {
+  font-size: 1rem;
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 2px solid var(--accent-primary);
+}
+
+.control-section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.control-section h3 {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-sm);
+}
+
+/* アバターセレクター */
+.avatar-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-sm);
+}
+
+.avatar-thumbnail {
+  width: 70px;
+  height: 70px;
+  border: 2px solid var(--border);
+  border-radius: var(--border-radius);
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  transition: all 0.2s ease;
+}
+
+.avatar-thumbnail:hover {
+  border-color: var(--accent-secondary);
+  transform: scale(1.05);
+}
+
+.avatar-thumbnail.selected {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.3);
+}
+
+/* メトリクスコントロール */
+.metric-control {
+  margin-bottom: var(--spacing-md);
+}
+
+.metric-control label {
+  display: block;
+  font-size: 0.875rem;
+  margin-bottom: 4px;
+}
+
+.metric-control input[type="range"] {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.metric-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  cursor: pointer;
+}
+
+/* 感情表示 */
+.emotion-display {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--bg-tertiary);
+  border-radius: var(--border-radius);
+}
+
+.emotion-emoji {
+  font-size: 2.5rem;
+}
+
+.emotion-label {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+/* ========================================
+   アバター表示エリア
+   ======================================== */
+
+.avatar-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+  background: var(--bg-primary);
+}
+
+.vrm-avatar-container {
+  width: 400px;
+  height: 450px;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  border-radius: var(--border-radius);
+  box-shadow: 0 4px 20px var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.webgl-status {
+  position: absolute;
+  top: var(--spacing-sm);
+  right: var(--spacing-sm);
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--success);
+  color: white;
+}
+
+.webgl-status.error {
+  background: var(--error);
+}
+
+/* アバター表示 */
+.avatar-display {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.avatar-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* アバターの顔（モック） */
+.avatar-face {
+  width: 150px;
+  height: 150px;
+  background: linear-gradient(180deg, #ffd5b8 0%, #ffcba4 100%);
+  border-radius: 50%;
+  position: relative;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.avatar-eyes {
+  position: absolute;
+  top: 45px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+}
+
+.eye {
+  width: 20px;
+  height: 20px;
+  background: #333;
+  border-radius: 50%;
+  position: relative;
+  animation: blink 4s infinite;
+}
+
+.eye::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 6px;
+  height: 6px;
+  background: white;
+  border-radius: 50%;
+}
+
+@keyframes blink {
+
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+
+.avatar-mouth {
+  position: absolute;
+  bottom: 35px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 15px;
+  background: #c44;
+  border-radius: 0 0 20px 20px;
+  transition: all 0.15s ease;
+}
+
+/* 感情による表情変化 */
+.avatar-face.happy .avatar-mouth {
+  width: 50px;
+  height: 25px;
+  border-radius: 0 0 25px 25px;
+}
+
+.avatar-face.angry .eye {
+  transform: rotate(-15deg);
+}
+
+.avatar-face.angry .eye.right {
+  transform: rotate(15deg);
+}
+
+.avatar-face.angry .avatar-mouth {
+  width: 30px;
+  height: 8px;
+  border-radius: 0;
+}
+
+.avatar-face.annoyed .avatar-mouth {
+  width: 35px;
+  height: 5px;
+  border-radius: 0;
+}
+
+.avatar-face.satisfied .avatar-mouth {
+  width: 45px;
+  height: 20px;
+  border-radius: 0 0 22px 22px;
+}
+
+/* 発話時の口アニメーション */
+.avatar-face.speaking .avatar-mouth {
+  animation: speak 0.2s infinite alternate;
+}
+
+@keyframes speak {
+  0% {
+    height: 10px;
+    width: 30px;
+  }
+
+  100% {
+    height: 25px;
+    width: 40px;
+  }
+}
+
+/* アバターの体 */
+.avatar-body {
+  width: 120px;
+  height: 100px;
+  background: linear-gradient(180deg, #4a90d9 0%, #357abd 100%);
+  border-radius: 60px 60px 0 0;
+  margin-top: -10px;
+  animation: breathe 4s ease-in-out infinite;
+}
+
+@keyframes breathe {
+
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+
+  50% {
+    transform: scaleY(1.02);
+  }
+}
+
+/* 発話インジケーター */
+.speaking-indicator {
+  position: absolute;
+  bottom: var(--spacing-md);
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(25, 118, 210, 0.9);
+  color: white;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  z-index: 5;
+}
+
+.speaking-indicator:not([hidden]) {
+  display: flex;
+}
+
+.speaker-icon {
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ローディング */
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  z-index: 10;
+}
+
+.loading-overlay:not([hidden]) {
+  display: flex;
+}
+
+[data-theme="dark"] .loading-overlay {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--bg-tertiary);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* エラー表示 */
+.error-display {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.95);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  text-align: center;
+  z-index: 10;
+}
+
+.error-display:not([hidden]) {
+  display: flex;
+}
+
+.error-message {
+  color: var(--error);
+  font-weight: 500;
+}
+
+/* アバター情報 */
+.avatar-info {
+  margin-top: var(--spacing-lg);
+  padding: var(--spacing-md);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  text-align: center;
+}
+
+.avatar-info h3 {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.avatar-info p {
+  font-size: 0.875rem;
+  margin: 4px 0;
+}
+
+/* ========================================
+   コンポーネントツリー
+   ======================================== */
+
+.component-tree {
+  width: var(--sidebar-width);
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  padding: var(--spacing-md);
+  overflow-y: auto;
+}
+
+.component-tree h2,
+.component-tree h3 {
+  font-size: 0.875rem;
+  margin-bottom: var(--spacing-sm);
+  color: var(--text-secondary);
+}
+
+.component-tree h3 {
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border);
+}
+
+.tree-view {
+  font-size: 0.8rem;
+}
+
+.tree-node {
+  padding: 6px var(--spacing-sm);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: default;
+}
+
+.tree-node:hover {
+  background: var(--bg-tertiary);
+}
+
+.tree-node.active {
+  background: rgba(25, 118, 210, 0.1);
+  border-left: 3px solid var(--accent-primary);
+}
+
+.tree-node.indent-1 {
+  padding-left: 20px;
+}
+
+.tree-node.indent-2 {
+  padding-left: 36px;
+}
+
+.tree-node.indent-3 {
+  padding-left: 52px;
+}
+
+.tree-node.indent-4 {
+  padding-left: 68px;
+}
+
+.node-icon {
+  font-size: 1rem;
+}
+
+/* データフロー */
+.data-flow {
+  font-size: 0.75rem;
+  margin-top: var(--spacing-sm);
+}
+
+.flow-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.flow-label {
+  font-weight: 600;
+  min-width: 60px;
+}
+
+.flow-arrow {
+  color: var(--accent-primary);
+}
+
+.flow-data {
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+/* ========================================
+   ログパネル
+   ======================================== */
+
+.log-panel {
+  height: var(--footer-height);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  padding: var(--spacing-md);
+}
+
+.log-panel h3 {
+  font-size: 0.875rem;
+  margin-bottom: var(--spacing-sm);
+  color: var(--text-secondary);
+}
+
+.log-container {
+  height: calc(var(--footer-height) - 50px);
+  overflow-y: auto;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  padding: var(--spacing-sm);
+}
+
+.log-entry {
+  padding: 4px var(--spacing-sm);
+  border-radius: 2px;
+  margin-bottom: 2px;
+}
+
+.log-entry.info {
+  color: var(--accent-primary);
+}
+
+.log-entry.success {
+  color: var(--success);
+}
+
+.log-entry.warning {
+  color: var(--warning);
+}
+
+.log-entry.error {
+  color: var(--error);
+}
+
+/* ========================================
+   ボタン
+   ======================================== */
+
+.btn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--accent-secondary);
+}
+
+.btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--border);
+}
+
+.status-text {
+  font-size: 0.875rem;
+  margin-top: var(--spacing-sm);
+  color: var(--text-secondary);
+}
+
+/* ========================================
+   レスポンシブ
+   ======================================== */
+
+@media (max-width: 1200px) {
+  .component-tree {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .main-content {
+    flex-direction: column;
+  }
+
+  .control-panel {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    max-height: 300px;
+  }
+
+  .avatar-selector {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+/* prefers-reduced-motion対応 */
+@media (prefers-reduced-motion: reduce) {
+
+  .eye,
+  .avatar-body,
+  .avatar-face.speaking .avatar-mouth,
+  .speaker-icon,
+  .spinner {
+    animation: none;
+  }
+}

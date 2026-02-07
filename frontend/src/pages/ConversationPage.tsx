@@ -32,7 +32,7 @@ import VideoManager from "../components/recording/v2/VideoManager";
 // 分割したコンポーネントをインポート
 import ConversationHeader from "../components/conversation/ConversationHeader";
 import NPCInfoCard from "../components/conversation/NPCInfoCard";
-import EmojiFeedbackContainer from "../components/conversation/EmojiFeedbackContainer";
+import { VRMAvatarContainer, AvatarProvider } from "../components/avatar";
 import MessageList from "../components/conversation/MessageList";
 import MessageInput from "../components/conversation/MessageInput";
 // クリーンアップ用のuseEffectを追加
@@ -71,6 +71,10 @@ const ConversationPage: React.FC = () => {
   const [sessionId, setSessionId] = useState<string>("");
   // アバターの表情状態管理用の状態変数
   const [currentEmotion, setCurrentEmotion] = useState<string>("neutral");
+  // NPC感情状態（リアルタイム評価から取得、アバターに直接渡す）
+  const [npcDirectEmotion, setNpcDirectEmotion] = useState<EmotionState | undefined>(undefined);
+  // シナリオに紐づくアバターID
+  const [scenarioAvatarId, setScenarioAvatarId] = useState<string | undefined>(undefined);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [audioVolume, setAudioVolume] = useState<number>(80);
   const [speechRate, setSpeechRate] = useState<number>(1.15);
@@ -233,6 +237,11 @@ const ConversationPage: React.FC = () => {
 
             setScenario(convertedScenario);
             setCurrentMetrics(convertedScenario.initialMetrics);
+
+            // シナリオに紐づくアバターIDを設定
+            if (scenarioInfo.avatarId) {
+              setScenarioAvatarId(scenarioInfo.avatarId);
+            }
 
             // ゴール情報の初期化
             setGoals(
@@ -697,6 +706,15 @@ const ConversationPage: React.FC = () => {
               if (evaluationResult) {
                 // 前回のメトリクスを保存
                 setPrevMetrics(currentMetrics);
+
+                // NPC感情状態をアバターに反映
+                if (evaluationResult.npcEmotion) {
+                  const validEmotions: EmotionState[] = ['happy', 'angry', 'sad', 'relaxed', 'neutral'];
+                  const emotion = evaluationResult.npcEmotion as EmotionState;
+                  if (validEmotions.includes(emotion)) {
+                    setNpcDirectEmotion(emotion);
+                  }
+                }
 
                 // 新しいメトリクスを設定
                 setCurrentMetrics((prevMetrics) => ({
@@ -1167,24 +1185,29 @@ const ConversationPage: React.FC = () => {
               <NPCInfoCard npc={scenario.npc} />
             </Box>
 
-            {/* 絵文字フィードバック表示エリア - 中央に配置 */}
+            {/* 3Dアバター表示エリア - 中央に配置 */}
             {sessionStarted && (
               <Box
                 sx={{
                   width: "20%",
-                  minWidth: "100px",
+                  minWidth: "150px",
+                  minHeight: "200px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <EmojiFeedbackContainer
-                  angerLevel={currentMetrics.angerLevel}
-                  trustLevel={currentMetrics.trustLevel}
-                  progressLevel={currentMetrics.progressLevel}
-                  isSpeaking={isSpeaking}
-                  onEmotionChange={handleEmotionChange}
-                />
+                <AvatarProvider>
+                  <VRMAvatarContainer
+                    avatarId={scenarioAvatarId}
+                    angerLevel={currentMetrics.angerLevel}
+                    trustLevel={currentMetrics.trustLevel}
+                    progressLevel={currentMetrics.progressLevel}
+                    isSpeaking={isSpeaking}
+                    directEmotion={npcDirectEmotion}
+                    onEmotionChange={handleEmotionChange}
+                  />
+                </AvatarProvider>
               </Box>
             )}
 

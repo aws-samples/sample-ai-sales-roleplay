@@ -163,6 +163,49 @@ export class PollyService {
   }
 
   /**
+   * テキストを音声に変換し、visemeデータも取得する（Phase 2）
+   * @param text 音声に変換するテキスト
+   * @param voiceId 音声のタイプ（オプション）
+   * @param rate 読み上げ速度（オプション）
+   * @returns 音声URLとvisemeデータ
+   */
+  public async synthesizeSpeechWithViseme(
+    text: string,
+    voiceId?: string,
+    rate?: number,
+  ): Promise<{ audioUrl: string; visemes?: Array<{ time: number; type: string; value: string }> }> {
+    try {
+      const ssmlText = this.textToSSML(text, rate);
+      const currentLanguage = i18next.language.split("-")[0] || "ja";
+      const pollySettings = getPollySettingsForLanguage(currentLanguage);
+      const finalVoiceId = voiceId || pollySettings.voiceId;
+
+      const requestBody = {
+        text: ssmlText,
+        voiceId: finalVoiceId,
+        engine: "neural",
+        languageCode: pollySettings.languageCode,
+        textType: "ssml" as const,
+      };
+
+      const apiService = ApiService.getInstance();
+      const response = await apiService.callPollyAPI(requestBody);
+
+      if (!response.success || !response.audioUrl) {
+        throw new Error(response.error || response.message || "音声URLの取得に失敗しました");
+      }
+
+      return {
+        audioUrl: response.audioUrl,
+        visemes: response.visemes,
+      };
+    } catch (error) {
+      console.error("Polly音声合成（viseme付き）エラー:", error);
+      throw error;
+    }
+  }
+
+  /**
    * テキストを指定された速度で音声に変換する（便利メソッド）
    * @param text 音声に変換するテキスト
    * @param rate 読み上げ速度（1.0が標準、0.5～2.0の範囲）

@@ -23,6 +23,12 @@ interface TextToSpeechRequest {
   textType?: 'text' | 'ssml';
 }
 
+interface VisemeEntry {
+  time: number;
+  type: string;
+  value: string;
+}
+
 interface TextToSpeechResponse {
   success: boolean;
   audioUrl?: string;
@@ -31,6 +37,7 @@ interface TextToSpeechResponse {
   voiceId?: string;
   engine?: string;
   fileName?: string;
+  visemes?: VisemeEntry[];
   error?: string;
   message?: string;
 }
@@ -88,6 +95,60 @@ async function synthesizeSpeech(
   return {
     success: false,
     error: `音声合成失敗: ${requestedVoiceId} + ${requestedEngine}`
+  }
+}
+
+/**
+ * Speech Marks（viseme）を取得
+ */
+async function getSpeechMarks(
+  text: string,
+  voiceId: string,
+  engine: string,
+  languageCode: string,
+  textType: string
+): Promise<VisemeEntry[]> {
+  try {
+    let lexiconName = "ja";
+    if (languageCode.startsWith('ja')) lexiconName = `${envId}ja`;
+    if (languageCode.startsWith('en')) lexiconName = `${envId}en`;
+
+    const params = {
+      Engine: engine as 'standard' | 'neural',
+      OutputFormat: 'json' as const,
+      Text: text,
+      TextType: textType as any,
+      VoiceId: voiceId,
+      LanguageCode: languageCode,
+      LexiconNames: [lexiconName],
+      SpeechMarkTypes: ['viseme'] as any,
+    } as any;
+
+    const command = new SynthesizeSpeechCommand(params);
+    const response = await pollyClient.send(command);
+
+    if (!response.AudioStream) return [];
+
+    const buffer = await streamToBuffer(response.AudioStream);
+    const jsonLines = buffer.toString('utf-8').trim().split('\n');
+
+    const visemes: VisemeEntry[] = jsonLines
+      .filter(line => line.trim())
+      .map(line => {
+        try {
+          const parsed = JSON.parse(line);
+          return { time: parsed.time, type: parsed.type, value: parsed.value };
+        } catch {
+          return null;
+        }
+      })
+      .filter((v): v is VisemeEntry => v !== null && v.type === 'viseme');
+
+    console.log(`Speech Marks取得成功: ${visemes.length}件のviseme`);
+    return visemes;
+  } catch (error) {
+    console.warn('Speech Marks取得失敗（音声合成は続行）:', error);
+    return [];
   }
 }
 
@@ -157,6 +218,15 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const synthesisResult = await synthesizeSpeech(
       text, requestedVoiceId, requestedEngine, languageCode, textType, outputFormat
     );
+
+    // Speech Marks（viseme）を並列取得（失敗しても音声合成は続行）
+    let visemes: VisemeEntry[] = [];
+    const visemePromise = getSpeechMarks(
+      text, requestedVoiceId, requestedEngine, languageCode, textType
+    ).then(v => { visemes = v; }).catch(() => { /* viseme取得失敗は無視 */ });
+
+    // viseme取得を待つ（最大2秒）
+    await Promise.race([visemePromise, new Promise(resolve => setTimeout(resolve, 2000))]);
 
     if (!synthesisResult.success) {
       return createResponse(500, {
@@ -242,7 +312,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       text,
       voiceId: synthesisResult.finalVoiceId,
       engine: synthesisResult.finalEngine,
-      fileName
+      fileName,
+      visemes: visemes.length > 0 ? visemes : undefined
     });
   } catch (error) {
     console.error('音声合成エラー:', error);

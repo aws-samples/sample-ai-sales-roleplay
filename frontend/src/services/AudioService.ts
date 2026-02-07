@@ -28,7 +28,7 @@ export class AudioService {
   private audioVolume: number = 1.0;
   private currentSynthesisTasks: Map<string, AbortController> = new Map();
   private pollyService: PollyService;
-  
+
   // イベントリスナーの追加
   private playbackCompleteListeners: Map<string, Set<() => void>> = new Map();
   private globalPlaybackListeners: Set<(messageId: string) => void> = new Set();
@@ -132,14 +132,20 @@ export class AudioService {
         const controller = new AbortController();
         this.currentSynthesisTasks.set(messageId, controller);
 
-        // Amazon Polly でテキストを音声に変換（デフォルト速度で変換）
-        // PollyService内で自動的にSSMLに変換され、速度調整される
-        const audioUrl = await this.pollyService.synthesizeSpeech(chunk);
+        // Amazon Polly でテキストを音声に変換（visemeデータも取得）
+        const result = await this.pollyService.synthesizeSpeechWithViseme(chunk);
 
         // タスクがキャンセルされていない場合のみ続行
         if (!controller.signal.aborted) {
+          // visemeデータをCustomEventで配信
+          if (result.visemes && result.visemes.length > 0) {
+            window.dispatchEvent(new CustomEvent('visemeData', {
+              detail: { messageId, visemes: result.visemes }
+            }));
+          }
+
           // 音声をキューに追加
-          const audio = new Audio(audioUrl);
+          const audio = new Audio(result.audioUrl);
           audio.volume = this.audioVolume;
 
           this.audioQueue.push({
@@ -276,7 +282,7 @@ export class AudioService {
       // 再生終了したら次の音声へ
       const completedMessageId = nextAudio.id;
       this.audioQueue.shift();
-      
+
       // キューが空になった場合（このメッセージの再生が完了した場合）、リスナーに通知
       if (this.audioQueue.length === 0 || this.audioQueue[0].id !== completedMessageId) {
         // 特定のメッセージに対するリスナーを実行
@@ -285,14 +291,14 @@ export class AudioService {
           console.log(`メッセージID ${completedMessageId} の再生完了リスナーを実行`);
           listeners.forEach(listener => listener());
         }
-        
+
         // グローバルリスナーを実行
         this.globalPlaybackListeners.forEach(listener => listener(completedMessageId));
-        
+
         // リスナーを削除（一回限りのイベント）
         this.playbackCompleteListeners.delete(completedMessageId);
       }
-      
+
       this.playNextAudio();
     };
 
@@ -300,20 +306,20 @@ export class AudioService {
       console.error("音声再生エラー:", error);
       const errorMessageId = nextAudio.id;
       this.audioQueue.shift();
-      
+
       // エラー時にもリスナーに通知
       const listeners = this.playbackCompleteListeners.get(errorMessageId);
       if (listeners) {
         console.log(`メッセージID ${errorMessageId} の再生エラー - リスナーを実行`);
         listeners.forEach(listener => listener());
       }
-      
+
       // グローバルリスナーを実行
       this.globalPlaybackListeners.forEach(listener => listener(errorMessageId));
-      
+
       // リスナーを削除（一回限りのイベント）
       this.playbackCompleteListeners.delete(errorMessageId);
-      
+
       this.playNextAudio();
     };
 
@@ -322,20 +328,20 @@ export class AudioService {
       console.error("音声再生開始エラー:", error);
       const failedMessageId = nextAudio.id;
       this.audioQueue.shift();
-      
+
       // 再生開始失敗時にもリスナーに通知
       const listeners = this.playbackCompleteListeners.get(failedMessageId);
       if (listeners) {
         console.log(`メッセージID ${failedMessageId} の再生開始失敗 - リスナーを実行`);
         listeners.forEach(listener => listener());
       }
-      
+
       // グローバルリスナーを実行
       this.globalPlaybackListeners.forEach(listener => listener(failedMessageId));
-      
+
       // リスナーを削除（一回限りのイベント）
       this.playbackCompleteListeners.delete(failedMessageId);
-      
+
       this.playNextAudio();
     });
   }
@@ -362,17 +368,17 @@ export class AudioService {
       this.audioQueue[0].audio.pause();
       this.audioQueue.shift();
       this.isPlaying = false;
-      
+
       // リスナーに通知
       const listeners = this.playbackCompleteListeners.get(messageId);
       if (listeners) {
         console.log(`メッセージID ${messageId} の再生キャンセル - リスナーを実行`);
         listeners.forEach(listener => listener());
       }
-      
+
       // グローバルリスナーにも通知
       this.globalPlaybackListeners.forEach(listener => listener(messageId));
-      
+
       // リスナーを削除（一回限りのイベント）
       this.playbackCompleteListeners.delete(messageId);
     }
@@ -399,7 +405,7 @@ export class AudioService {
       controller.abort();
     });
     this.currentSynthesisTasks.clear();
-    
+
     // 再生中のメッセージIDを記録（リスナー通知用）
     const activeMessageIds = new Set<string>();
     this.audioQueue.forEach(item => activeMessageIds.add(item.id));
@@ -412,7 +418,7 @@ export class AudioService {
     // キューをクリア
     this.audioQueue = [];
     this.isPlaying = false;
-    
+
     // すべてのメッセージIDに対応するリスナーに通知
     activeMessageIds.forEach(messageId => {
       const listeners = this.playbackCompleteListeners.get(messageId);
@@ -420,14 +426,14 @@ export class AudioService {
         console.log(`メッセージID ${messageId} の再生中断 - リスナーを実行`);
         listeners.forEach(listener => listener());
       }
-      
+
       // グローバルリスナーにも通知
       this.globalPlaybackListeners.forEach(listener => listener(messageId));
-      
+
       // リスナーを削除（一回限りのイベント）
       this.playbackCompleteListeners.delete(messageId);
     });
-    
+
     console.log("すべての音声再生を停止しました");
   }
 
@@ -452,7 +458,7 @@ export class AudioService {
   public getVolume(): number {
     return this.audioVolume;
   }
-  
+
   /**
    * 特定のメッセージIDの音声再生完了時に実行されるリスナーを追加
    * 
@@ -466,7 +472,7 @@ export class AudioService {
     this.playbackCompleteListeners.get(messageId)?.add(callback);
     console.log(`メッセージID ${messageId} の再生完了リスナーを追加しました`);
   }
-  
+
   /**
    * 特定のメッセージIDの音声再生完了リスナーを削除
    * 
@@ -475,7 +481,7 @@ export class AudioService {
    */
   public removePlaybackCompleteListener(messageId: string, callback?: () => void): void {
     if (!this.playbackCompleteListeners.has(messageId)) return;
-    
+
     if (callback) {
       this.playbackCompleteListeners.get(messageId)?.delete(callback);
     } else {
@@ -483,7 +489,7 @@ export class AudioService {
     }
     console.log(`メッセージID ${messageId} の再生完了リスナーを削除しました`);
   }
-  
+
   /**
    * すべての音声再生完了イベントを監視するグローバルリスナーを追加
    * 
@@ -493,7 +499,7 @@ export class AudioService {
     this.globalPlaybackListeners.add(callback);
     console.log("グローバル再生完了リスナーを追加しました");
   }
-  
+
   /**
    * グローバル再生完了リスナーを削除
    * 

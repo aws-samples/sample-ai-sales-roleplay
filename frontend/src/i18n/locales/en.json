@@ -1,4 +1,13 @@
 {
+  "avatar": {
+    "label": "3D Avatar Display Area",
+    "description": "Displaying current emotional state with 3D avatar",
+    "emotion": "Emotion",
+    "loading": "Loading avatar...",
+    "loadError": "Failed to load avatar",
+    "webglNotSupported": "Your browser does not support WebGL. Please use a WebGL-compatible browser to display the 3D avatar.",
+    "speaking": "Speaking"
+  },
   "home": {
     "title": "AI Sales Role-Play",
     "subtitle": "Improve Your Sales Skills Through AI Conversations",
