@@ -37,7 +37,7 @@ Goals:
 {goals_txt}
 
 Rules for "analysis" field:
-- Write 1-2 SHORT sentences only (max 80 characters)
+- Write 1-2 SHORT sentences only (max 120 characters)
 - Format: "[Score change reason]. [One actionable tip]."
 - Example: "Good rapport building, trust +1. Try mentioning specific product benefits next."
 - Do NOT write long explanations, bullet points, or section headers
@@ -47,7 +47,15 @@ NPC Emotion Estimation:
 - Estimate the NPC's current emotional state based on the conversation context
 - npcEmotion: one of "happy", "angry", "sad", "relaxed", "neutral"
 - npcEmotionIntensity: 0.0 (very weak) to 1.0 (very strong)
-- Consider: NPC personality, conversation flow, user's attitude, and score changes"""
+- Consider: NPC personality, conversation flow, user's attitude, and score changes
+
+NPC Gesture Estimation:
+- Estimate the appropriate gesture for the NPC based on the conversation context
+- gesture: "nod" (nodding), "headTilt" (head tilt), "none" (no gesture)
+- Nod: Use when NPC shows agreement, understanding, or empathy
+- Head tilt: Use when NPC shows doubt, confusion, or is thinking
+- None: Default when no gesture is needed
+- Do not add a gesture every time. Use them at a natural frequency."""
     else:
         return f"""あなたは営業会話のスコアリングエンジンです。最新メッセージを評価しスコアを更新してください。
 
@@ -62,7 +70,7 @@ NPC Emotion Estimation:
 {goals_txt}
 
 「analysis」フィールドのルール:
-- 1〜2文の短文のみ（最大80文字）
+- 1〜2文の短文のみ（最大120文字）
 - 形式: 「[スコア変動理由]。[次の一手のアドバイス]。」
 - 例: 「丁寧な挨拶で好印象。次は訪問目的を簡潔に伝えましょう。」
 - 長文の説明、箇条書き、見出しは禁止
@@ -72,7 +80,15 @@ NPC感情推定:
 - 会話の文脈からNPCの現在の感情状態を推定してください
 - npcEmotion: "happy", "angry", "sad", "relaxed", "neutral" のいずれか
 - npcEmotionIntensity: 0.0（非常に弱い）〜 1.0（非常に強い）
-- 考慮要素: NPCの性格、会話の流れ、ユーザーの態度、スコアの変化"""
+- 考慮要素: NPCの性格、会話の流れ、ユーザーの態度、スコアの変化
+
+NPCジェスチャー推定:
+- 会話の文脈からNPCの適切なジェスチャーを推定してください
+- gesture: "nod"（うなずき）, "headTilt"（首かしげ）, "none"（なし） のいずれか
+- うなずき(nod): NPCが同意・理解・共感を示す場面で使用
+- 首かしげ(headTilt): NPCが疑問・困惑・考え中の場面で使用
+- なし(none): 特にジェスチャーが不要な場面（デフォルト）
+- 毎回ジェスチャーを付ける必要はありません。自然な頻度で使用してください"""
 
 
 def format_conversation_history(messages: List[Dict], language: str = 'ja') -> str:
