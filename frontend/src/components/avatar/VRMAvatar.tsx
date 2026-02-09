@@ -126,11 +126,13 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
 
   /**
    * リサイズハンドラー
+   * コンテナサイズが0の場合はスキップ（レイアウト未完了時の対策）
    */
   const handleResize = useCallback(() => {
     if (!containerRef.current || !cameraRef.current || !rendererRef.current) return;
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
+    if (width === 0 || height === 0) return;
     cameraRef.current.aspect = width / height;
     cameraRef.current.updateProjectionMatrix();
     rendererRef.current.setSize(width, height);
@@ -219,10 +221,16 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
       if (animationFrameRef.current === null && renderLoopRef.current) {
         animationFrameRef.current = requestAnimationFrame(renderLoopRef.current);
       }
-      window.addEventListener('resize', handleResize);
+      // ResizeObserverでコンテナサイズ変化を検知
+      const container = containerRef.current;
+      let resizeObserver: ResizeObserver | null = null;
+      if (container) {
+        resizeObserver = new ResizeObserver(() => handleResize());
+        resizeObserver.observe(container);
+      }
       return () => {
         isMountedRef.current = false;
-        window.removeEventListener('resize', handleResize);
+        resizeObserver?.disconnect();
         if (animationFrameRef.current !== null) {
           cancelAnimationFrame(animationFrameRef.current);
           animationFrameRef.current = null;
@@ -282,7 +290,7 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
         const loader = new VRMLoader();
         vrmLoaderRef.current = loader;
 
-        const vrm = await loader.load(modelUrlRef.current, () => {});
+        const vrm = await loader.load(modelUrlRef.current, () => { });
 
         // クリーンアップ済みの場合は読み込んだリソースを破棄
         if (!isMountedRef.current) {
@@ -306,6 +314,9 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
         expressionControllerRef.current = new ExpressionController(vrm);
         lipSyncControllerRef.current = new LipSyncController(vrm);
         animationControllerRef.current = new AnimationController(vrm);
+
+        // AnimationControllerにExpressionControllerの参照を設定（blink競合回避）
+        animationControllerRef.current.setExpressionController(expressionControllerRef.current);
 
         // 初期感情状態を設定
         expressionControllerRef.current.setEmotion(initialEmotionRef.current);
@@ -336,13 +347,14 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
       animationFrameRef.current = requestAnimationFrame(renderLoopRef.current);
     }
 
-    // リサイズイベントリスナー
-    window.addEventListener('resize', handleResize);
+    // ResizeObserverでコンテナサイズ変化を検知（window.resizeより正確）
+    const resizeObserver = new ResizeObserver(() => handleResize());
+    resizeObserver.observe(container);
 
     // クリーンアップ
     return () => {
       isMountedRef.current = false;
-      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
 
       // アニメーションフレームをキャンセル
       if (animationFrameRef.current !== null) {
@@ -364,14 +376,15 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
   }, []);
 
   // 感情状態の変更を監視
+  // ※ VRMAvatarContainerが既にdirectEmotionとメトリクスを統合した
+  //    currentEmotionをemotion propとして渡しているため、ここでは
+  //    directEmotionによる再オーバーライドは行わない
   useEffect(() => {
-    // directEmotionが指定されている場合はそちらを優先
-    const effectiveEmotion = directEmotion || emotion;
-    if (effectiveEmotion !== previousEmotionRef.current) {
-      expressionControllerRef.current?.setEmotion(effectiveEmotion);
-      previousEmotionRef.current = effectiveEmotion;
+    if (emotion !== previousEmotionRef.current) {
+      expressionControllerRef.current?.setEmotion(emotion);
+      previousEmotionRef.current = emotion;
     }
-  }, [emotion, directEmotion]);
+  }, [emotion]);
 
   // visemeデータの変更を監視
   useEffect(() => {

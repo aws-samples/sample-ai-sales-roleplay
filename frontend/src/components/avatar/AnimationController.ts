@@ -39,6 +39,7 @@ export class AnimationController {
   private vrm: VRM;
   private isRunning: boolean = false;
   private isSpeaking: boolean = false;
+  private expressionController: { getExpressionBlinkValue(): number } | null = null;
 
   // 瞬き用
   private nextBlinkTime: number = 0;
@@ -149,6 +150,11 @@ export class AnimationController {
     this.isSpeaking = speaking;
   }
 
+  /** ExpressionControllerの参照を設定（blink競合回避用） */
+  setExpressionController(controller: { getExpressionBlinkValue(): number } | null): void {
+    this.expressionController = controller;
+  }
+
   /**
    * うなずきジェスチャーをトリガー
    */
@@ -201,18 +207,24 @@ export class AnimationController {
   private updateBlink(deltaTime: number): void {
     if (!this.vrm.expressionManager) return;
 
+    // ExpressionControllerが表情ブレンドで使用中のblink値を取得
+    // （例: angry表情の目を細める効果 blink: 0.3）
+    const expressionBlinkValue = this.expressionController?.getExpressionBlinkValue() ?? 0;
+
     if (this.isBlinking) {
       this.blinkProgress += deltaTime / BLINK_DURATION;
       if (this.blinkProgress >= 1) {
         this.isBlinking = false;
         this.blinkProgress = 0;
-        this.vrm.expressionManager.setValue('blink', 0);
+        // 表情ブレンドのblink値を下回らないようにする
+        this.vrm.expressionManager.setValue('blink', expressionBlinkValue);
         this.scheduleNextBlink();
       } else {
         const blinkValue = this.blinkProgress < 0.5
           ? this.blinkProgress * 2
           : (1 - this.blinkProgress) * 2;
-        this.vrm.expressionManager.setValue('blink', blinkValue);
+        // 瞬きアニメーション値と表情ブレンド値の大きい方を採用
+        this.vrm.expressionManager.setValue('blink', Math.max(blinkValue, expressionBlinkValue));
       }
     } else {
       this.nextBlinkTime -= deltaTime;

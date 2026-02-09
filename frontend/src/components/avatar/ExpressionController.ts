@@ -100,6 +100,14 @@ export class ExpressionController {
     this.targetBlend = mapping.blend ?? [];
     this.isDirty = true;
 
+    // デバッグログ: 表情変更の追跡
+    if (process.env.NODE_ENV === 'development') {
+      const actualName = this.getActualExpressionName(mapping.expression);
+      console.log(
+        `ExpressionController: setEmotion("${emotion}") → expression="${mapping.expression}"(actual="${actualName}"), intensity=${mapping.intensity}, blend=${JSON.stringify(mapping.blend ?? [])}, availableExpressions=[${this.availableExpressions.join(', ')}]`
+      );
+    }
+
     // 中間状態トランジションの判定
     if (previousExpression !== mapping.expression && previousExpression !== 'neutral') {
       const paths = EMOTION_TRANSITION_PATH[previousExpression];
@@ -126,7 +134,7 @@ export class ExpressionController {
 
     // 変更がなく、ターゲットに到達済みならスキップ
     if (!this.isDirty && this.currentExpression === this.targetExpression &&
-        Math.abs(this.currentIntensity - this.targetIntensity) < 0.001) {
+      Math.abs(this.currentIntensity - this.targetIntensity) < 0.001) {
       return;
     }
 
@@ -172,7 +180,7 @@ export class ExpressionController {
 
     // ターゲットに到達したらdirtyフラグをクリア
     if (this.currentExpression === this.targetExpression &&
-        Math.abs(this.currentIntensity - this.targetIntensity) < 0.001) {
+      Math.abs(this.currentIntensity - this.targetIntensity) < 0.001) {
       this.isDirty = false;
     }
   }
@@ -225,6 +233,22 @@ export class ExpressionController {
         this.currentIntensity = Math.max(this.targetIntensity, this.currentIntensity - step);
       }
     }
+  }
+
+  /**
+   * 現在の表情ブレンドで使用中のblink値を取得
+   * AnimationControllerが瞬きアニメーションと競合しないようにするため
+   */
+  getExpressionBlinkValue(): number {
+    // ターゲット表情に到達していない場合は0
+    if (this.currentExpression !== this.targetExpression) return 0;
+    if (this.targetBlend.length === 0) return 0;
+
+    const blinkEntry = this.targetBlend.find(e => e.name === 'blink');
+    if (!blinkEntry) return 0;
+
+    const blendRatio = this.targetIntensity > 0 ? this.currentIntensity / this.targetIntensity : 0;
+    return blinkEntry.intensity * blendRatio;
   }
 
   /**

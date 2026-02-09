@@ -33,24 +33,36 @@ const MessageList: React.FC<MessageListProps> = ({
 }) => {
   const { t } = useTranslation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // メッセージ自動スクロール
+  // メッセージ自動スクロール（親要素のスクロールを防止）
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    const container = scrollContainerRef.current;
+    if (container) {
+      // requestAnimationFrameでレンダリング後にスクロール
+      requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+      });
+    }
+  }, [messages, isProcessing]);
 
   return (
     <Paper
+      ref={scrollContainerRef}
       sx={{
-        flexGrow: 1,
+        flex: 1,
+        minHeight: 0,
         p: 2,
         overflow: "auto",
-        backgroundColor: "#fafafa",
-        border: "1px solid #e0e0e0",
+        backgroundColor: sessionStarted ? "#fafafa" : "transparent",
+        border: sessionStarted ? "1px solid #e0e0e0" : "none",
+        boxShadow: sessionStarted ? undefined : "none",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       {!sessionStarted ? (
-        <Box textAlign="center" py={4}>
+        <Box textAlign="center" py={4} sx={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
           <Typography variant="h6" gutterBottom>
             {t("conversation.startQuestion")}
           </Typography>

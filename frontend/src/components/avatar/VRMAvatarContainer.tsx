@@ -88,15 +88,27 @@ const VRMAvatarContainer: React.FC<VRMAvatarContainerProps> = ({
     initializeAvatar();
   }, [avatarId]);
 
-  // 感情状態の計算（directEmotionが指定されていない場合のみ使用）
+  // 感情状態の計算（メトリクスベースとdirectEmotionを統合）
   const currentEmotion = useMemo<EmotionState>(() => {
-    if (directEmotion) return directEmotion;
-    return calculateEmotionState({
+    // メトリクスベースの感情を常に計算
+    const metricsEmotion = calculateEmotionState({
       angerLevel,
       trustLevel,
       progressLevel,
       previousEmotion,
     });
+
+    // directEmotionが未指定の場合はメトリクスベースを使用
+    if (!directEmotion) return metricsEmotion;
+
+    // メトリクスが強い感情を示している場合はメトリクスを優先
+    // （怒りメーターが高いのにneutralのままになる問題を防止）
+    if (metricsEmotion === 'angry' || metricsEmotion === 'annoyed') {
+      return metricsEmotion;
+    }
+
+    // それ以外はdirectEmotion（API応答）を優先
+    return directEmotion;
   }, [angerLevel, trustLevel, progressLevel, previousEmotion, directEmotion]);
 
   // visemeデータのCustomEventリスナー

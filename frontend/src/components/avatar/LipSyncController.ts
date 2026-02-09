@@ -219,6 +219,18 @@ export class LipSyncController {
    */
   disconnect(): void {
     this.stopVisemePlayback();
+    // 口形状を即座にリセット
+    this.currentMouthOpen = 0;
+    this.currentValues = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
+    this.useVisemeMode = false;
+    // VRM表情を直接リセット（update()が呼ばれなくても口が閉じるように）
+    if (this.vrm.expressionManager) {
+      this.vrm.expressionManager.setValue('aa', 0);
+      this.vrm.expressionManager.setValue('ih', 0);
+      this.vrm.expressionManager.setValue('ou', 0);
+      this.vrm.expressionManager.setValue('ee', 0);
+      this.vrm.expressionManager.setValue('oh', 0);
+    }
     if (this.audioContext) {
       this.audioContext.close();
       this.audioContext = null;

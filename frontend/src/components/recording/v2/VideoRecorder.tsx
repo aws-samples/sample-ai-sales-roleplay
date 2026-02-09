@@ -433,7 +433,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
   };
 
   return (
-    <Box sx={{ border: 1, borderColor: "grey.300", borderRadius: 1, p: 2 }}>
+    <Box sx={{ borderRadius: 1, overflow: "hidden", lineHeight: 0 }}>
       {/* エラー表示用Snackbar */}
       <Snackbar
         open={snackbarOpen && !!error}
@@ -451,19 +451,8 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
         </Alert>
       </Snackbar>
 
-      {/* isActiveステータス表示（開発用） */}
-      <Typography
-        variant="caption"
-        color={isActive ? "success.main" : "text.secondary"}
-        sx={{ display: "block", mb: 1 }}
-      >
-        {isActive
-          ? t("recording.recordingActive")
-          : t("recording.recordingStandby")}
-      </Typography>
-
       {/* ビデオプレビュー */}
-      <Box sx={{ position: "relative", mb: 2 }}>
+      <Box sx={{ position: "relative" }}>
         {previewUrl ? (
           <Box sx={{ position: "relative" }}>
             <video
@@ -472,6 +461,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
               controls
               width="100%"
               height="auto"
+              style={{ display: "block", borderRadius: 4 }}
               onError={(e) => {
                 console.error(t("recording.videoLoadError") + ":", e);
                 if (previewUrl) {
@@ -489,9 +479,34 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
             playsInline
             width="100%"
             height="auto"
+            style={{ display: "block", borderRadius: 4 }}
           />
         )}
       </Box>
+
+      {/* 録画ステータスインジケーター */}
+      {isActive && (
+        <Box
+          sx={{
+            position: "absolute",
+            top: 4,
+            right: 4,
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            backgroundColor: "#ef4444",
+            animation: "pulse 1.5s infinite",
+            "@keyframes pulse": {
+              "0%, 100%": { opacity: 1 },
+              "50%": { opacity: 0.4 },
+            },
+            "@media (prefers-reduced-motion: reduce)": {
+              animation: "none",
+            },
+          }}
+          aria-label={t("recording.recordingActive")}
+        />
+      )}
     </Box>
   );
 });

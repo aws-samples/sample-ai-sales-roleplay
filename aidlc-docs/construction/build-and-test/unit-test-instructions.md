@@ -1,4 +1,4 @@
-# Unit Test Execution - 3Dアバター機能 Phase 3（拡張実装）
+# ユニットテスト実行手順
 
 ## テスト実行
 
@@ -8,57 +8,44 @@ cd frontend
 npm run test
 ```
 
-### 2. Phase 3関連テストのみ実行
+### 2. 変更ファイルに関連するテストのみ実行
 ```bash
 cd frontend
-npx jest --testPathPattern="avatar|Avatar" --run
+npx jest --testPathPattern="ConversationPage|ConversationHeader|ComplianceAlert|MetricsOverlay|CoachingHintBar|AvatarStage|RightPanelContainer|ScenarioPanel|PersonaPanel"
 ```
 
-## Phase 3 テストケース
+### 3. カバレッジ付きテスト
+```bash
+cd frontend
+npm run test:coverage
+```
 
-### AnimationController テスト
-- `triggerNod()`: headボーンのX軸回転が発生すること
-- `triggerHeadTilt()`: headボーンのZ軸回転が発生すること
-- `triggerGesture('nod')`: nodジェスチャーが正しくトリガーされること
-- `triggerGesture('headTilt')`: headTiltジェスチャーが正しくトリガーされること
-- `triggerGesture('none')`: ジェスチャーがトリガーされないこと
-- `setIsSpeaking(true)`: 発話中にアイドルモーションが抑制されること
-- アイドルモーション: 視線移動（lookAt）と体の揺れ（spine）が動作すること
+## テスト対象コンポーネント
 
-### ExpressionController テスト
-- 感情間の中間状態トランジションが正しく適用されること
-- 感情種類に応じたトランジション速度が異なること
-- `angry` → `happy`のトランジションで中間状態を経由すること
+### 新規コンポーネント（テスト追加推奨）
+| コンポーネント | テストファイル | テスト内容 |
+|---|---|---|
+| MetricsOverlay | MetricsOverlay.test.tsx | visible制御、メトリクス表示、aria属性 |
+| ScenarioPanel | ScenarioPanel.test.tsx | シナリオ情報表示 |
+| PersonaPanel | PersonaPanel.test.tsx | NPC情報表示 |
+| RightPanelContainer | RightPanelContainer.test.tsx | visible制御、子コンポーネント配置 |
+| CoachingHintBar | CoachingHintBar.test.tsx | hint表示/非表示、aria-live |
+| AvatarStage | AvatarStage.test.tsx | NPC名表示、発話インジケーター |
 
-### VRMAvatar / VRMAvatarContainer テスト
-- `gesture`プロパティが正しくAnimationControllerに渡されること
-- gestureが変更された時にtriggerGestureが呼ばれること
-
-### ConversationPage テスト
-- リアルタイム評価レスポンスからgestureが抽出されること
-- gestureが1500ms後にリセットされること
-- VRMAvatarContainerにgestureが渡されること
-
-### AvatarService テスト
-- `listAvatars()`: API呼び出しが正しいパスで行われること
-- `createAvatar()`: リクエストボディが正しいこと
-- `uploadVrmFile()`: FormDataが正しく構築されること
-- `confirmUpload()`: PUTリクエストが正しいパスで行われること
-- `deleteAvatar()`: DELETEリクエストが正しいパスで行われること
-
-### AvatarUpload テスト
-- .vrm以外のファイルが拒否されること
-- 50MBを超えるファイルが拒否されること
-- アップロードフロー（作成→アップロード→確認）が正しく動作すること
-- エラー時にエラーメッセージが表示されること
-
-### AvatarManagement テスト
-- アバター一覧が正しく表示されること
-- 削除確認ダイアログが表示されること
-- 削除後にリストが更新されること
-- アバター選択時にonSelectが呼ばれること
+### 改修コンポーネント（既存テスト更新推奨）
+| コンポーネント | テスト内容 |
+|---|---|
+| ConversationHeader | 新規アクションボタン（📋📊🔊）のレンダリング・クリック |
+| ComplianceAlert | Collapse表示、重大度別スタイル |
+| ConversationPage | 新レイアウト構造、state制御 |
 
 ## テスト結果の確認
-- **期待結果**: 全テスト通過
-- **カバレッジ**: `npm run test:coverage`で確認
-- **テストレポート**: コンソール出力
+- テストレポート: コンソール出力
+- カバレッジレポート: `frontend/coverage/` ディレクトリ
+- 全テストがパスすることを確認
+
+## テスト失敗時の対応
+1. 失敗したテストのエラーメッセージを確認
+2. コンポーネントのProps変更に起因する場合はテストを更新
+3. レイアウト変更に起因する場合はセレクターを更新
+4. 修正後に再実行して全テストパスを確認

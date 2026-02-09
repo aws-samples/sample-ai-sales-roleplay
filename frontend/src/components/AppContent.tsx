@@ -50,7 +50,7 @@ const AppContent: React.FC = () => {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       <Header pageTitle={getPageTitle()} />
-      <Box component="main" sx={{ flexGrow: 1, py: 2 }}>
+      <Box component="main" sx={{ flexGrow: 1, py: 2, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/scenarios" element={<ScenarioSelectPage />} />

@@ -202,7 +202,17 @@
     "evaluationLabel": "評価",
     "voiceOutput": "音声出力",
     "npcVoicePlayback": "※NPCの応答が音声で再生されます",
-    "expandSettings": "展開して設定を表示"
+    "expandSettings": "展開して設定を表示",
+    "chatLog": {
+      "expand": "チャットログを展開",
+      "collapse": "チャットログを折りたたむ"
+    },
+    "header": {
+      "toggleRightPanels": "情報パネル表示切替",
+      "toggleMetrics": "メトリクス表示切替",
+      "openAudioSettings": "音声設定を開く",
+      "endSession": "セッション終了"
+    }
   },
   "metrics": {
     "realtimeEvaluation": "リアルタイム評価",
@@ -217,7 +227,10 @@
     "progressLevelTooltip": "高い値は商談が進んでいることを示します",
     "analysis": "分析",
     "analysisResult": "分析結果",
-    "angerLevel": "怒りレベル"
+    "angerLevel": "怒りレベル",
+    "overlay": {
+      "title": "リアルタイム評価"
+    }
   },
   "speech": {
     "processing": "音声を処理中...",
@@ -248,6 +261,17 @@
     "settingsNav": "設定",
     "profileNav": "プロフィール",
     "rankings": "ランキング"
+  },
+  "rightPanels": {
+    "scenarioTitle": "シナリオ",
+    "personaTitle": "ペルソナ"
+  },
+  "coachingHint": {
+    "label": "コーチングヒント"
+  },
+  "avatarStage": {
+    "label": "アバター表示エリア",
+    "speakingIndicator": "NPC発話中"
   },
   "sidebar": {
     "expand": "展開する",

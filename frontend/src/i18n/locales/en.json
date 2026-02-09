@@ -202,7 +202,17 @@
     "evaluationLabel": "Evaluation",
     "voiceOutput": "Voice Output",
     "npcVoicePlayback": "* NPC responses will be played as voice",
-    "expandSettings": "Expand to show settings"
+    "expandSettings": "Expand to show settings",
+    "chatLog": {
+      "expand": "Expand chat log",
+      "collapse": "Collapse chat log"
+    },
+    "header": {
+      "toggleRightPanels": "Toggle info panels",
+      "toggleMetrics": "Toggle metrics",
+      "openAudioSettings": "Open audio settings",
+      "endSession": "End Session"
+    }
   },
   "metrics": {
     "realtimeEvaluation": "Realtime Evaluation",
@@ -217,7 +227,10 @@
     "progressLevelTooltip": "Higher values indicate that the conversation is progressing well",
     "analysis": "Analysis",
     "analysisResult": "Analysis Result",
-    "angerLevel": "Anger Level"
+    "angerLevel": "Anger Level",
+    "overlay": {
+      "title": "Realtime Evaluation"
+    }
   },
   "speech": {
     "processing": "Processing audio...",
@@ -248,6 +261,17 @@
     "settingsNav": "Settings",
     "profileNav": "Profile",
     "rankings": "Rankings"
+  },
+  "rightPanels": {
+    "scenarioTitle": "Scenario",
+    "personaTitle": "Persona"
+  },
+  "coachingHint": {
+    "label": "Coaching Hint"
+  },
+  "avatarStage": {
+    "label": "Avatar display area",
+    "speakingIndicator": "NPC is speaking"
   },
   "sidebar": {
     "expand": "Expand",

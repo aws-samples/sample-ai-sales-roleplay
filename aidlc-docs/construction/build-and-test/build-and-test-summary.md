@@ -1,82 +1,41 @@
-# Build and Test Summary - 3Dアバター機能 Phase 3（拡張実装）
+# ビルド・テストサマリー
 
 ## ビルドステータス
-- ビルドツール: Vite 7.1.3（フロントエンド）、AWS CDK 2.1026.0（バックエンド）
-- リントステータス: エラー0件
-- 型チェック: エラー0件
+- ビルドツール: Vite 7.1.3 + TypeScript 5.9.2
+- ビルドステータス: 型チェック通過（getDiagnostics エラー0件）
 - ビルド成果物: `frontend/dist/`
-
-## Phase 3 変更サマリー
-
-### 新機能
-1. AI駆動ジェスチャー（うなずき・首かしげ）- realtime-scoringからgesture推定
-2. プロシージャルアイドルモーション（視線移動・体揺れ）
-3. 感情トランジション高度化（中間状態・速度調整）
-4. VRMアバターアップロード管理（S3 + DynamoDB）
-5. アバター管理UI（アップロード・一覧・削除）
-6. レスポンシブレイアウト対応
-
-### 変更ファイル（19ファイル + i18n 2ファイル）
-
-バックエンド（7ファイル）:
-- `cdk/agents/realtime-scoring/models.py` - gestureフィールド追加
-- `cdk/agents/realtime-scoring/prompts.py` - ジェスチャー推定プロンプト追加
-- `cdk/lib/constructs/storage/avatar-storage.ts` - 新規: S3 + DynamoDB
-- `cdk/lib/constructs/api/avatar-lambda.ts` - 新規: Lambda構成
-- `cdk/lambda/avatars/index.py` - 新規: CRUD Lambda
-- `cdk/lib/constructs/api.ts` - アバターストレージ・API統合
-- `cdk/lib/constructs/api/api-gateway.ts` - アバターAPIルート追加
-
-フロントエンド（10ファイル）:
-- `frontend/src/types/avatar.ts` - GestureType型追加
-- `frontend/src/components/avatar/AnimationController.ts` - ジェスチャー + アイドルモーション
-- `frontend/src/components/avatar/ExpressionController.ts` - 感情トランジション高度化
-- `frontend/src/components/avatar/VRMAvatar.tsx` - gesture受け渡し
-- `frontend/src/components/avatar/VRMAvatarContainer.tsx` - gesture受け渡し
-- `frontend/src/pages/ConversationPage.tsx` - gestureデータフロー
-- `frontend/src/services/AgentCoreService.ts` - gesture型追加
-- `frontend/src/services/ApiService.ts` - gesture型追加
-- `frontend/src/services/AvatarService.ts` - 新規: アバター管理API
-- `frontend/src/components/avatar/AvatarUpload.tsx` - 新規: VRMアップロード
-
-i18n（2ファイル）:
-- `frontend/src/i18n/locales/ja.json` - アバター管理キー追加
-- `frontend/src/i18n/locales/en.json` - アバター管理キー追加
-
-### リントエラー修正（Build and Test中に実施）
-- `frontend/src/components/avatar/VRMAvatarContainer.tsx` - 未使用GestureTypeインポート削除、Ref更新をuseEffectに移動
-- `frontend/src/services/AvatarService.ts` - 未使用error変数削除
 
 ## テスト実行サマリー
 
 ### ユニットテスト
-- テスト対象: AnimationController、ExpressionController、AvatarService、AvatarUpload、AvatarManagement等
-- ステータス: 手順書作成完了
+- 対象: 新規6コンポーネント + 改修3コンポーネント
+- ステータス: テスト追加推奨（新規コンポーネント用）
+- 既存テスト: 改修による影響確認が必要
 
 ### 統合テスト
-- テストシナリオ: 5シナリオ定義（ジェスチャーデータフロー、アバターアップロードフロー、アイドルモーション統合、レスポンシブ、回帰テスト）
-- ステータス: 手順書作成完了
+- テストシナリオ: 5シナリオ（セッション開始、メッセージ送受信、パネルトグル、コンプライアンス通知、セッション終了）
+- ステータス: 手動テスト手順を提供
 
 ### パフォーマンステスト
-- フレームレート: 目標 30fps以上（アイドル）、25fps以上（ジェスチャー中）
-- ジェスチャー応答時間: 目標 200ms以下
-- アバターアップロード時間: 目標 10秒以下（10MB）
-- ステータス: 手順書作成完了
+- 対象: レンダリング、CSSアニメーション、prefers-reduced-motion
+- ステータス: React DevTools + Chrome Performance での計測手順を提供
 
 ### E2Eテスト
-- 既存テストファイル: `avatar-emotion-test.spec.ts`
-- 実行コマンド: `cd frontend && npx playwright test avatar-emotion-test.spec.ts --project=chromium`
-- ステータス: 実行はユーザー判断
-
-## 生成ドキュメント
-1. build-instructions.md - ビルド手順
-2. unit-test-instructions.md - ユニットテスト手順
-3. integration-test-instructions.md - 統合テスト手順
-4. performance-test-instructions.md - パフォーマンステスト手順
-5. build-and-test-summary.md - テストサマリー（本ファイル）
+- 既存E2Eテスト: `frontend/src/tests/e2e/` に配置
+- 実行コマンド: `cd frontend && npx playwright test --project=chromium`
+- ステータス: 既存テストの更新が必要な可能性あり（レイアウト変更のため）
 
 ## 全体ステータス
-- ビルド: 準備完了（リントエラー0件、型エラー0件）
-- コード生成: 完了（Phase 3全10ステップ）
-- テスト手順書: 完了
-- Operationsへの準備: 完了
+- ビルド: ✅ 成功（型エラー0件）
+- リント: 実行推奨（`cd frontend && npm run lint`）
+- ユニットテスト: 実行推奨（`cd frontend && npm run test`）
+- E2Eテスト: 実行推奨（`cd frontend && npx playwright test --project=chromium`）
+
+## 推奨アクション
+1. `cd frontend && npm run lint` でリントチェック実行
+2. `cd frontend && npm run test` でユニットテスト実行
+3. 開発サーバーで手動統合テスト実行
+4. E2Eテスト実行前にセレクター変更の影響を確認
+
+## 次のステップ
+ビルド・テスト完了後、Operations フェーズ（デプロイ計画）に進む準備完了。

@@ -1,6 +1,6 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Container, Box } from "@mui/material";
+import { Box } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import type {
   Message,
@@ -31,15 +31,20 @@ import VideoManager from "../components/recording/v2/VideoManager";
 
 // 分割したコンポーネントをインポート
 import ConversationHeader from "../components/conversation/ConversationHeader";
-import NPCInfoCard from "../components/conversation/NPCInfoCard";
-import { VRMAvatarContainer, AvatarProvider } from "../components/avatar";
+import { AvatarProvider } from "../components/avatar";
 import type { GestureType } from "../types/avatar";
 import MessageList from "../components/conversation/MessageList";
 import MessageInput from "../components/conversation/MessageInput";
 // クリーンアップ用のuseEffectを追加
 import { useEffect, useState, useCallback, useRef } from "react";
-import SidebarPanel from "../components/conversation/SidebarPanel";
 import ComplianceAlert from "../components/compliance/ComplianceAlert";
+// 新規コンポーネント
+import MetricsOverlay from "../components/conversation/MetricsOverlay";
+import RightPanelContainer from "../components/conversation/RightPanelContainer";
+import CoachingHintBar from "../components/conversation/CoachingHintBar";
+import AvatarStage from "../components/conversation/AvatarStage";
+import AudioSettingsPanel from "../components/conversation/AudioSettingsPanel";
+import { Dialog, DialogTitle, DialogContent } from "@mui/material";
 
 /**
  * 会話ページコンポーネント
@@ -47,7 +52,7 @@ import ComplianceAlert from "../components/compliance/ComplianceAlert";
 const ConversationPage: React.FC = () => {
   const { scenarioId } = useParams<{ scenarioId: string }>();
   const navigate = useNavigate();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // 状態管理
   const [scenario, setScenario] = useState<Scenario | null>(null);
@@ -114,6 +119,12 @@ const ConversationPage: React.FC = () => {
   const [isCameraInitialized, setIsCameraInitialized] = useState<boolean>(false);
   // カメラエラー状態管理
   const [cameraError, setCameraError] = useState<boolean>(false);
+
+  // 新レイアウト用state
+  const [rightPanelsVisible, setRightPanelsVisible] = useState<boolean>(true);
+  const [metricsVisible, setMetricsVisible] = useState<boolean>(true);
+  const [chatLogExpanded, setChatLogExpanded] = useState<boolean>(false);
+  const [showAudioSettings, setShowAudioSettings] = useState<boolean>(false);
 
 
   // コンポーネントの初期マウント時のフラグ設定
@@ -293,6 +304,12 @@ const ConversationPage: React.FC = () => {
     const audioSvc = AudioService.getInstance();
     audioSvc.setAudioEnabled(audioEnabled);
     audioSvc.setVolume(audioVolume / 100);
+
+    // 音声出力OFF時：再生中の音声を停止し、口パクをリセット
+    if (!audioEnabled) {
+      audioSvc.stopAllAudio();
+      setIsSpeaking(false);
+    }
   }, [audioEnabled, audioVolume]);
 
   // 読み上げ速度変更時の処理
@@ -719,11 +736,14 @@ const ConversationPage: React.FC = () => {
 
                 // NPC感情状態をアバターに反映
                 if (evaluationResult.npcEmotion) {
-                  const validEmotions: EmotionState[] = ['happy', 'angry', 'sad', 'relaxed', 'neutral'];
+                  const validEmotions: EmotionState[] = ['happy', 'angry', 'neutral', 'annoyed', 'satisfied'];
                   const emotion = evaluationResult.npcEmotion as EmotionState;
                   if (validEmotions.includes(emotion)) {
                     setNpcDirectEmotion(emotion);
                   }
+                } else {
+                  // APIがnpcEmotionを返さない場合はリセットし、メトリクスベースの計算にフォールバック
+                  setNpcDirectEmotion(undefined);
                 }
 
                 // NPCジェスチャーをアバターに反映
@@ -1173,10 +1193,17 @@ const ConversationPage: React.FC = () => {
   const emotionClassName = `emotion-${currentEmotion}`;
 
   return (
-    <Container
-      maxWidth="lg"
+    <Box
       className={`conversation-container ${emotionClassName}`}
-      sx={{ py: 2, height: "100vh", display: "flex", flexDirection: "column" }}
+      sx={{
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        position: "relative",
+        my: -2,
+      }}
     >
       {/* ヘッダー */}
       <ConversationHeader
@@ -1185,68 +1212,133 @@ const ConversationPage: React.FC = () => {
         sessionEnded={sessionEnded}
         onManualEnd={handleManualEnd}
         messageCount={messages.length}
+        onToggleRightPanels={() => setRightPanelsVisible((v) => !v)}
+        onToggleMetrics={() => setMetricsVisible((v) => !v)}
+        onOpenAudioSettings={() => setShowAudioSettings(true)}
+        rightPanelsVisible={rightPanelsVisible}
+        metricsVisible={metricsVisible}
       />
 
+      {/* コンプライアンス違反通知 - ヘッダー下スライドイン */}
+      {showComplianceAlert && activeViolation && (
+        <ComplianceAlert
+          violation={activeViolation}
+          open={showComplianceAlert}
+          onClose={() => setShowComplianceAlert(false)}
+        />
+      )}
+
+      {/* メインエリア */}
       <Box
-        display="flex"
-        gap={2}
-        flexGrow={1}
-        minHeight={0}
         sx={{
-          "@media (max-width: 1024px)": {
-            flexDirection: "column",
-          },
+          flex: 1,
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          minHeight: 0,
+          overflow: "hidden",
         }}
       >
-        {/* メイン対話エリア */}
-        <Box flexGrow={1} display="flex" flexDirection="column">
-          {/* ヘッダー部分: NPC情報と絵文字フィードバックを横並びに */}
-          <Box display="flex" gap={2} mb={2}>
-            {/* NPC情報カード - 幅を制限 */}
-            <Box flexGrow={1} maxWidth="60%">
-              <NPCInfoCard npc={scenario.npc} />
-            </Box>
+        {/* メトリクスオーバーレイ（左上） */}
+        {sessionStarted && (
+          <MetricsOverlay
+            currentMetrics={currentMetrics}
+            prevMetrics={prevMetrics}
+            metricsUpdating={metricsUpdating}
+            visible={metricsVisible}
+          />
+        )}
 
-            {/* 3Dアバター表示エリア - 中央に配置 */}
-            {sessionStarted && (
-              <Box
-                sx={{
-                  width: "20%",
-                  minWidth: "150px",
-                  minHeight: "200px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <AvatarProvider>
-                  <VRMAvatarContainer
-                    avatarId={scenarioAvatarId}
-                    angerLevel={currentMetrics.angerLevel}
-                    trustLevel={currentMetrics.trustLevel}
-                    progressLevel={currentMetrics.progressLevel}
-                    isSpeaking={isSpeaking}
-                    directEmotion={npcDirectEmotion}
-                    gesture={npcGesture}
-                    onEmotionChange={handleEmotionChange}
-                  />
-                </AvatarProvider>
-              </Box>
-            )}
+        {/* 右側パネル（ゴール・シナリオ・ペルソナ） */}
+        {sessionStarted && (
+          <RightPanelContainer
+            visible={rightPanelsVisible}
+            goals={goals}
+            goalStatuses={goalStatuses}
+            scenario={scenario}
+          />
+        )}
 
-            {/* 録画コンポーネント - 右側に配置 */}
-            <Box sx={{ width: "20%", minWidth: "100px" }}>
-              {/* 新しいVideoManagerコンポーネントを使用 */}
-              <VideoManager
-                sessionId={sessionId}
-                sessionStarted={sessionStarted}
-                sessionEnded={sessionEnded}
-                onCameraInitialized={handleCameraInitialized}
+        {/* カメラプレビュー（左上、メトリクスの下） */}
+        <Box
+          sx={{
+            position: "absolute",
+            top: metricsVisible && sessionStarted ? 110 : 12,
+            left: 12,
+            zIndex: 10,
+            width: 180,
+            borderRadius: 2,
+            overflow: "hidden",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+            transition: "top 0.2s ease",
+            "@media (prefers-reduced-motion: reduce)": {
+              transition: "none",
+            },
+          }}
+        >
+          <VideoManager
+            ref={undefined}
+            sessionId={sessionId}
+            sessionStarted={sessionStarted}
+            sessionEnded={sessionEnded}
+            onCameraInitialized={handleCameraInitialized}
+          />
+        </Box>
+
+        {/* アバターステージ（中央） */}
+        {sessionStarted ? (
+          <AvatarProvider>
+            <Box sx={{ flex: "1 1 0", minHeight: 0, maxHeight: "40vh" }}>
+              <AvatarStage
+                avatarId={scenarioAvatarId}
+                angerLevel={currentMetrics.angerLevel}
+                trustLevel={currentMetrics.trustLevel}
+                progressLevel={currentMetrics.progressLevel}
+                isSpeaking={isSpeaking}
+                directEmotion={npcDirectEmotion}
+                gesture={npcGesture}
+                onEmotionChange={handleEmotionChange}
+                npcName={scenario.npc.name}
               />
             </Box>
-          </Box>
+          </AvatarProvider>
+        ) : null}
 
-          {/* メッセージエリア */}
+
+        {/* チャットログ（下部） */}
+        <Box
+          sx={{
+            // セッション開始前はflex:1で全体を使用、開始後は残りスペースを埋める
+            ...(sessionStarted
+              ? {
+                flex: "1 1 auto",
+                minHeight: 100,
+                maxHeight: "30vh",
+                // 右パネルと重ならないようにマージンを追加
+                mr: rightPanelsVisible ? "280px" : 0,
+                display: "flex",
+                flexDirection: "column",
+              }
+              : {
+                flex: 1,
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                cursor: "default",
+                backgroundColor: "#fafafa",
+              }),
+            overflow: "hidden",
+            "@media (prefers-reduced-motion: reduce)": {
+              transition: "none",
+            },
+          }}
+          role="region"
+          aria-label={
+            chatLogExpanded
+              ? t("conversation.chatLog.collapse")
+              : t("conversation.chatLog.expand")
+          }
+        >
           <MessageList
             messages={messages}
             isProcessing={isProcessing}
@@ -1258,37 +1350,43 @@ const ConversationPage: React.FC = () => {
             isCameraInitialized={isCameraInitialized}
             cameraError={cameraError}
           />
-
-          {/* メッセージ入力エリア */}
-          {/* コンプライアンス違反通知 */}
-          {showComplianceAlert && activeViolation && (
-            <ComplianceAlert
-              violation={activeViolation}
-              open={showComplianceAlert}
-              onClose={() => setShowComplianceAlert(false)}
-            />
-          )}
-
-          <MessageInput
-            userInput={userInput}
-            setUserInput={setUserInput}
-            sendMessage={sendMessage}
-            isProcessing={isProcessing}
-            isListening={isListening}
-            isConnecting={connectionState === ConnectionState.CONNECTING}
-            speechRecognitionError={speechRecognitionError}
-            startSpeechRecognition={startSpeechRecognition}
-            switchToTextInput={switchToTextInput}
-            handleKeyDown={handleKeyDown}
-            sessionStarted={sessionStarted}
-            sessionEnded={sessionEnded}
-            continuousListening={continuousListening}
-          />
         </Box>
 
-        {/* サイドバー - 評価指標と録画 */}
-        <Box display="flex" flexDirection="column" width="300px">
-          <SidebarPanel
+      </Box>
+
+      {/* コーチングヒントバー（入力エリア上部） */}
+      <CoachingHintBar hint={currentMetrics.analysis} />
+
+      {/* メッセージ入力エリア */}
+      <MessageInput
+        userInput={userInput}
+        setUserInput={setUserInput}
+        sendMessage={sendMessage}
+        isProcessing={isProcessing}
+        isListening={isListening}
+        isConnecting={connectionState === ConnectionState.CONNECTING}
+        speechRecognitionError={speechRecognitionError}
+        startSpeechRecognition={startSpeechRecognition}
+        switchToTextInput={switchToTextInput}
+        handleKeyDown={handleKeyDown}
+        sessionStarted={sessionStarted}
+        sessionEnded={sessionEnded}
+        continuousListening={continuousListening}
+      />
+
+      {/* 音声設定モーダル */}
+      <Dialog
+        open={showAudioSettings}
+        onClose={() => setShowAudioSettings(false)}
+        aria-labelledby="audio-settings-dialog-title"
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle id="audio-settings-dialog-title">
+          {t("conversation.audioSettings.title")}
+        </DialogTitle>
+        <DialogContent>
+          <AudioSettingsPanel
             audioEnabled={audioEnabled}
             setAudioEnabled={setAudioEnabled}
             audioVolume={audioVolume}
@@ -1297,15 +1395,10 @@ const ConversationPage: React.FC = () => {
             setSpeechRate={setSpeechRate}
             silenceThreshold={silenceThreshold}
             setSilenceThreshold={setSilenceThreshold}
-            currentMetrics={currentMetrics}
-            prevMetrics={prevMetrics}
-            metricsUpdating={metricsUpdating}
-            goals={goals}
-            goalStatuses={goalStatuses}
           />
-        </Box>
-      </Box>
-    </Container>
+        </DialogContent>
+      </Dialog>
+    </Box>
   );
 };
 
