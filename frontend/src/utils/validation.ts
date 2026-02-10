@@ -174,7 +174,7 @@ export const validateForm = (formData: ScenarioFormData) => {
     formData.npc.company,
   );
 
-  const goalsValidation = validateGoals(formData.objectives, formData.goals);
+  const goalsValidation = validateGoals([], formData.goals);
 
   const sharingValidation = validateSharing(
     formData.visibility,

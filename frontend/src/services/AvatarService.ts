@@ -2,7 +2,7 @@
  * アバター管理APIサービス
  * VRMアバターのCRUD操作を提供
  */
-import { post, get, del, put } from "aws-amplify/api";
+import { post, del, put, get } from "aws-amplify/api";
 import { getCurrentUser, fetchAuthSession, signOut } from "aws-amplify/auth";
 
 /** アバターメタデータ */
@@ -56,27 +56,6 @@ export class AvatarService {
       return headers;
     } catch {
       throw new Error("ユーザーがログインしていません");
-    }
-  }
-
-  /** アバター一覧取得 */
-  public async listAvatars(): Promise<AvatarMetadata[]> {
-    try {
-      const headers = await this.getAuthHeaders();
-      const restOperation = get({
-        apiName: "AISalesRoleplayAPI",
-        path: "/avatars",
-        options: { headers },
-      });
-      const response = await restOperation.response;
-      const data = JSON.parse(await response.body.text()) as {
-        success: boolean;
-        avatars: AvatarMetadata[];
-      };
-      return data.avatars || [];
-    } catch (error) {
-      console.error("アバター一覧取得エラー:", error);
-      return [];
     }
   }
 
@@ -135,20 +114,22 @@ export class AvatarService {
     await restOperation.response;
   }
 
-  /** ダウンロード用署名付きURL取得 */
-  public async getDownloadUrl(avatarId: string): Promise<string> {
-    const headers = await this.getAuthHeaders();
-    const restOperation = get({
-      apiName: "AISalesRoleplayAPI",
-      path: `/avatars/${avatarId}/download-url`,
-      options: { headers },
-    });
-    const response = await restOperation.response;
-    const data = JSON.parse(await response.body.text()) as {
-      success: boolean;
-      downloadUrl: string;
-    };
-    return data.downloadUrl;
+  /** アバター詳細取得 */
+  public async getAvatarDetail(avatarId: string): Promise<AvatarMetadata | null> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const restOperation = get({
+        apiName: "AISalesRoleplayAPI",
+        path: `/avatars/${avatarId}`,
+        options: { headers },
+      });
+      const response = await restOperation.response;
+      const data = JSON.parse(await response.body.text()) as { success: boolean; avatar?: AvatarMetadata };
+      return data.success && data.avatar ? data.avatar : null;
+    } catch {
+      console.warn("アバター詳細取得失敗（共有アバターの可能性）:", avatarId);
+      return null;
+    }
   }
 
   /** アバター削除 */

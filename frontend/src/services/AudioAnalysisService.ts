@@ -1,11 +1,11 @@
 import { ApiService } from './ApiService';
-import { 
-  AudioAnalysisApiResponse, 
-  AudioUploadUrlResponse, 
+import {
+  AudioAnalysisApiResponse,
+  AudioUploadUrlResponse,
   AudioAnalysisStatusResponse,
   AudioAnalysisStartResponse,
   AudioAnalysisLanguage,
-  SupportedAudioFormat 
+  SupportedAudioFormat
 } from '../types/audioAnalysis';
 
 /**
@@ -160,7 +160,7 @@ export class AudioAnalysisService {
       );
 
       console.log('音声分析開始完了:', response);
-      
+
       // 型を適合させる
       return {
         success: response.success,
@@ -185,7 +185,7 @@ export class AudioAnalysisService {
   async getAnalysisStatus(sessionId: string): Promise<AudioAnalysisStatusResponse> {
     try {
       const response = await this.apiService.getAudioAnalysisStatus(sessionId);
-      
+
       // 型を適合させる
       return {
         success: response.success,
@@ -215,12 +215,12 @@ export class AudioAnalysisService {
       const response = await this.apiService.getAudioAnalysisResults(sessionId);
 
       console.log('音声分析結果取得完了:', response);
-      
+
       // 型を適合させる
       return {
         success: response.success,
         sessionId: response.sessionId,
-        audioAnalysis: response.audioAnalysis,
+        audioAnalysis: response.audioAnalysis as AudioAnalysisApiResponse['audioAnalysis'],
         scenarioId: response.scenarioId,
         language: response.language,
         createdAt: response.createdAt
@@ -260,14 +260,14 @@ export class AudioAnalysisService {
     // 音声形式チェック
     const supportedTypes: SupportedAudioFormat[] = [
       'audio/mpeg',
-      'audio/mp3', 
+      'audio/mp3',
       'audio/wav',
       'audio/flac',
       'audio/ogg'
     ];
 
     let contentType: SupportedAudioFormat = 'audio/mpeg';
-    
+
     // MIMEタイプによる判定
     if (supportedTypes.includes(file.type as SupportedAudioFormat)) {
       contentType = file.type as SupportedAudioFormat;
@@ -325,7 +325,7 @@ export class AudioAnalysisService {
         try {
           attempts++;
           console.log(`ポーリング試行: ${attempts}/${maxAttempts}`);
-          
+
           const status = await this.getAnalysisStatus(sessionId);
           onProgress(status);
 
@@ -415,7 +415,7 @@ export class AudioAnalysisService {
       // 5. ポーリングで結果を監視
       const result = await this.pollAnalysisStatus(
         uploadInfo.sessionId,
-        onAnalysisProgress || (() => {})
+        onAnalysisProgress || (() => { })
       );
 
       console.log('=== 音声分析統合処理完了 ===');
@@ -424,7 +424,7 @@ export class AudioAnalysisService {
     } catch (error) {
       console.error('=== 音声分析統合処理エラー ===');
       console.error('エラー詳細:', error);
-      
+
       if (error instanceof Error) {
         throw new Error(`音声分析処理に失敗しました: ${error.message}`);
       } else {

@@ -5,6 +5,7 @@
     "emotion": "感情",
     "loading": "アバターを読み込み中...",
     "loadError": "アバターの読み込みに失敗しました",
+    "loadErrorDetail": "エラーが発生しました。再読み込みしてください。",
     "webglNotSupported": "お使いのブラウザはWebGLをサポートしていません。3Dアバターを表示するには、WebGL対応のブラウザをご使用ください。",
     "speaking": "発話中",
     "upload": {
@@ -455,6 +456,23 @@
           }
         }
       },
+      "voice": {
+        "label": "音声モデル",
+        "help": "NPCの音声を選択してください",
+        "required": "音声モデルを選択してください",
+        "male": "男性",
+        "female": "女性",
+        "maleChild": "男の子",
+        "femaleChild": "女の子"
+      },
+      "avatar": {
+        "label": "VRMアバター（任意）",
+        "selectFile": "VRMファイルを選択",
+        "remove": "アバターを削除",
+        "help": "VRM形式のアバターファイルをアップロードできます（最大50MB）",
+        "invalidFormat": "VRM形式のファイルのみアップロードできます（.vrm）",
+        "fileTooLarge": "ファイルサイズが50MBを超えています"
+      },
       "error": {
         "guardrailsLoad": "ガードレールの読み込みに失敗しました",
         "unknown": "予期せぬエラーが発生しました"
@@ -566,7 +584,8 @@
       "goalsRequired": "ゴールを少なくとも1つ設定してください",
       "goalsCriteriaRequired": "すべてのゴールに判定基準を設定してください",
       "sharedUsersRequired": "共有シナリオには少なくとも1人のユーザーを指定してください",
-      "guardrailRequired": "ガードレールの選択は必須です"
+      "guardrailRequired": "ガードレールの選択は必須です",
+      "voiceIdRequired": "音声モデルの選択は必須です"
     },
     "visibility": {
       "private": "非公開",

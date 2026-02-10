@@ -5,6 +5,7 @@
     "emotion": "Emotion",
     "loading": "Loading avatar...",
     "loadError": "Failed to load avatar",
+    "loadErrorDetail": "An error occurred. Please reload the page.",
     "webglNotSupported": "Your browser does not support WebGL. Please use a WebGL-compatible browser to display the 3D avatar.",
     "speaking": "Speaking",
     "upload": {
@@ -455,6 +456,23 @@
           }
         }
       },
+      "voice": {
+        "label": "Voice Model",
+        "help": "Select a voice for the NPC",
+        "required": "Please select a voice model",
+        "male": "Male",
+        "female": "Female",
+        "maleChild": "Male (Child)",
+        "femaleChild": "Female (Child)"
+      },
+      "avatar": {
+        "label": "VRM Avatar (Optional)",
+        "selectFile": "Select VRM File",
+        "remove": "Remove Avatar",
+        "help": "Upload a VRM avatar file (max 50MB)",
+        "invalidFormat": "Only VRM files can be uploaded (.vrm)",
+        "fileTooLarge": "File size exceeds 50MB limit"
+      },
       "error": {
         "guardrailsLoad": "Failed to load guardrails",
         "unknown": "An unexpected error occurred"
@@ -566,7 +584,8 @@
       "goalsRequired": "At least one goal is required",
       "goalsCriteriaRequired": "All goals must have at least one criteria",
       "sharedUsersRequired": "At least one user must be specified for shared scenarios",
-      "guardrailRequired": "Guardrail selection is required"
+      "guardrailRequired": "Guardrail selection is required",
+      "voiceIdRequired": "Voice model selection is required"
     },
     "visibility": {
       "private": "Private",

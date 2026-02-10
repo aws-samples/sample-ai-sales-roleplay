@@ -16,18 +16,13 @@ import {
   Stack,
   Divider,
   Chip,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
 } from '@mui/material';
-import type { SelectChangeEvent } from '@mui/material';
 import VRMLoader from '../components/avatar/VRMLoader';
 import ExpressionController from '../components/avatar/ExpressionController';
 import AnimationController from '../components/avatar/AnimationController';
 import LipSyncController from '../components/avatar/LipSyncController';
 import { EmotionState } from '../types/index';
-import { VRMExpressionName, AvatarInfo } from '../types/avatar';
+import { VRMExpressionName } from '../types/avatar';
 
 // VRMファイルのパス（publicディレクトリから配信）
 const DEFAULT_MODEL_URL = '/models/avatars/default_girl1.vrm';
@@ -120,24 +115,10 @@ const AvatarTestPage: React.FC = () => {
   const [isVisemePlaying, setIsVisemePlaying] = useState(false);
   const [directEmotionMode, setDirectEmotionMode] = useState(false);
   const [selectedDirectEmotion, setSelectedDirectEmotion] = useState<EmotionState>('neutral');
-  const [avatarList, setAvatarList] = useState<AvatarInfo[]>([]);
-  const [selectedAvatarId, setSelectedAvatarId] = useState<string>('default');
-  const [currentModelUrl, setCurrentModelUrl] = useState<string>(DEFAULT_MODEL_URL);
+  const [currentModelUrl] = useState<string>(DEFAULT_MODEL_URL);
 
   // レンダリングループ（Refで保持）
   const renderLoopRef = useRef<(() => void) | undefined>(undefined);
-
-  // Phase 2: manifest.jsonからアバター一覧を読み込み
-  useEffect(() => {
-    fetch('/models/avatars/manifest.json')
-      .then(res => res.json())
-      .then(data => {
-        if (data.avatars && Array.isArray(data.avatars)) {
-          setAvatarList(data.avatars);
-        }
-      })
-      .catch(err => console.warn('manifest.json読み込みエラー:', err));
-  }, []);
 
   useEffect(() => {
     renderLoopRef.current = () => {
@@ -535,20 +516,6 @@ const AvatarTestPage: React.FC = () => {
     expressionCtrlRef.current?.setEmotion(emotion);
   }, []);
 
-  // Phase 2: アバター切り替え
-  const handleAvatarChange = useCallback((event: SelectChangeEvent<string>) => {
-    const avatarId = event.target.value;
-    setSelectedAvatarId(avatarId);
-
-    const avatar = avatarList.find(a => a.id === avatarId);
-    if (avatar) {
-      const modelPath = avatar.modelPath.startsWith('/')
-        ? avatar.modelPath
-        : `/models/avatars/${avatar.modelPath}`;
-      setCurrentModelUrl(modelPath);
-    }
-  }, [avatarList]);
-
   return (
     <Box sx={{ display: 'flex', height: 'calc(100vh - 64px)', p: 2, gap: 2 }}>
       {/* 3D表示エリア */}
@@ -823,34 +790,6 @@ const AvatarTestPage: React.FC = () => {
                 </Button>
               ))}
             </Stack>
-          </Box>
-
-          {/* Phase 2: アバター切り替え */}
-          <Box>
-            <Typography variant="subtitle2" gutterBottom>
-              アバター切り替え
-            </Typography>
-            {avatarList.length > 0 ? (
-              <FormControl fullWidth size="small">
-                <InputLabel id="avatar-select-label">アバター</InputLabel>
-                <Select
-                  labelId="avatar-select-label"
-                  value={selectedAvatarId}
-                  label="アバター"
-                  onChange={handleAvatarChange}
-                >
-                  {avatarList.map((avatar) => (
-                    <MenuItem key={avatar.id} value={avatar.id}>
-                      {avatar.name}{avatar.isDefault ? ' (デフォルト)' : ''}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            ) : (
-              <Typography variant="caption" color="text.secondary">
-                manifest.json読み込み中...
-              </Typography>
-            )}
           </Box>
         </Stack>
       </Box>

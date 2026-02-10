@@ -21,6 +21,7 @@ export class VRMLoader {
    * VRMファイルを非同期ロード
    */
   async load(url: string, onProgress?: LoadProgressCallback): Promise<VRM> {
+    console.log('VRMLoader: Loading VRM from URL:', url);
     return new Promise((resolve, reject) => {
       this.loader.load(
         url,
@@ -39,9 +40,8 @@ export class VRMLoader {
             if (typeof VRMUtils?.rotateVRM0 === 'function') {
               VRMUtils.rotateVRM0(vrm);
             }
-          } catch (e) {
+          } catch {
             // 回転処理に失敗しても続行（VRM 1.0の場合は不要なため）
-            console.warn('VRM回転処理をスキップ:', e);
           }
 
           this.currentVRM = vrm;

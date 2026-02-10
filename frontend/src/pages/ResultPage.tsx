@@ -382,33 +382,10 @@ const ResultPage: React.FC = () => {
               criteria: goal.criteria,
             }),
           );
-        } else if (completeData.realtimeMetrics && completeData.realtimeMetrics.length > 0) {
-          // リアルタイムメトリクスからゴール情報を取得
-          const latestMetricsWithGoals = completeData.realtimeMetrics.find(
-            (m) => m.goalStatuses && m.goalStatuses.length > 0,
-          );
-          if (latestMetricsWithGoals && latestMetricsWithGoals.goalStatuses) {
-            // 型変換: string | number → number, string | null → Date | undefined
-            goalStatuses = latestMetricsWithGoals.goalStatuses.map(
-              (status) => ({
-                goalId: status.goalId,
-                achieved: status.achieved,
-                achievedAt: status.achievedAt && status.achievedAt !== "null"
-                  ? (() => {
-                    try {
-                      const date = new Date(status.achievedAt);
-                      return isNaN(date.getTime()) ? undefined : date;
-                    } catch {
-                      return undefined;
-                    }
-                  })()
-                  : undefined,
-                progress: Number(status.progress),
-              }),
-            );
-            goalScore = Number(latestMetricsWithGoals.goalScore);
-          }
         }
+        // 注: リアルタイムメトリクスからのgoalStatusesフォールバックは削除
+        // バックエンドのformatted_realtime_metricsにgoalStatusesが含まれないため機能しない
+        // goalResultsはfinal-feedbackレコードから取得される
 
         // scenarioGoalsが空の場合、シナリオ情報から取得を試みる
         if (scenarioGoals.length === 0 && sessionInfo.scenarioId) {

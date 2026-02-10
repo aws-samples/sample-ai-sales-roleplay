@@ -36,6 +36,7 @@ const webGLSupported = checkWebGLSupport();
  */
 const VRMAvatarContainer: React.FC<VRMAvatarContainerProps> = ({
   avatarId,
+  avatarS3Key,
   angerLevel,
   trustLevel,
   progressLevel,
@@ -45,7 +46,7 @@ const VRMAvatarContainer: React.FC<VRMAvatarContainerProps> = ({
   onEmotionChange,
 }) => {
   const { t } = useTranslation();
-  const { avatarInfo, isLoading: isContextLoading, error: contextError, loadAvatar, getDefaultAvatarId } = useAvatar();
+  const { avatarInfo, isLoading: isContextLoading, error: contextError, loadAvatar } = useAvatar();
 
   // ローカル状態
   const [isModelLoading, setIsModelLoading] = useState<boolean>(false);
@@ -56,37 +57,30 @@ const VRMAvatarContainer: React.FC<VRMAvatarContainerProps> = ({
   // 感情変更通知のフラグ（無限ループ防止）
   const emotionChangeNotifiedRef = useRef<EmotionState>('neutral');
 
-  // loadAvatar/getDefaultAvatarIdをRefで保持（useEffect依存を避ける）
+  // loadAvatarをRefで保持（useEffect依存を避ける）
   const loadAvatarRef = useRef(loadAvatar);
-  const getDefaultAvatarIdRef = useRef(getDefaultAvatarId);
 
   useEffect(() => {
     loadAvatarRef.current = loadAvatar;
   }, [loadAvatar]);
 
-  useEffect(() => {
-    getDefaultAvatarIdRef.current = getDefaultAvatarId;
-  }, [getDefaultAvatarId]);
-
   // アバターの読み込み
   useEffect(() => {
     const initializeAvatar = async () => {
       try {
-        if (avatarId) {
-          await loadAvatarRef.current(avatarId);
-        } else {
-          const defaultId = await getDefaultAvatarIdRef.current();
-          if (defaultId) {
-            await loadAvatarRef.current(defaultId);
-          }
+        const targetId = avatarId || 'default';
+        // カスタムアバターの場合、s3Keyが揃うまで読み込みを待機
+        if (targetId !== 'default' && !avatarS3Key) {
+          return;
         }
+        await loadAvatarRef.current(targetId, avatarS3Key);
       } catch (error) {
         console.error('アバター初期化エラー:', error);
       }
     };
 
     initializeAvatar();
-  }, [avatarId]);
+  }, [avatarId, avatarS3Key]);
 
   // 感情状態の計算（メトリクスベースとdirectEmotionを統合）
   const currentEmotion = useMemo<EmotionState>(() => {
@@ -152,11 +146,17 @@ const VRMAvatarContainer: React.FC<VRMAvatarContainerProps> = ({
   // モデルURLの取得
   const modelUrl = useMemo(() => {
     if (!avatarInfo?.modelPath) return null;
-    // 相対パスの場合は/models/avatars/を付加
+    // WR-006: CDN URL（https://）の場合はそのまま使用
+    if (avatarInfo.modelPath.startsWith('http://') || avatarInfo.modelPath.startsWith('https://')) {
+      return avatarInfo.modelPath;
+    }
+    // 絶対パスの場合はそのまま使用
     if (avatarInfo.modelPath.startsWith('/')) {
       return avatarInfo.modelPath;
     }
-    return `/models/avatars/${avatarInfo.modelPath}`;
+    // 相対パスの場合は/models/avatars/を付加
+    const url = `/models/avatars/${avatarInfo.modelPath}`;
+    return url;
   }, [avatarInfo]);
 
   // ローディング状態
@@ -214,7 +214,7 @@ const VRMAvatarContainer: React.FC<VRMAvatarContainerProps> = ({
             {t('avatar.loadError', 'アバターの読み込みに失敗しました')}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {error.message}
+            {t('avatar.loadErrorDetail', 'エラーが発生しました。再読み込みしてください。')}
           </Typography>
         </Alert>
       </Box>

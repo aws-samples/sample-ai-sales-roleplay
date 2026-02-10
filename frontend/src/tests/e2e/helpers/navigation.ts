@@ -90,14 +90,14 @@ export async function clickStartConversationButton(page: Page): Promise<void> {
       console.log("clickStartConversationButton: ボタンが有効になりました。クリックします");
       await startConversationButton.click();
 
-      // セッションが開始されるまで待機（「商談終了」ボタンが表示されることを確認）
-      const endButton = page.locator('button:has-text("商談終了"), button:has-text("End Conversation")').first();
+      // セッションが開始されるまで待機（「セッション終了」ボタンが表示されることを確認）
+      const endButton = page.locator('button:has-text("セッション終了"), button:has-text("商談終了"), button:has-text("End Conversation")').first();
       try {
         await expect(endButton).toBeVisible({ timeout: 30000 });
-        console.log("clickStartConversationButton: セッションが開始されました（商談終了ボタンが表示）");
+        console.log("clickStartConversationButton: セッションが開始されました（セッション終了ボタンが表示）");
         return;
       } catch {
-        console.log("clickStartConversationButton: 商談終了ボタンが表示されませんでした。NPCメッセージを確認します");
+        console.log("clickStartConversationButton: セッション終了ボタンが表示されませんでした。NPCメッセージを確認します");
         // NPCメッセージが表示されているか確認
         const npcMessage = page.locator('.MuiPaper-root:has-text("こんにちは")')
           .or(page.locator('.MuiPaper-root:has-text("いらっしゃいませ")'))

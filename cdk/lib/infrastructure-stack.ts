@@ -240,6 +240,7 @@ export class InfrastructureStack extends cdk.Stack {
       webAclId: props?.webAclId,
       resourceNamePrefix: resourcePrefix,
       transcribeWebSocketEndpoint: api.transcribeWebSocket.webSocketApiEndpoint,
+      avatarBucket: api.avatarStorage.bucket,
       agentCoreEnabled: true,
       npcConversationAgentArn: this.npcConversationAgent.runtimeArn,
       realtimeScoringAgentArn: this.realtimeScoringAgent.runtimeArn,

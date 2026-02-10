@@ -1,6 +1,6 @@
 /**
  * アバターContext
- * アバター情報の状態管理とmanifest.jsonからのデータ取得を提供
+ * アバター情報の状態管理とCloudFront経由のVRMモデル読み込みを提供
  */
 import React, {
   createContext,
@@ -8,18 +8,15 @@ import React, {
   useState,
   useCallback,
   useMemo,
-  useRef,
   ReactNode,
 } from 'react';
-import { AvatarInfo, AvatarManifest, AvatarContextState } from '../../types/avatar';
+import { AvatarInfo, AvatarContextState } from '../../types/avatar';
 
 /**
  * アバターContextの値の型定義
  */
 interface AvatarContextValue extends AvatarContextState {
-  loadAvatar: (avatarId: string) => Promise<void>;
-  getAvatarList: () => Promise<AvatarInfo[]>;
-  getDefaultAvatarId: () => Promise<string | null>;
+  loadAvatar: (avatarId: string, s3Key?: string) => Promise<void>;
 }
 
 /**
@@ -30,9 +27,8 @@ const defaultContextValue: AvatarContextValue = {
   avatarInfo: null,
   isLoading: false,
   error: null,
-  loadAvatar: async () => { },
-  getAvatarList: async () => [],
-  getDefaultAvatarId: async () => null,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  loadAvatar: async (_avatarId: string, _s3Key?: string) => { },
 };
 
 /**
@@ -41,41 +37,14 @@ const defaultContextValue: AvatarContextValue = {
 const AvatarContext = createContext<AvatarContextValue>(defaultContextValue);
 
 /**
- * マニフェストファイルのパス
+ * CloudFront経由のアバターCDN URL
  */
-const MANIFEST_PATH = '/models/avatars/manifest.json';
+const AVATAR_CDN_URL = import.meta.env.VITE_AVATAR_CDN_URL || '';
 
 /**
- * マニフェストファイルを取得する
+ * デフォルトアバターのモデルパス（ローカルアセット）
  */
-const fetchManifest = async (cache: React.MutableRefObject<AvatarManifest | null>): Promise<AvatarManifest> => {
-  if (cache.current) {
-    return cache.current;
-  }
-
-  try {
-    const response = await fetch(MANIFEST_PATH);
-
-    if (!response.ok) {
-      throw new Error(`マニフェストの取得に失敗しました: ${response.status}`);
-    }
-
-    const manifest: AvatarManifest = await response.json();
-
-    if (!manifest.avatars || !Array.isArray(manifest.avatars)) {
-      throw new Error('マニフェストの形式が不正です: avatars配列が見つかりません');
-    }
-
-    cache.current = manifest;
-
-    return manifest;
-  } catch (error) {
-    console.error('マニフェスト取得エラー:', error);
-    throw error instanceof Error
-      ? error
-      : new Error('マニフェストの取得に失敗しました');
-  }
-};
+const DEFAULT_AVATAR_MODEL_PATH = '/models/avatars/default_girl1.vrm';
 
 /**
  * AvatarProviderのプロパティ
@@ -94,69 +63,75 @@ export const AvatarProvider: React.FC<AvatarProviderProps> = ({ children }) => {
   const [avatarInfo, setAvatarInfo] = useState<AvatarInfo | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
-  const manifestCacheRef = useRef<AvatarManifest | null>(null);
 
   /**
    * アバターを読み込む
+   * avatarIdが指定された場合はCloudFront経由でVRMモデルを参照
+   * 未指定の場合はデフォルトアバターを使用
    * @param avatarId - 読み込むアバターのID
+   * @param s3Key - S3キー（"avatars/{userId}/{avatarId}/{fileName}" 形式）
    */
-  const loadAvatar = useCallback(async (avatarId: string): Promise<void> => {
+  const loadAvatar = useCallback(async (avatarId: string, s3Key?: string): Promise<void> => {
     // 同じアバターが既に読み込まれている場合はスキップ
+    // ただしs3Keyが新たに提供された場合は再読み込み
     if (currentAvatarId === avatarId && avatarInfo) {
-      return;
+      if (!s3Key || avatarInfo.s3Key === s3Key) {
+        return;
+      }
     }
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const manifest = await fetchManifest(manifestCacheRef);
-
-      // 指定されたIDのアバターを検索
-      const avatar = manifest.avatars.find((a) => a.id === avatarId);
-
-      if (!avatar) {
-        throw new Error(`アバターが見つかりません: ${avatarId}`);
+      if (avatarId === 'default' || !avatarId) {
+        // デフォルトアバター
+        setCurrentAvatarId('default');
+        setAvatarInfo({
+          id: 'default',
+          name: 'default',
+          modelPath: DEFAULT_AVATAR_MODEL_PATH,
+        });
+      } else if (AVATAR_CDN_URL && s3Key) {
+        // s3Keyは "avatars/{userId}/{avatarId}/{fileName}" 形式
+        // VITE_AVATAR_CDN_URLは "https://xxx.cloudfront.net/avatars" なので
+        // s3Keyから先頭の "avatars/" を除去して結合
+        const relativePath = s3Key.replace(/^avatars\//, '');
+        const modelPath = `${AVATAR_CDN_URL}/${relativePath}`;
+        setCurrentAvatarId(avatarId);
+        setAvatarInfo({
+          id: avatarId,
+          name: avatarId,
+          modelPath,
+          s3Key,
+        });
+      } else if (AVATAR_CDN_URL) {
+        console.warn('s3Key not provided, falling back to default avatar');
+        setCurrentAvatarId('default');
+        setAvatarInfo({
+          id: 'default',
+          name: 'default',
+          modelPath: DEFAULT_AVATAR_MODEL_PATH,
+        });
+      } else {
+        console.warn('VITE_AVATAR_CDN_URL not configured, falling back to default avatar');
+        setCurrentAvatarId('default');
+        setAvatarInfo({
+          id: 'default',
+          name: 'default',
+          modelPath: DEFAULT_AVATAR_MODEL_PATH,
+        });
       }
-
-      setCurrentAvatarId(avatarId);
-      setAvatarInfo(avatar);
     } catch (err) {
       const errorObj = err instanceof Error
         ? err
-        : new Error('アバターの読み込みに失敗しました');
+        : new Error('Failed to load avatar');
       setError(errorObj);
-      console.error('アバター読み込みエラー:', errorObj);
+      console.error('Avatar load error:', errorObj);
     } finally {
       setIsLoading(false);
     }
   }, [currentAvatarId, avatarInfo]);
-
-  /**
-   * アバター一覧を取得する
-   */
-  const getAvatarList = useCallback(async (): Promise<AvatarInfo[]> => {
-    try {
-      const manifest = await fetchManifest(manifestCacheRef);
-      return manifest.avatars;
-    } catch (err) {
-      console.error('アバター一覧取得エラー:', err);
-      return [];
-    }
-  }, []);
-
-  /**
-   * デフォルトアバターIDを取得する
-   */
-  const getDefaultAvatarId = useCallback(async (): Promise<string | null> => {
-    try {
-      const manifest = await fetchManifest(manifestCacheRef);
-      return manifest.defaultAvatarId || null;
-    } catch (err) {
-      console.error('デフォルトアバターID取得エラー:', err);
-      return null;
-    }
-  }, []);
 
   // Contextの値をメモ化
   const contextValue = useMemo<AvatarContextValue>(
@@ -166,8 +141,6 @@ export const AvatarProvider: React.FC<AvatarProviderProps> = ({ children }) => {
       isLoading,
       error,
       loadAvatar,
-      getAvatarList,
-      getDefaultAvatarId,
     }),
     [
       currentAvatarId,
@@ -175,8 +148,6 @@ export const AvatarProvider: React.FC<AvatarProviderProps> = ({ children }) => {
       isLoading,
       error,
       loadAvatar,
-      getAvatarList,
-      getDefaultAvatarId,
     ]
   );
 
@@ -197,7 +168,7 @@ export const useAvatar = (): AvatarContextValue => {
   const context = useContext(AvatarContext);
 
   if (context === undefined) {
-    throw new Error('useAvatarはAvatarProvider内で使用する必要があります');
+    throw new Error('useAvatar must be used within an AvatarProvider');
   }
 
   return context;

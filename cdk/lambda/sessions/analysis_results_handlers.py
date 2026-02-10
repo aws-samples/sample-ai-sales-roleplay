@@ -20,7 +20,7 @@ from aws_lambda_powertools.event_handler.exceptions import (
 import boto3.dynamodb.conditions
 
 from utils import get_user_id_from_event, sessions_table, messages_table, scenarios_table, dynamodb
-from feedback_service import generate_feedback_with_bedrock, save_feedback_to_dynamodb
+
 from realtime_scoring import calculate_realtime_scores
 from datetime import datetime
 from decimal import Decimal
@@ -792,6 +792,7 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
             feedback_items = feedback_response.get('Items', [])
             
             # フィードバックデータを分類
+            # ScanIndexForward=Falseで降順ソート済みのため、最初に見つかったfinal-feedbackが最新
             final_feedback = None
             dynamodb_realtime_metrics = []
             
@@ -799,7 +800,8 @@ def register_analysis_results_routes(app: APIGatewayRestResolver):
                 data_type = item.get('dataType')
                 
                 if data_type == 'final-feedback':
-                    final_feedback = item
+                    if final_feedback is None:
+                        final_feedback = item
                 elif data_type == 'realtime-metrics':
                     dynamodb_realtime_metrics.append(item)
             

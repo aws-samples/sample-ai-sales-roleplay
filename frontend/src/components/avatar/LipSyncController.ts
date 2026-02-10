@@ -194,7 +194,7 @@ export class LipSyncController {
 
     let targetMouthOpen = 0;
     if (this.analyser && this.dataArray) {
-      this.analyser.getByteFrequencyData(this.dataArray);
+      this.analyser.getByteFrequencyData(this.dataArray as Uint8Array<ArrayBuffer>);
       let sum = 0;
       for (let i = 0; i < this.dataArray.length; i++) {
         sum += this.dataArray[i];

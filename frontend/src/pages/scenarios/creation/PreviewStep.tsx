@@ -176,7 +176,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({ formData }) => {
               aria-label={t("scenarios.fields.npcPersonality")}
             >
               {formData.npc.personality &&
-              formData.npc.personality.length > 0 ? (
+                formData.npc.personality.length > 0 ? (
                 formData.npc.personality.map((trait, index) => (
                   <Chip key={index} label={trait} size="small" />
                 ))
@@ -293,30 +293,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({ formData }) => {
             </Box>
           </Box>
 
-          {/* 目標 */}
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle1" gutterBottom id="objectives-title">
-              {t("scenarios.fields.objectives")}
-            </Typography>
-
-            {formData.objectives && formData.objectives.length > 0 ? (
-              <List dense role="list" aria-labelledby="objectives-title">
-                {formData.objectives.map((objective, index) => (
-                  <ListItem
-                    key={index}
-                    divider={index < formData.objectives.length - 1}
-                    role="listitem"
-                  >
-                    <ListItemText primary={objective} />
-                  </ListItem>
-                ))}
-              </List>
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                {t("scenarios.create.noObjectivesAdded")}
-              </Typography>
-            )}
-          </Box>
+          {/* ゴール（目標セクションはgoalsに統合済み） */}
         </Box>
       </Paper>
 
@@ -361,11 +338,11 @@ const PreviewStep: React.FC<PreviewStepProps> = ({ formData }) => {
                             variant="body2"
                             color="text.primary"
                           >
-                            {t("scenarios.fields.priority")}: {goal.priority}/5 {goal.priority === 5 ? `(${t("scenarios.priority.highest")})` : 
-                            goal.priority === 4 ? `(${t("scenarios.priority.high")})` : 
-                            goal.priority === 3 ? `(${t("scenarios.priority.medium")})` : 
-                            goal.priority === 2 ? `(${t("scenarios.priority.low")})` : 
-                            `(${t("scenarios.priority.lowest")})`}
+                            {t("scenarios.fields.priority")}: {goal.priority}/5 {goal.priority === 5 ? `(${t("scenarios.priority.highest")})` :
+                              goal.priority === 4 ? `(${t("scenarios.priority.high")})` :
+                                goal.priority === 3 ? `(${t("scenarios.priority.medium")})` :
+                                  goal.priority === 2 ? `(${t("scenarios.priority.low")})` :
+                                    `(${t("scenarios.priority.lowest")})`}
                           </Typography>
                           {" • "}
                           <Typography

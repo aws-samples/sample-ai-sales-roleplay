@@ -3,34 +3,6 @@
  */
 
 /**
- * Transcribe WebSocket関連の型定義
- */
-export interface TranscribeMessageEvent {
-  transcript?: string;
-  isPartial?: boolean; // true=途中認識、false=最終確定（AWS Transcribe APIの標準に準拠）
-  voiceActivity?: boolean;
-  error?: {
-    code: string;
-    message: string;
-  };
-}
-
-export interface TranscribeRequest {
-  action: 'sendAudio';
-  audio: string; // Base64エンコードされた音声データ
-}
-
-export interface TranscribeResponse {
-  transcript?: string;
-  isPartial?: boolean; // true=途中認識、false=最終確定（AWS Transcribe APIの標準に準拠）
-  voiceActivity?: boolean;
-  error?: {
-    code: string;
-    message: string;
-  };
-}
-
-/**
  * 難易度レベルの型
  */
 export type DifficultyLevel = "easy" | "normal" | "hard" | "expert";
@@ -51,6 +23,7 @@ export interface NPCInfo {
   personality: string[];
   avatar?: string;
   description: string;
+  voiceId?: string;
 }
 
 /**

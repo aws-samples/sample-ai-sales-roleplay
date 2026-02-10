@@ -4,33 +4,16 @@
 import { EmotionState } from './index';
 
 /**
- * アバター情報
+ * アバター情報（DynamoDB管理）
  */
 export interface AvatarInfo {
   id: string;
   name: string;
   modelPath: string;
+  s3Key?: string;
   thumbnail?: string;
   description?: string;
   isDefault?: boolean;
-}
-
-/**
- * アバターマニフェスト
- */
-export interface AvatarManifest {
-  version: string;
-  defaultAvatarId: string;
-  avatars: AvatarInfo[];
-}
-
-/**
- * Polly Speech Marksのvisemeエントリ
- */
-export interface SpeechMarksEntry {
-  time: number;
-  type: string;
-  value: string;
 }
 
 /**
@@ -128,6 +111,7 @@ export interface VRMAvatarProps {
  */
 export interface VRMAvatarContainerProps {
   avatarId?: string;
+  avatarS3Key?: string;
   angerLevel: number;
   trustLevel: number;
   progressLevel: number;

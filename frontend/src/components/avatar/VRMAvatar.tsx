@@ -47,6 +47,7 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
   emotion,
   isSpeaking,
   visemeData,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   directEmotion,
   gesture,
   onLoad,
@@ -93,7 +94,7 @@ const VRMAvatar: React.FC<VRMAvatarProps> = ({
   /**
    * レンダリングループ（Refで保持して自己参照を回避）
    */
-  const renderLoopRef = useRef<() => void>();
+  const renderLoopRef = useRef<() => void>(undefined);
 
   useEffect(() => {
     renderLoopRef.current = () => {

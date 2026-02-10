@@ -19,13 +19,6 @@ export {
 } from './AvatarContext';
 
 // ===== UI補助コンポーネント =====
-// アバター選択UI（シナリオ管理画面用）
-export { AvatarSelector } from './AvatarSelector';
-export type { AvatarSelectorProps } from './AvatarSelector';
-
-// アバターサムネイル表示
-export { AvatarThumbnail } from './AvatarThumbnail';
-export type { AvatarThumbnailProps } from './AvatarThumbnail';
 
 // ===== ユーティリティクラス =====
 // VRMファイルローダー
@@ -44,7 +37,6 @@ export { default as AnimationController } from './AnimationController';
 // ===== 型定義の再エクスポート =====
 export type {
   AvatarInfo,
-  AvatarManifest,
   AvatarContextState,
   VisemeData,
   VRMExpressionName,

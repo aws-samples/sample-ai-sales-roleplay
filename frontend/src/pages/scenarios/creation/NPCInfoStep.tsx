@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import {
   Box,
   TextField,
@@ -7,18 +7,53 @@ import {
   Paper,
   Stack,
   Button,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormHelperText,
+  Alert,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import AddIcon from "@mui/icons-material/Add";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
+import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { NPCInfoStepProps } from "../../../types";
+import { getVoicesForLanguage } from "../../../config/pollyVoices";
 
 const NPCInfoStep: React.FC<NPCInfoStepProps> = ({
   formData,
   updateFormData,
   validationErrors = {},
+  avatarFile,
+  avatarFileName,
+  onAvatarFileChange,
+  voiceId,
+  onVoiceIdChange,
 }) => {
   const { t } = useTranslation();
   const [newPersonality, setNewPersonality] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // WR-015: alert()をMUI Alertに置き換え
+  const [fileError, setFileError] = useState<string>("");
+
+  // 言語に応じた音声モデル一覧を取得
+  const availableVoices = useMemo(() => {
+    const lang = formData.language || "ja";
+    return getVoicesForLanguage(lang);
+  }, [formData.language]);
+
+  // 性別表示用ラベル
+  const genderLabel = (gender: string): string => {
+    switch (gender) {
+      case "male": return t("scenarios.create.voice.male");
+      case "female": return t("scenarios.create.voice.female");
+      case "male_child": return t("scenarios.create.voice.maleChild");
+      case "female_child": return t("scenarios.create.voice.femaleChild");
+      default: return "";
+    }
+  };
 
   // テキストフィールド変更ハンドラー
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,6 +81,36 @@ const NPCInfoStep: React.FC<NPCInfoStepProps> = ({
         (personality) => personality !== personalityToDelete,
       ),
     });
+  };
+
+  // VRMファイル選択ハンドラー
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // .vrm拡張子チェック
+      if (!file.name.toLowerCase().endsWith(".vrm")) {
+        setFileError(t("scenarios.create.avatar.invalidFormat"));
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+      // 50MB制限チェック
+      if (file.size > 50 * 1024 * 1024) {
+        setFileError(t("scenarios.create.avatar.fileTooLarge"));
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+      setFileError("");
+      onAvatarFileChange?.(file);
+    }
+    // inputをリセット（同じファイルを再選択可能にする）
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  // VRMファイル削除ハンドラー
+  const handleFileRemove = () => {
+    onAvatarFileChange?.(null);
   };
 
   return (
@@ -96,6 +161,92 @@ const NPCInfoStep: React.FC<NPCInfoStepProps> = ({
           margin="normal"
           error={Boolean(validationErrors.company)}
         />
+
+        {/* 音声モデル選択 */}
+        {/* 将来拡張: 音声プレビュー再生機能を追加する場合は、
+            Selectの各MenuItemにPlayArrowIconボタンを追加し、
+            PollyService.synthesizeSpeech()でサンプルテキストを再生する。
+            コンポーネントの拡張性を維持するため、プレビュー機能は
+            別コンポーネント（VoicePreviewButton等）として切り出すことを推奨。 */}
+        <FormControl
+          fullWidth
+          required
+          margin="normal"
+          error={Boolean(validationErrors.voiceId)}
+        >
+          <InputLabel id="voice-select-label">
+            {t("scenarios.create.voice.label")}
+          </InputLabel>
+          <Select
+            labelId="voice-select-label"
+            id="voice-select"
+            value={voiceId || ""}
+            label={t("scenarios.create.voice.label")}
+            onChange={(e) => onVoiceIdChange?.(e.target.value)}
+            data-testid="voice-select"
+          >
+            {availableVoices.map((voice) => (
+              <MenuItem key={voice.voiceId} value={voice.voiceId}>
+                {voice.displayName} ({genderLabel(voice.gender)})
+              </MenuItem>
+            ))}
+          </Select>
+          <FormHelperText>
+            {validationErrors.voiceId
+              ? t(validationErrors.voiceId)
+              : t("scenarios.create.voice.help")}
+          </FormHelperText>
+        </FormControl>
+
+        {/* VRMアバターアップロード */}
+        <Typography variant="subtitle1" sx={{ mt: 3, mb: 1 }}>
+          {t("scenarios.create.avatar.label")}
+        </Typography>
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          {fileError && (
+            <Alert severity="error" sx={{ mb: 1 }} onClose={() => setFileError("")}>
+              {fileError}
+            </Alert>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".vrm"
+            onChange={handleFileSelect}
+            style={{ display: "none" }}
+            id="vrm-file-input"
+            aria-label={t("scenarios.create.avatar.selectFile")}
+          />
+          {avatarFile || avatarFileName ? (
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <InsertDriveFileIcon color="primary" />
+              <Typography variant="body2" sx={{ flex: 1 }}>
+                {avatarFile?.name || avatarFileName}
+              </Typography>
+              <Button
+                size="small"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={handleFileRemove}
+                aria-label={t("scenarios.create.avatar.remove")}
+              >
+                {t("common.delete")}
+              </Button>
+            </Stack>
+          ) : (
+            <Button
+              variant="outlined"
+              startIcon={<UploadFileIcon />}
+              onClick={() => fileInputRef.current?.click()}
+              fullWidth
+            >
+              {t("scenarios.create.avatar.selectFile")}
+            </Button>
+          )}
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+            {t("scenarios.create.avatar.help")}
+          </Typography>
+        </Paper>
 
         {/* 性格特性 */}
         <Typography variant="subtitle1" sx={{ mt: 3, mb: 1 }}>

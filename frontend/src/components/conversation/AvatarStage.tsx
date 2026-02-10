@@ -8,6 +8,7 @@ import type { GestureType } from "../../types/avatar";
 interface AvatarStageProps {
   // アバター関連
   avatarId?: string;
+  avatarS3Key?: string;
   angerLevel: number;
   trustLevel: number;
   progressLevel: number;
@@ -26,6 +27,7 @@ interface AvatarStageProps {
  */
 const AvatarStage: React.FC<AvatarStageProps> = ({
   avatarId,
+  avatarS3Key,
   angerLevel,
   trustLevel,
   progressLevel,
@@ -80,6 +82,7 @@ const AvatarStage: React.FC<AvatarStageProps> = ({
       >
         <VRMAvatarContainer
           avatarId={avatarId}
+          avatarS3Key={avatarS3Key}
           angerLevel={angerLevel}
           trustLevel={trustLevel}
           progressLevel={progressLevel}

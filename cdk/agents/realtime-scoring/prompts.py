@@ -36,6 +36,10 @@ Latest Message: {user_message}
 Goals:
 {goals_txt}
 
+Goal evaluation rules:
+- For goalUpdates, use the exact goalId shown in [ID: xxx] above
+- Do NOT invent your own IDs. Always use the provided IDs exactly as shown
+
 Rules for "analysis" field:
 - Write 1-2 SHORT sentences only (max 120 characters)
 - Format: "[Score change reason]. [One actionable tip]."
@@ -68,6 +72,10 @@ NPC Gesture Estimation:
 
 ゴール:
 {goals_txt}
+
+ゴール判定ルール:
+- goalUpdatesのgoalIdには、上記ゴール一覧の[ID: xxx]に記載されたIDをそのまま使用すること
+- 自分でIDを作成しないこと。必ず提供されたIDを使用すること
 
 「analysis」フィールドのルール:
 - 1〜2文の短文のみ（最大120文字）
@@ -110,7 +118,7 @@ def format_conversation_history(messages: List[Dict], language: str = 'ja') -> s
 
 
 def format_goals(goals: List[Dict], language: str = 'ja') -> str:
-    """ゴールをフォーマット"""
+    """ゴールをフォーマット（IDを含めてLLMが正確なgoalIdを返せるようにする）"""
     if not goals:
         return "（ゴールなし）" if language == 'ja' else "(No goals)"
     
@@ -119,10 +127,11 @@ def format_goals(goals: List[Dict], language: str = 'ja') -> str:
     
     lines = []
     for goal in goals:
+        goal_id = goal.get('id', '')
         description = goal.get('description', '')
         achieved = goal.get('achieved', False)
         status = achieved_label if achieved else not_achieved_label
-        lines.append(f"- {description}: {status}")
+        lines.append(f"- [ID: {goal_id}] {description}: {status}")
     
     return "\n".join(lines)
 

@@ -85,7 +85,6 @@ export class ExpressionController {
       }
     }
 
-    console.warn(`ExpressionController: 表情 "${targetName}" が見つかりません`);
     return null;
   }
 
@@ -99,14 +98,6 @@ export class ExpressionController {
     this.targetIntensity = mapping.intensity;
     this.targetBlend = mapping.blend ?? [];
     this.isDirty = true;
-
-    // デバッグログ: 表情変更の追跡
-    if (process.env.NODE_ENV === 'development') {
-      const actualName = this.getActualExpressionName(mapping.expression);
-      console.log(
-        `ExpressionController: setEmotion("${emotion}") → expression="${mapping.expression}"(actual="${actualName}"), intensity=${mapping.intensity}, blend=${JSON.stringify(mapping.blend ?? [])}, availableExpressions=[${this.availableExpressions.join(', ')}]`
-      );
-    }
 
     // 中間状態トランジションの判定
     if (previousExpression !== mapping.expression && previousExpression !== 'neutral') {
