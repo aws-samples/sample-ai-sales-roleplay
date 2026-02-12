@@ -79,7 +79,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
             <span>
               <Button
                 variant="contained"
-                onClick={sendMessage}
+                onClick={() => sendMessage()}
                 disabled={!userInput.trim() || isProcessing || isListening}
                 sx={{ minWidth: "auto", px: 3, flex: 1 }}
                 aria-label={t("conversation.input.send")}
