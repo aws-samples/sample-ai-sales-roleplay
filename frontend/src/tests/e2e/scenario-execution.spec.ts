@@ -591,7 +591,7 @@ test.describe("Phase 6: 結果画面", () => {
   test.describe("6.1 総合スコア表示", () => {
     test("スコアが表示されること", async ({ page }) => {
       // テストタイムアウトを延長（分析完了まで待機するため）
-      test.setTimeout(300000);
+test.setTimeout(300000);
 
       await completeSessionAndNavigateToResult(page);
 
@@ -621,7 +621,7 @@ test.describe("Phase 6: 結果画面", () => {
 
     test("パフォーマンスレベルが表示されること", async ({ page }) => {
       // テストタイムアウトを延長
-      test.setTimeout(300000);
+test.setTimeout(300000);
 
       await completeSessionAndNavigateToResult(page);
 
@@ -643,7 +643,7 @@ test.describe("Phase 6: 結果画面", () => {
   test.describe("6.2 詳細フィードバック表示", () => {
     test("レーダーチャートが表示されること", async ({ page }) => {
       // テストタイムアウトを延長
-      test.setTimeout(300000);
+test.setTimeout(300000);
 
       await completeSessionAndNavigateToResult(page);
 
@@ -666,7 +666,7 @@ test.describe("Phase 6: 結果画面", () => {
 
     test("改善提案が表示されること", async ({ page }) => {
       // テストタイムアウトを延長
-      test.setTimeout(300000);
+test.setTimeout(300000);
 
       await completeSessionAndNavigateToResult(page);
 
@@ -687,7 +687,7 @@ test.describe("Phase 6: 結果画面", () => {
   test.describe("6.3 会話履歴タブ", () => {
     test("会話履歴タブでメッセージ一覧が表示されること", async ({ page }) => {
       // テストタイムアウトを延長
-      test.setTimeout(300000);
+test.setTimeout(300000);
 
       await completeSessionAndNavigateToResult(page);
 
@@ -719,7 +719,7 @@ test.describe("Phase 6: 結果画面", () => {
   test.describe("6.4 コンプライアンス違反タブ", () => {
     test("コンプライアンスタブが表示されること", async ({ page }) => {
       // テストタイムアウトを延長
-      test.setTimeout(300000);
+test.setTimeout(300000);
 
       await completeSessionAndNavigateToResult(page);
 
@@ -749,7 +749,7 @@ test.describe("Phase 6: 結果画面", () => {
   test.describe("6.5 ナビゲーション", () => {
     test("ホームへ戻るボタンが機能すること", async ({ page }) => {
       // テストタイムアウトを延長
-      test.setTimeout(300000);
+test.setTimeout(300000);
 
       await completeSessionAndNavigateToResult(page);
 
