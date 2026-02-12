@@ -284,6 +284,14 @@ const ConversationPage: React.FC = () => {
             setScenario(convertedScenario);
             setCurrentMetrics(convertedScenario.initialMetrics);
 
+            // シナリオNPCの音声モデルIDを設定（アバターAPI取得前に即座に設定）
+            // アバター詳細APIの完了を待つとvoiceId設定が遅延し、
+            // 初期メッセージの音声合成でデフォルト（Takumi/男性）にフォールバックする問題を防止
+            const npcVoiceId = scenarioInfo.npc?.voiceId || scenarioInfo.npcInfo?.voiceId;
+            if (npcVoiceId) {
+              setScenarioVoiceId(npcVoiceId);
+            }
+
             // シナリオに紐づくアバターIDを設定
             if (scenarioInfo.avatarId) {
               setScenarioAvatarId(scenarioInfo.avatarId);
@@ -297,12 +305,6 @@ const ConversationPage: React.FC = () => {
               } catch {
                 // アバターs3Key取得失敗時はCloudFrontフォールバックを使用
               }
-            }
-
-            // シナリオNPCの音声モデルIDを設定
-            const npcVoiceId = scenarioInfo.npc?.voiceId || scenarioInfo.npcInfo?.voiceId;
-            if (npcVoiceId) {
-              setScenarioVoiceId(npcVoiceId);
             }
 
             // ゴール情報の初期化
