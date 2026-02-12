@@ -3,8 +3,8 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-02-10T10:00:00Z
-- **Current Stage**: INCEPTION - Workspace Detection
-- **Feature**: VRMアップロード + Polly音声モデル選択
+- **Current Stage**: IDLE - 次の作業待ち
+- **Feature**: なし（前回の作業完了済み）
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -13,40 +13,53 @@
 - **Project Structure**: Full-stack application (React frontend + AWS CDK backend)
 - **Reverse Engineering Needed**: No (既存成果物あり)
 
-## Current Feature: VRMアップロード + Polly音声モデル選択
-- Phase 3で計画済みのVRMファイルアップロード機能（管理者がVRMをアップロードしてアバターを追加）
-- シナリオNPC設定にPolly音声モデル選択を追加（neural/generativeモデルを言語ごとに全選択可能）
-- 音声モデルはアバターではなくシナリオのNPC設定に紐付け
-- S3 + DynamoDB + CloudFrontによるVRMファイル管理
-- 既存manifest.jsonベースアバターとの後方互換性維持
+## 完了済み作業一覧
 
-## Stage Progress
+### 3Dアバター機能 Phase 1（MVP） ✅ 完了
+- VRMモデルの基本表示
+- 音量ベースのリップシンク
+- 瞬きアニメーション
+- 単一デフォルトアバター
 
-### 🔵 INCEPTION PHASE
-- [x] Workspace Detection - COMPLETED
-- [x] Reverse Engineering - SKIP (既存成果物あり)
-- [x] Requirements Analysis - COMPLETED (承認済み)
-- [x] User Stories - SKIP (プロジェクト単純さに基づきスキップ)
-- [x] Workflow Planning - COMPLETED
-- [x] Application Design - SKIP (既存コンポーネント拡張のみ)
-- [x] Units Generation - SKIP (単一ユニット)
+### 3Dアバター機能 Phase 2（標準実装） ✅ 完了
+- Amazon Polly Visemeによる母音リップシンク
+- AI感情分析（realtime-scoring）による表情自動連動
+- 複数アバター切り替え対応（manifest.json管理）
+- ExpressionControllerによるスムーズな感情トランジション
+- AnimationControllerによる瞬き・呼吸アニメーション
 
-### 🟢 CONSTRUCTION PHASE
-- [x] Functional Design - SKIP (要件定義書に十分記載)
-- [x] NFR Requirements - SKIP (既存NFRで十分)
-- [x] NFR Design - SKIP
-- [x] Infrastructure Design - SKIP (既存CDKパターン踏襲)
-- [x] Code Generation - COMPLETED
-- [x] Build and Test - COMPLETED
+### 3Dアバター機能 Phase 3（拡張実装） ✅ 完了
+- AI駆動ジェスチャーアニメーション（うなずき・首かしげ）
+- 感情トランジションの高度化（中間状態、速度調整）
+- アイドルモーションの多様化（視線移動、体の揺れ）
+- VRMファイルアップロード機能（S3 + DynamoDB + CloudFront）
+- アバター管理UI
+- レスポンシブレイアウト対応
 
-### 🟡 OPERATIONS PHASE
-- [ ] Operations - PLACEHOLDER (将来拡張予定)
+### VRMアップロード + Polly音声モデル選択 ✅ 完了
+- シナリオNPC設定内VRMファイルアップロードUI
+- Polly音声モデル選択ドロップダウン（言語別動的フィルタリング）
+- エンジン自動選択ロジック（generative優先）
+- CloudFrontアバターS3オリジン追加
+- manifest.json廃止・DynamoDB + S3管理に統一
+- ハードコード音声マッピング廃止・シナリオ設定voiceIdに統一
+- 未使用コード・API削除（技術的負債解消）
+
+### 会話画面UI/UXリデザイン ✅ 完了
+- ConversationPage全面改修（モックv2ベース）
+- オーバーレイコンポーネント群（MetricsOverlay、RightPanelContainer等）
+- 既存コンポーネント削除・改修
+
+### AgentCore Runtime移行 ✅ 完了
+- Strands Agent → Bedrock AgentCore Runtime移行
+- NFR要件・設計・インフラ設計
+- CDKコンストラクト・エージェントコード・フロントエンド変更
 
 ## Current Status
-- **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Build and Test Complete
-- **Next Stage**: Operations (Placeholder)
-- **Status**: Build and Test完了、Operationsフェーズ（プレースホルダー）へ進む準備完了
+- **Lifecycle Phase**: IDLE
+- **Current Stage**: なし
+- **Next Stage**: 次のユーザーリクエスト待ち
+- **Status**: 全作業完了、新しい作業の開始待ち
 
 ## Notes
 - AI営業ロールプレイアプリケーション
@@ -54,7 +67,4 @@
 - バックエンド: AWS CDK + Lambda (Python/TypeScript) + DynamoDB + S3
 - AI/ML: Amazon Bedrock, Amazon Nova Premiere, Amazon Polly, Amazon Transcribe
 - 3Dアバター: three.js + @pixiv/three-vrm
-- Phase 3要件定義書にVRMアップロード機能の要件あり（P3-FR-013〜P3-FR-020）
-- Polly音声モデル選択は新規要件（Phase 3要件定義書に未記載）
-- 音声モデルバインディング: シナリオNPC設定に紐付け（ユーザー決定済み）
-- 対象モデル: neural + generativeエンジンの全モデル（言語ごと）
+- 全フェーズ（Phase 1〜3 + VRMアップロード + 音声選択 + 会話UI + AgentCore移行）完了済み

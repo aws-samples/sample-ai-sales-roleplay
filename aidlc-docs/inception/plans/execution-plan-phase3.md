@@ -23,12 +23,12 @@ flowchart TD
     subgraph INCEPTION["🔵 INCEPTION PHASE"]
         WD["Workspace Detection<br/><b>COMPLETED</b>"]
         RA["Requirements Analysis<br/><b>COMPLETED</b>"]
-        WP["Workflow Planning<br/><b>IN PROGRESS</b>"]
+        WP["Workflow Planning<br/><b>COMPLETED</b>"]
     end
     
     subgraph CONSTRUCTION["🟢 CONSTRUCTION PHASE"]
-        CG["Code Generation<br/><b>EXECUTE</b>"]
-        BT["Build and Test<br/><b>EXECUTE</b>"]
+        CG["Code Generation<br/><b>COMPLETED</b>"]
+        BT["Build and Test<br/><b>COMPLETED</b>"]
     end
     
     Start --> WD
@@ -40,7 +40,7 @@ flowchart TD
 
     style WD fill:#4CAF50,stroke:#1B5E20,stroke-width:3px,color:#fff
     style RA fill:#4CAF50,stroke:#1B5E20,stroke-width:3px,color:#fff
-    style WP fill:#FFA726,stroke:#E65100,stroke-width:3px,stroke-dasharray: 5 5,color:#000
+    style WP fill:#4CAF50,stroke:#1B5E20,stroke-width:3px,color:#fff
     style CG fill:#4CAF50,stroke:#1B5E20,stroke-width:3px,color:#fff
     style BT fill:#4CAF50,stroke:#1B5E20,stroke-width:3px,color:#fff
     style Start fill:#CE93D8,stroke:#6A1B9A,stroke-width:3px,color:#000
@@ -55,24 +55,24 @@ flowchart TD
 - [x] Requirements Analysis - COMPLETED
 - [x] User Stories - SKIP
   - **理由**: Phase 1/2と同じユーザーペルソナ、技術拡張が主目的
-- [x] Workflow Planning - IN PROGRESS
-- [ ] Application Design - SKIP
+- [x] Workflow Planning - COMPLETED
+- [x] Application Design - SKIP
   - **理由**: Phase 1で設計済みのコンポーネント構造を拡張するのみ。AnimationController、ExpressionControllerへのメソッド追加が主で、新規コンポーネント設計は不要（AvatarUpload/AvatarManagementは既存パターンに従う）
-- [ ] Units Generation - SKIP
+- [x] Units Generation - SKIP
   - **理由**: 単一ユニットとして実装可能。機能間の依存関係が明確で分割不要
 
 ### 🟢 CONSTRUCTION PHASE
-- [ ] Functional Design - SKIP
+- [x] Functional Design - SKIP
   - **理由**: ビジネスロジックは単純（CRUD操作、プロシージャルアニメーション）。複雑なドメインモデルなし
-- [ ] NFR Requirements - SKIP
+- [x] NFR Requirements - SKIP
   - **理由**: Phase 3のNFR要件は要件定義書に十分記載済み。新たな技術スタック選定不要
-- [ ] NFR Design - SKIP
+- [x] NFR Design - SKIP
   - **理由**: NFR Requirementsをスキップするため
-- [ ] Infrastructure Design - SKIP
+- [x] Infrastructure Design - SKIP
   - **理由**: 既存のCDKパターン（S3バケット、DynamoDBテーブル、Lambda、API Gateway）を踏襲。新しいインフラパターンなし
-- [ ] Code Generation - EXECUTE
+- [x] Code Generation - COMPLETED
   - **理由**: 実装が必要。バックエンド（Lambda、CDK）+ フロントエンド（アニメーション拡張、アップロードUI）
-- [ ] Build and Test - EXECUTE
+- [x] Build and Test - COMPLETED
   - **理由**: リント、型チェック、テスト手順の確認が必要
 
 ## 推定タイムライン

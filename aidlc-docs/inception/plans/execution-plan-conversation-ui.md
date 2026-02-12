@@ -62,7 +62,7 @@ flowchart TD
         RE["Reverse Engineering<br/><b>SKIP</b>"]
         RA["Requirements Analysis<br/><b>COMPLETED</b>"]
         US["User Stories<br/><b>SKIP</b>"]
-        WP["Workflow Planning<br/><b>IN PROGRESS</b>"]
+        WP["Workflow Planning<br/><b>COMPLETED</b>"]
         AD["Application Design<br/><b>SKIP</b>"]
         UG["Units Generation<br/><b>SKIP</b>"]
     end
@@ -72,9 +72,9 @@ flowchart TD
         NFRA["NFR Requirements<br/><b>SKIP</b>"]
         NFRD["NFR Design<br/><b>SKIP</b>"]
         ID["Infrastructure Design<br/><b>SKIP</b>"]
-        CP["Code Planning<br/><b>EXECUTE</b>"]
-        CG["Code Generation<br/><b>EXECUTE</b>"]
-        BT["Build and Test<br/><b>EXECUTE</b>"]
+        CP["Code Planning<br/><b>COMPLETED</b>"]
+        CG["Code Generation<br/><b>COMPLETED</b>"]
+        BT["Build and Test<br/><b>COMPLETED</b>"]
     end
     
     subgraph OPERATIONS["🟡 OPERATIONS PHASE"]
@@ -117,34 +117,34 @@ flowchart TD
 
 ### 🔵 INCEPTION PHASE
 - [x] Workspace Detection (COMPLETED)
-- [ ] Reverse Engineering - SKIP（既存成果物あり）
+- [x] Reverse Engineering - SKIP（既存成果物あり）
 - [x] Requirements Analysis (COMPLETED)
-- [ ] User Stories - SKIP
+- [x] User Stories - SKIP
   - **理由**: UI/UXリデザインは既存ユーザー向け改善。ペルソナ・ストーリーは既知。
-- [x] Workflow Planning (IN PROGRESS)
-- [ ] Application Design - SKIP
+- [x] Workflow Planning (COMPLETED)
+- [x] Application Design - SKIP
   - **理由**: 既存コンポーネントの再配置・改修が中心。新規コンポーネントはシンプルなUIパーツのみで、設計ドキュメントは不要。モックv2で設計は検証済み。
-- [ ] Units Generation - SKIP
+- [x] Units Generation - SKIP
   - **理由**: 単一ユニット（会話画面のみ）。分割不要。
 
 ### 🟢 CONSTRUCTION PHASE
-- [ ] Functional Design - SKIP
+- [x] Functional Design - SKIP
   - **理由**: ビジネスロジックの変更なし。UIレイアウトの変更のみ。
-- [ ] NFR Requirements - SKIP
+- [x] NFR Requirements - SKIP
   - **理由**: 既存NFR（パフォーマンス、アクセシビリティ）の範囲内。要件定義書のNFR-1〜NFR-5で十分。
-- [ ] NFR Design - SKIP
+- [x] NFR Design - SKIP
   - **理由**: NFR Requirementsをスキップするため。
-- [ ] Infrastructure Design - SKIP
+- [x] Infrastructure Design - SKIP
   - **理由**: フロントエンドのみの変更。インフラ変更なし。
-- [ ] Code Planning - EXECUTE（必須）
+- [x] Code Planning - COMPLETED
   - **理由**: 実装ステップの詳細計画が必要
-- [ ] Code Generation - EXECUTE（必須）
+- [x] Code Generation - COMPLETED
   - **理由**: コード実装が必要
-- [ ] Build and Test - EXECUTE（必須）
+- [x] Build and Test - COMPLETED
   - **理由**: リント・型チェック・テスト手順の確認が必要
 
 ### 🟡 OPERATIONS PHASE
-- [ ] Operations - PLACEHOLDER
+- [x] Operations - COMPLETED（デプロイ・テスト完了）
 
 ## 推定タイムライン
 - **実行ステージ数**: 3（Code Planning + Code Generation + Build and Test）
