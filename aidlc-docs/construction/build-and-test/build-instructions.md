@@ -1,115 +1,64 @@
-# Build Instructions: AgentCore Runtime Migration
-
-## 概要
-AgentCore Runtime移行のビルド手順を記載します。
-
----
+# ビルド手順 - 会話画面UI/UXリデザイン
 
 ## 前提条件
+- Node.js 18.x以上
+- npm 9.x以上
+- 環境変数: `.env` ファイルが `frontend/` に配置済み
 
-- Node.js 22+
-- Python 3.9+
-- AWS CLI 2+ (設定済み)
-- AWS CDK 2+
+## ビルドステップ
 
----
-
-## ビルド手順
-
-### Step 1: 依存関係インストール
-
+### 1. 依存関係のインストール
 ```bash
-# CDK依存関係
-cd cdk
-npm install
-
-# フロントエンド依存関係
-cd ../frontend
+cd frontend
 npm install
 ```
 
-### Step 2: TypeScript型チェック（CDK）
-
+### 2. 型チェック
 ```bash
-cd cdk
+cd frontend
 npx tsc --noEmit
 ```
 
-**注意**: `npm run build`は実行禁止です。
-
-### Step 3: CDK Synth（テンプレート生成）
-
+### 3. リントチェック
 ```bash
-cd cdk
-npm run synth:dev
+cd frontend
+npm run lint
 ```
 
-### Step 4: フロントエンドビルド
-
+### 4. プロダクションビルド（型チェック付き）
 ```bash
 cd frontend
 npm run build:full
 ```
 
-### Step 5: Lint実行
+### 5. ビルド成功の確認
+- `frontend/dist/` ディレクトリにビルド成果物が生成される
+- コンソールにエラーが表示されないこと
+- ビルドサイズが妥当であること
 
-```bash
-# CDK
-cd cdk
-npm run lint
+## 変更ファイル一覧
 
-# フロントエンド
-cd ../frontend
-npm run lint
-```
+### 新規作成
+- `frontend/src/components/conversation/MetricsOverlay.tsx`
+- `frontend/src/components/conversation/ScenarioPanel.tsx`
+- `frontend/src/components/conversation/PersonaPanel.tsx`
+- `frontend/src/components/conversation/RightPanelContainer.tsx`
+- `frontend/src/components/conversation/CoachingHintBar.tsx`
+- `frontend/src/components/conversation/AvatarStage.tsx`
 
----
-
-## 段階的統合手順
-
-### Phase 1: AgentCore Runtime CDKコンストラクト検証
-
-1. `cdk/lib/constructs/agentcore/agentcore-runtime.ts`の型チェック
-2. `cdk/lib/constructs/agentcore/index.ts`のエクスポート確認
-
-### Phase 2: InfrastructureStack統合
-
-1. `cdk/lib/infrastructure-stack.ts`にAgentCoreRuntimeをインポート
-2. 各エージェント用のAgentCoreRuntimeインスタンスを作成
-3. 既存のApiコンストラクトとの依存関係を確認
-
-### Phase 3: Step Functions更新
-
-1. `cdk/lib/constructs/session-analysis-stepfunctions.ts`を更新
-2. Lambda呼び出しをAgentCore Runtime呼び出しに変更
-
-### Phase 4: フロントエンド統合
-
-1. `AgentCoreService.ts`の型チェック
-2. 既存サービスとの統合テスト
-
----
+### 改修
+- `frontend/src/components/conversation/ConversationHeader.tsx`
+- `frontend/src/components/compliance/ComplianceAlert.tsx`
+- `frontend/src/pages/ConversationPage.tsx`
+- `frontend/src/i18n/locales/ja.json`
+- `frontend/src/i18n/locales/en.json`
 
 ## トラブルシューティング
 
-### CfnRuntime型エラー
+### 型エラーが発生する場合
+- `npx tsc --noEmit` で詳細なエラー箇所を確認
+- 新規コンポーネントのProps型定義を確認
 
-```
-Property 'CfnRuntime' does not exist on type 'typeof import("aws-cdk-lib/aws-bedrockagentcore")'
-```
-
-**解決策**: AWS CDKバージョンを確認し、最新版にアップデート
-
-```bash
-npm update aws-cdk-lib
-```
-
-### AgentCore Memory API未対応
-
-AgentCore Memory APIがまだSDKに含まれていない場合、S3フォールバックを使用します。
-
----
-
-## 次のステップ
-
-ビルドが成功したら、`unit-test-instructions.md`に従ってテストを実行してください。
+### リントエラーが発生する場合
+- `npm run lint -- --fix` で自動修正可能なエラーを修正
+- i18nキーの不足がないか `npm run validate-i18n` で確認

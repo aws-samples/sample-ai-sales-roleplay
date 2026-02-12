@@ -13,7 +13,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : isStaging ? 3 : undefined,
   reporter: "html",
   // テストタイムアウト設定（ステージング環境では長めに設定）
   timeout: isStaging ? 120000 : 30000,

@@ -1,6 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { PollyClient, SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
+import { PollyClient, SynthesizeSpeechCommand, TextType, Engine, OutputFormat, SpeechMarkType, VoiceId, LanguageCode } from '@aws-sdk/client-polly';
 import * as crypto from 'crypto';
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
@@ -18,9 +18,31 @@ const URL_EXPIRATION = 300; // 5分
 interface TextToSpeechRequest {
   text: string;
   voiceId?: string;
-  engine?: string;
+  engine?: string; // 無視される（voiceIdから自動選択）
   languageCode?: string;
   textType?: 'text' | 'ssml';
+}
+
+/**
+ * generative対応モデルのセット
+ * これらのvoiceIdはgenerativeエンジンを優先使用する
+ * 重要: フロントエンドの frontend/src/config/pollyVoices.ts の GENERATIVE_VOICE_IDS と同期が必要
+ */
+const GENERATIVE_VOICE_IDS = new Set([
+  'Danielle', 'Joanna', 'Salli', 'Matthew', 'Ruth', 'Stephen'
+]);
+
+/**
+ * voiceIdに応じたエンジンを自動選択（generative優先）
+ */
+function getPreferredEngine(voiceId: string): string {
+  return GENERATIVE_VOICE_IDS.has(voiceId) ? 'generative' : 'neural';
+}
+
+interface VisemeEntry {
+  time: number;
+  type: string;
+  value: string;
 }
 
 interface TextToSpeechResponse {
@@ -31,6 +53,7 @@ interface TextToSpeechResponse {
   voiceId?: string;
   engine?: string;
   fileName?: string;
+  visemes?: VisemeEntry[];
   error?: string;
   message?: string;
 }
@@ -38,6 +61,12 @@ interface TextToSpeechResponse {
 /**
  * 音声合成を実行（フォールバック機能付き）
  */
+function getLexiconName(languageCode: string): string {
+  if (languageCode.startsWith('ja')) return `${envId}ja`;
+  if (languageCode.startsWith('en')) return `${envId}en`;
+  return 'ja';
+}
+
 async function synthesizeSpeech(
   text: string,
   requestedVoiceId: string,
@@ -45,49 +74,82 @@ async function synthesizeSpeech(
   languageCode: string,
   textType: string,
   outputFormat: string
-): Promise<{ success: true; audioStream: any; finalVoiceId: string; finalEngine: string } | { success: false; error: string }> {
-
-  // まず希望の音声・エンジンを試行
-  const initialStrategy = { voiceId: requestedVoiceId, engine: requestedEngine };
+): Promise<{ success: true; audioStream: NodeJS.ReadableStream; finalVoiceId: string; finalEngine: string } | { success: false; error: string }> {
 
   try {
-    console.log(`音声合成試行: ${requestedVoiceId} + ${requestedEngine}`);
-
-    let lexiconName = "ja"
-    if (languageCode.startsWith('ja')) lexiconName = `${envId}ja`
-    if (languageCode.startsWith('en')) lexiconName = `${envId}en`
-
-    const pollyParams = {
-      Engine: requestedEngine as 'standard' | 'neural',
-      OutputFormat: outputFormat as 'json' | 'mp3' | 'ogg_vorbis' | 'pcm',
+    const pollyCommand = new SynthesizeSpeechCommand({
+      Engine: requestedEngine as Engine,
+      OutputFormat: outputFormat as OutputFormat,
       Text: text,
-      TextType: textType as any,
-      VoiceId: requestedVoiceId,
-      LanguageCode: languageCode,
-      // 言語コードに基づいて適切なLexiconを適用
-      LexiconNames: [lexiconName],
-    } as any;
+      TextType: textType as TextType,
+      VoiceId: requestedVoiceId as VoiceId,
+      LanguageCode: languageCode as LanguageCode,
+      LexiconNames: [getLexiconName(languageCode)],
+    });
 
-    console.log('Pollyパラメータ:', JSON.stringify(pollyParams));
-
-    const pollyCommand = new SynthesizeSpeechCommand(pollyParams);
     const pollyResponse = await pollyClient.send(pollyCommand);
 
     if (pollyResponse.AudioStream) {
-      console.log(`音声合成成功: ${requestedVoiceId} + ${requestedEngine}`);
       return {
         success: true,
-        audioStream: pollyResponse.AudioStream,
+        audioStream: pollyResponse.AudioStream as unknown as NodeJS.ReadableStream,
         finalVoiceId: requestedVoiceId,
         finalEngine: requestedEngine
       };
     }
   } catch (error) {
-    console.warn('音声合成失敗:', { voiceId: requestedVoiceId, engine: requestedEngine }, error);
+    // 音声合成失敗時はエラーレスポンスを返す
   }
   return {
     success: false,
     error: `音声合成失敗: ${requestedVoiceId} + ${requestedEngine}`
+  }
+}
+
+/**
+ * Speech Marks（viseme）を取得
+ */
+async function getSpeechMarks(
+  text: string,
+  voiceId: string,
+  engine: string,
+  languageCode: string,
+  textType: string
+): Promise<VisemeEntry[]> {
+  try {
+    const command = new SynthesizeSpeechCommand({
+      Engine: engine as Engine,
+      OutputFormat: 'json' as OutputFormat,
+      Text: text,
+      TextType: textType as TextType,
+      VoiceId: voiceId as VoiceId,
+      LanguageCode: languageCode as LanguageCode,
+      LexiconNames: [getLexiconName(languageCode)],
+      SpeechMarkTypes: ['viseme' as SpeechMarkType],
+    });
+
+    const response = await pollyClient.send(command);
+
+    if (!response.AudioStream) return [];
+
+    const buffer = await streamToBuffer(response.AudioStream);
+    const jsonLines = buffer.toString('utf-8').trim().split('\n');
+
+    const visemes: VisemeEntry[] = jsonLines
+      .filter(line => line.trim())
+      .map(line => {
+        try {
+          const parsed = JSON.parse(line);
+          return { time: parsed.time, type: parsed.type, value: parsed.value };
+        } catch {
+          return null;
+        }
+      })
+      .filter((v): v is VisemeEntry => v !== null && v.type === 'viseme');
+
+    return visemes;
+  } catch (error) {
+    return [];
   }
 }
 
@@ -127,7 +189,6 @@ async function streamToBuffer(stream: any): Promise<Buffer> {
  */
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
-    console.log('イベント受信:', JSON.stringify(event));
 
     // リクエストボディのパース
     let body: TextToSpeechRequest;
@@ -149,14 +210,34 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     const text = body.text;
     const requestedVoiceId = body.voiceId || 'Takumi'; // デフォルトは男性音声
-    const requestedEngine = body.engine || 'neural'; // デフォルトはニューラルエンジン
+
+    // WR-001: voiceIdバリデーション
+    const VALID_VOICE_IDS = new Set([
+      'Takumi', 'Kazuha', 'Tomoko',
+      'Danielle', 'Gregory', 'Ivy', 'Joanna', 'Kendra',
+      'Kimberly', 'Salli', 'Joey', 'Justin', 'Kevin',
+      'Matthew', 'Ruth', 'Stephen'
+    ]);
+    if (!VALID_VOICE_IDS.has(requestedVoiceId)) {
+      return createResponse(400, { success: false, error: '無効なvoiceIdです' });
+    }
+
+    const requestedEngine = getPreferredEngine(requestedVoiceId); // voiceIdに応じてエンジン自動選択
     const languageCode = body.languageCode || 'ja-JP';
     const textType = body.textType || 'text'; // text または ssml
     const outputFormat = 'mp3';
 
-    const synthesisResult = await synthesizeSpeech(
-      text, requestedVoiceId, requestedEngine, languageCode, textType, outputFormat
-    );
+    const [synthesisResult, visemes] = await Promise.all([
+      synthesizeSpeech(
+        text, requestedVoiceId, requestedEngine, languageCode, textType, outputFormat
+      ),
+      getSpeechMarks(
+        text, requestedVoiceId, requestedEngine, languageCode, textType
+      ).catch((error) => {
+        console.error('Viseme取得エラー（音声合成は続行）:', error);
+        return [] as VisemeEntry[];
+      }),
+    ]);
 
     if (!synthesisResult.success) {
       return createResponse(500, {
@@ -182,19 +263,15 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         Key: fileName,
       }));
       audioExists = true;
-      console.log('既存の音声ファイルが見つかりました:', fileName);
     } catch (err) {
       audioExists = false;
-      console.log('新しい音声ファイルを作成します');
     }
 
     // ファイルが存在しない場合のみS3にアップロード
     if (!audioExists) {
       try {
         // AudioStreamをBufferに変換
-        console.log('AudioStreamをBufferに変換中...');
         const audioBuffer = await streamToBuffer(synthesisResult.audioStream);
-        console.log('Buffer変換成功:', audioBuffer.length, 'bytes');
 
         // S3に音声ファイルをアップロード
         const s3Params = {
@@ -208,14 +285,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
         const s3Command = new PutObjectCommand(s3Params);
         await s3Client.send(s3Command);
-
-        console.log('S3アップロード成功:', fileName);
       } catch (s3Error) {
         console.error('S3アップロードエラー:', s3Error);
         return createResponse(500, {
           success: false,
-          error: 'S3アップロードに失敗しました',
-          message: s3Error instanceof Error ? s3Error.message : String(s3Error)
+          error: 'S3アップロードに失敗しました'
         });
       }
     }
@@ -232,8 +306,6 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       { expiresIn: URL_EXPIRATION }
     );
 
-    console.log('署名付きURL生成成功');
-
     // 成功レスポンスを返す
     return createResponse(200, {
       success: true,
@@ -242,14 +314,14 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       text,
       voiceId: synthesisResult.finalVoiceId,
       engine: synthesisResult.finalEngine,
-      fileName
+      fileName,
+      visemes: visemes.length > 0 ? visemes : undefined
     });
   } catch (error) {
     console.error('音声合成エラー:', error);
     return createResponse(500, {
       success: false,
-      error: '音声合成中にエラーが発生しました',
-      message: error instanceof Error ? error.message : String(error)
+      error: '音声合成中にエラーが発生しました'
     });
   }
 };
@@ -262,8 +334,8 @@ function createResponse(statusCode: number, body: TextToSpeechResponse): APIGate
     statusCode,
     headers: {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*', // CORS対応
-      'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+      'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
+      'Access-Control-Allow-Methods': 'OPTIONS,POST'
     },
     body: JSON.stringify(body)
   };

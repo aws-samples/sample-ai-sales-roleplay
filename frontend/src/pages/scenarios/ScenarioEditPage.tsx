@@ -14,6 +14,7 @@ import {
   AlertTitle,
 } from "@mui/material";
 import { ApiService } from "../../services/ApiService";
+import { AvatarService } from "../../services/AvatarService";
 import { useTranslation } from "react-i18next";
 
 // ステップコンポーネントをインポート
@@ -45,6 +46,14 @@ const ScenarioEditPage: React.FC = () => {
       description: string;
     }>
   >([]);
+
+  // アバター・音声モデル管理
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [voiceId, setVoiceId] = useState<string>("");
+  const [existingAvatarId, setExistingAvatarId] = useState<string | undefined>(undefined);
+  const [existingAvatarFileName, setExistingAvatarFileName] = useState<string | undefined>(undefined);
+  // CR-010: フィールドレベルバリデーションエラー
+  const [validationErrors, setValidationErrors] = useState<Record<string, string | null>>({});
 
   // フォームデータ
   const [formData, setFormData] = useState({
@@ -164,6 +173,15 @@ const ScenarioEditPage: React.FC = () => {
           initialMessage: scenarioData.initialMessage || "",
         });
 
+        // voiceIdとavatarIdを復元
+        const loadedVoiceId = scenarioData.npc?.voiceId || scenarioData.npcInfo?.voiceId || "";
+        setVoiceId(loadedVoiceId);
+        if (scenarioData.avatarId) {
+          setExistingAvatarId(scenarioData.avatarId);
+          // ファイル名はアバターIDから推定（表示用）
+          setExistingAvatarFileName(scenarioData.avatarId);
+        }
+
         setIsLoading(false);
       } catch (error) {
         console.error("データ読み込みエラー:", error);
@@ -195,7 +213,7 @@ const ScenarioEditPage: React.FC = () => {
       label: t("scenarios.create.steps.npcInfo"),
       component: (
         <NPCInfoStep
-          formData={formData}
+          formData={{ ...formData, npc: formData.npc, language: formData.language }}
           updateFormData={(npcData) => {
             // initialMessageが単独で更新される場合と、NPCフィールドが更新される場合を適切に処理
             if ('initialMessage' in npcData && Object.keys(npcData).length === 1) {
@@ -214,6 +232,18 @@ const ScenarioEditPage: React.FC = () => {
               });
             }
           }}
+          validationErrors={validationErrors}
+          avatarFile={avatarFile}
+          avatarFileName={avatarFile?.name || existingAvatarFileName}
+          onAvatarFileChange={(file) => {
+            setAvatarFile(file);
+            if (file === null) {
+              // ファイル削除時は既存アバター情報もクリア
+              setExistingAvatarFileName(undefined);
+            }
+          }}
+          voiceId={voiceId}
+          onVoiceIdChange={setVoiceId}
         />
       ),
     },
@@ -261,6 +291,17 @@ const ScenarioEditPage: React.FC = () => {
 
   // 次のステップへ
   const handleNext = () => {
+    // NPC情報ステップ（ステップ1）でvoiceIdの必須バリデーション
+    // CR-010: Create画面と同じフィールドレベルバリデーションに統一
+    if (activeStep === 1) {
+      if (!voiceId) {
+        setValidationErrors({ voiceId: "scenarios.validation.voiceIdRequired" });
+        setError(null);
+        return;
+      }
+      setValidationErrors({});
+      setError(null);
+    }
     setActiveStep((prevStep) => prevStep + 1);
   };
 
@@ -277,6 +318,43 @@ const ScenarioEditPage: React.FC = () => {
     setError(null);
 
     try {
+      // アバターアップロード/置き換え処理
+      let avatarId: string | undefined = existingAvatarId;
+      const avatarService = AvatarService.getInstance();
+
+      if (avatarFile) {
+        // 新しいファイルがある場合：先に新アバターをアップロード → 成功後に旧アバターを削除
+        const createResult = await avatarService.createAvatar(
+          avatarFile.name,
+          avatarFile.name.replace(/\.vrm$/i, ""),
+          "application/octet-stream",
+        );
+        await avatarService.uploadVrmFile(
+          createResult.uploadUrl,
+          createResult.formData,
+          avatarFile,
+        );
+        await avatarService.confirmUpload(createResult.avatarId);
+        avatarId = createResult.avatarId;
+
+        // 新アバターが確定してから旧アバターを削除
+        if (existingAvatarId) {
+          try {
+            await avatarService.deleteAvatar(existingAvatarId);
+          } catch (deleteError) {
+            console.warn("旧アバター削除エラー（孤立リソース）:", deleteError);
+          }
+        }
+      } else if (!avatarFile && !existingAvatarFileName && existingAvatarId) {
+        // ファイルが削除された場合：旧アバターを削除
+        try {
+          await avatarService.deleteAvatar(existingAvatarId);
+        } catch (deleteError) {
+          console.warn("旧アバター削除エラー（続行）:", deleteError);
+        }
+        avatarId = undefined;
+      }
+
       // APIリクエスト用にデータを整形
       const scenarioData = {
         title: formData.title,
@@ -284,13 +362,14 @@ const ScenarioEditPage: React.FC = () => {
         difficulty: formData.difficulty,
         category: formData.category,
         maxTurns: formData.maxTurns,
-        npc: formData.npc,
+        npc: { ...formData.npc, voiceId },
         initialMetrics: formData.initialMetrics,
         goals: formData.goals,
         pdfFiles: formData.pdfFiles?.length > 0 ? formData.pdfFiles : undefined,
         visibility: formData.visibility,
         guardrail: formData.guardrail,
         initialMessage: formData.initialMessage,
+        ...(avatarId !== undefined ? { avatarId } : {}),
         ...(formData.visibility === "shared"
           ? { sharedWithUsers: formData.sharedWithUsers }
           : {}),

@@ -24,14 +24,11 @@ def build_scoring_prompt(
     goals_txt = format_goals(goals, language)
     
     if language == 'en':
-        return f"""Evaluate the sales message and update scores.
+        return f"""You are a sales conversation scoring engine. Evaluate the latest message and update scores.
 
-Current Scores:
-- Anger Level: {anger}/10
-- Trust Level: {trust}/10
-- Progress Level: {progress}/10
+Current Scores: Anger={anger}/10, Trust={trust}/10, Progress={progress}/10
 
-Conversation History:
+Conversation:
 {history}
 
 Latest Message: {user_message}
@@ -39,14 +36,34 @@ Latest Message: {user_message}
 Goals:
 {goals_txt}
 
-Analyze the latest message and provide updated scores with analysis."""
-    else:
-        return f"""営業メッセージを評価しスコアを更新してください。
+Goal evaluation rules:
+- For goalUpdates, use the exact goalId shown in [ID: xxx] above
+- Do NOT invent your own IDs. Always use the provided IDs exactly as shown
 
-現在のスコア:
-- 怒りレベル: {anger}/10
-- 信頼レベル: {trust}/10
-- 進捗レベル: {progress}/10
+Rules for "analysis" field:
+- Write 1-2 SHORT sentences only (max 120 characters)
+- Format: "[Score change reason]. [One actionable tip]."
+- Example: "Good rapport building, trust +1. Try mentioning specific product benefits next."
+- Do NOT write long explanations, bullet points, or section headers
+- Do NOT repeat the scores or goal list in the analysis
+
+NPC Emotion Estimation:
+- Estimate the NPC's current emotional state based on the conversation context
+- npcEmotion: one of "happy", "angry", "sad", "relaxed", "neutral"
+- npcEmotionIntensity: 0.0 (very weak) to 1.0 (very strong)
+- Consider: NPC personality, conversation flow, user's attitude, and score changes
+
+NPC Gesture Estimation:
+- Estimate the appropriate gesture for the NPC based on the conversation context
+- gesture: "nod" (nodding), "headTilt" (head tilt), "none" (no gesture)
+- Nod: Use when NPC shows agreement, understanding, or empathy
+- Head tilt: Use when NPC shows doubt, confusion, or is thinking
+- None: Default when no gesture is needed
+- Do not add a gesture every time. Use them at a natural frequency."""
+    else:
+        return f"""あなたは営業会話のスコアリングエンジンです。最新メッセージを評価しスコアを更新してください。
+
+現在のスコア: 怒り={anger}/10, 信頼={trust}/10, 進捗={progress}/10
 
 会話履歴:
 {history}
@@ -56,7 +73,30 @@ Analyze the latest message and provide updated scores with analysis."""
 ゴール:
 {goals_txt}
 
-最新メッセージを分析し、更新されたスコアと分析を提供してください。"""
+ゴール判定ルール:
+- goalUpdatesのgoalIdには、上記ゴール一覧の[ID: xxx]に記載されたIDをそのまま使用すること
+- 自分でIDを作成しないこと。必ず提供されたIDを使用すること
+
+「analysis」フィールドのルール:
+- 1〜2文の短文のみ（最大120文字）
+- 形式: 「[スコア変動理由]。[次の一手のアドバイス]。」
+- 例: 「丁寧な挨拶で好印象。次は訪問目的を簡潔に伝えましょう。」
+- 長文の説明、箇条書き、見出しは禁止
+- スコアやゴール一覧をanalysisに繰り返さないこと
+
+NPC感情推定:
+- 会話の文脈からNPCの現在の感情状態を推定してください
+- npcEmotion: "happy", "angry", "sad", "relaxed", "neutral" のいずれか
+- npcEmotionIntensity: 0.0（非常に弱い）〜 1.0（非常に強い）
+- 考慮要素: NPCの性格、会話の流れ、ユーザーの態度、スコアの変化
+
+NPCジェスチャー推定:
+- 会話の文脈からNPCの適切なジェスチャーを推定してください
+- gesture: "nod"（うなずき）, "headTilt"（首かしげ）, "none"（なし） のいずれか
+- うなずき(nod): NPCが同意・理解・共感を示す場面で使用
+- 首かしげ(headTilt): NPCが疑問・困惑・考え中の場面で使用
+- なし(none): 特にジェスチャーが不要な場面（デフォルト）
+- 毎回ジェスチャーを付ける必要はありません。自然な頻度で使用してください"""
 
 
 def format_conversation_history(messages: List[Dict], language: str = 'ja') -> str:
@@ -78,7 +118,7 @@ def format_conversation_history(messages: List[Dict], language: str = 'ja') -> s
 
 
 def format_goals(goals: List[Dict], language: str = 'ja') -> str:
-    """ゴールをフォーマット"""
+    """ゴールをフォーマット（IDを含めてLLMが正確なgoalIdを返せるようにする）"""
     if not goals:
         return "（ゴールなし）" if language == 'ja' else "(No goals)"
     
@@ -87,10 +127,11 @@ def format_goals(goals: List[Dict], language: str = 'ja') -> str:
     
     lines = []
     for goal in goals:
+        goal_id = goal.get('id', '')
         description = goal.get('description', '')
         achieved = goal.get('achieved', False)
         status = achieved_label if achieved else not_achieved_label
-        lines.append(f"- {description}: {status}")
+        lines.append(f"- [ID: {goal_id}] {description}: {status}")
     
     return "\n".join(lines)
 

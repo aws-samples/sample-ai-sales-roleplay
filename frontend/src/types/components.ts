@@ -113,11 +113,19 @@ export interface NPCInfoStepProps {
   formData: {
     npc: NPCInfo;
     initialMessage?: string;
+    language?: string;
   };
   updateFormData: (
-    data: Partial<NPCInfo & { initialMessage?: string }>,
+    data: Partial<NPCInfo & { initialMessage?: string; voiceId?: string }>,
   ) => void;
   validationErrors?: Record<string, string | null>;
+  // VRMアバターアップロード
+  avatarFile?: File | null;
+  avatarFileName?: string;
+  onAvatarFileChange?: (file: File | null) => void;
+  // 音声モデル選択
+  voiceId?: string;
+  onVoiceIdChange?: (voiceId: string) => void;
 }
 
 /**

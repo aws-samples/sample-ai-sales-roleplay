@@ -14,6 +14,7 @@ import {
   AlertTitle,
 } from "@mui/material";
 import { ApiService } from "../../services/ApiService";
+import { AvatarService } from "../../services/AvatarService";
 import { useTranslation } from "react-i18next";
 import {
   validateBasicInfo,
@@ -52,7 +53,7 @@ const ScenarioCreatePage: React.FC = () => {
       description: string;
     }>
   >([]);
-  
+
   // バリデーションエラー管理
   const [validationErrors, setValidationErrors] = useState<{
     basicInfo: Record<string, string | null>;
@@ -65,6 +66,10 @@ const ScenarioCreatePage: React.FC = () => {
     goals: {},
     sharing: {},
   });
+
+  // アバター・音声モデル管理
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [voiceId, setVoiceId] = useState<string>("");
 
   // フォームデータ
   const [formData, setFormData] = useState({
@@ -175,6 +180,10 @@ const ScenarioCreatePage: React.FC = () => {
         formData.npc.role,
         formData.npc.company,
       );
+      // voiceId必須チェック
+      if (!voiceId) {
+        (errors as Record<string, string | null>).voiceId = "scenarios.validation.voiceIdRequired";
+      }
       isValid = Object.values(errors).every((error) => error === null);
       currentErrors.npcInfo = errors;
     } else if (activeStep === 2) {
@@ -216,6 +225,24 @@ const ScenarioCreatePage: React.FC = () => {
     setError(null);
 
     try {
+      // アバターアップロード処理
+      let avatarId: string | undefined;
+      if (avatarFile) {
+        const avatarService = AvatarService.getInstance();
+        const createResult = await avatarService.createAvatar(
+          avatarFile.name,
+          avatarFile.name.replace(/\.vrm$/i, ""),
+          "application/octet-stream",
+        );
+        await avatarService.uploadVrmFile(
+          createResult.uploadUrl,
+          createResult.formData,
+          avatarFile,
+        );
+        await avatarService.confirmUpload(createResult.avatarId);
+        avatarId = createResult.avatarId;
+      }
+
       // APIリクエスト用にデータを整形
       const scenarioData: Partial<ScenarioInfo> = {
         scenarioId: formData.scenarioId,
@@ -223,7 +250,7 @@ const ScenarioCreatePage: React.FC = () => {
         description: formData.description,
         difficulty: formData.difficulty,
         category: formData.category,
-        npc: formData.npc,
+        npc: { ...formData.npc, voiceId },
         objectives: formData.objectives,
         initialMetrics: formData.initialMetrics,
         goals: formData.goals,
@@ -233,6 +260,7 @@ const ScenarioCreatePage: React.FC = () => {
         language: formData.language,
         initialMessage: formData.initialMessage,
         maxTurns: formData.maxTurns,
+        ...(avatarId ? { avatarId } : {}),
         ...(formData.visibility === "shared"
           ? { sharedWithUsers: formData.sharedWithUsers }
           : {}),
@@ -309,7 +337,7 @@ const ScenarioCreatePage: React.FC = () => {
           )}
           {activeStep === 1 && (
             <NPCInfoStep
-              formData={formData}
+              formData={{ ...formData, npc: formData.npc, language: formData.language }}
               updateFormData={(npcData) => {
                 const { initialMessage, ...npcFields } = npcData;
                 setFormData({
@@ -319,6 +347,11 @@ const ScenarioCreatePage: React.FC = () => {
                 });
               }}
               validationErrors={validationErrors.npcInfo}
+              avatarFile={avatarFile}
+              avatarFileName={avatarFile?.name}
+              onAvatarFileChange={setAvatarFile}
+              voiceId={voiceId}
+              onVoiceIdChange={setVoiceId}
             />
           )}
           {activeStep === 2 && (

@@ -1,4 +1,37 @@
 {
+  "avatar": {
+    "label": "3D Avatar Display Area",
+    "description": "Displaying current emotional state with 3D avatar",
+    "emotion": "Emotion",
+    "loading": "Loading avatar...",
+    "loadError": "Failed to load avatar",
+    "loadErrorDetail": "An error occurred. Please reload the page.",
+    "webglNotSupported": "Your browser does not support WebGL. Please use a WebGL-compatible browser to display the 3D avatar.",
+    "speaking": "Speaking",
+    "upload": {
+      "selectFile": "Select VRM File",
+      "start": "Start Upload",
+      "progress": "Upload Progress",
+      "uploading": "Uploading...",
+      "invalidFormat": "Only VRM files can be uploaded",
+      "tooLarge": "File size must be 50MB or less",
+      "success": "Avatar upload completed",
+      "error": "Upload failed"
+    },
+    "management": {
+      "title": "Avatar Management",
+      "upload": "Upload New Avatar",
+      "empty": "No uploaded avatars",
+      "loading": "Loading",
+      "select": "Select",
+      "selected": "Selected",
+      "delete": "Delete",
+      "deleteConfirmTitle": "Delete Avatar",
+      "deleteConfirmMessage": "Delete \"{{name}}\"? This action cannot be undone.",
+      "statusActive": "Available",
+      "statusUploading": "Uploading"
+    }
+  },
   "home": {
     "title": "AI Sales Role-Play",
     "subtitle": "Improve Your Sales Skills Through AI Conversations",
@@ -170,7 +203,17 @@
     "evaluationLabel": "Evaluation",
     "voiceOutput": "Voice Output",
     "npcVoicePlayback": "* NPC responses will be played as voice",
-    "expandSettings": "Expand to show settings"
+    "expandSettings": "Expand to show settings",
+    "chatLog": {
+      "expand": "Expand chat log",
+      "collapse": "Collapse chat log"
+    },
+    "header": {
+      "toggleRightPanels": "Toggle info panels",
+      "toggleMetrics": "Toggle metrics",
+      "openAudioSettings": "Open audio settings",
+      "endSession": "End Session"
+    }
   },
   "metrics": {
     "realtimeEvaluation": "Realtime Evaluation",
@@ -185,7 +228,10 @@
     "progressLevelTooltip": "Higher values indicate that the conversation is progressing well",
     "analysis": "Analysis",
     "analysisResult": "Analysis Result",
-    "angerLevel": "Anger Level"
+    "angerLevel": "Anger Level",
+    "overlay": {
+      "title": "Realtime Evaluation"
+    }
   },
   "speech": {
     "processing": "Processing audio...",
@@ -216,6 +262,17 @@
     "settingsNav": "Settings",
     "profileNav": "Profile",
     "rankings": "Rankings"
+  },
+  "rightPanels": {
+    "scenarioTitle": "Scenario",
+    "personaTitle": "Persona"
+  },
+  "coachingHint": {
+    "label": "Coaching Hint"
+  },
+  "avatarStage": {
+    "label": "Avatar display area",
+    "speakingIndicator": "NPC is speaking"
   },
   "sidebar": {
     "expand": "Expand",
@@ -399,6 +456,23 @@
           }
         }
       },
+      "voice": {
+        "label": "Voice Model",
+        "help": "Select a voice for the NPC",
+        "required": "Please select a voice model",
+        "male": "Male",
+        "female": "Female",
+        "maleChild": "Male (Child)",
+        "femaleChild": "Female (Child)"
+      },
+      "avatar": {
+        "label": "VRM Avatar (Optional)",
+        "selectFile": "Select VRM File",
+        "remove": "Remove Avatar",
+        "help": "Upload a VRM avatar file (max 50MB)",
+        "invalidFormat": "Only VRM files can be uploaded (.vrm)",
+        "fileTooLarge": "File size exceeds 50MB limit"
+      },
       "error": {
         "guardrailsLoad": "Failed to load guardrails",
         "unknown": "An unexpected error occurred"
@@ -510,7 +584,8 @@
       "goalsRequired": "At least one goal is required",
       "goalsCriteriaRequired": "All goals must have at least one criteria",
       "sharedUsersRequired": "At least one user must be specified for shared scenarios",
-      "guardrailRequired": "Guardrail selection is required"
+      "guardrailRequired": "Guardrail selection is required",
+      "voiceIdRequired": "Voice model selection is required"
     },
     "visibility": {
       "private": "Private",

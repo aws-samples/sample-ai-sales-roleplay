@@ -6,38 +6,54 @@ This system is designed for junior sales representatives, helping them improve t
 
 ### Key Features
 
-- **Voice Conversation with AI**: Natural conversations powered by Amazon Bedrock
+- **Voice Conversation with AI**: Natural conversations powered by Amazon Bedrock AgentCore Runtime
+- **3D Avatar**: VRM model-based NPC display with lip sync, emotion-driven expressions, and gesture animations
+- **Real-time Speech Recognition**: Real-time voice recognition via Amazon Transcribe Streaming (WebSocket)
 - **Real-time Emotional Feedback**: Visualization of anger meter, trust level, and progress
-- **Diverse Scenarios**: Customizable sales scenes
+- **Text-to-Speech**: Natural speech with Amazon Polly (SSML support), per-scenario voice model selection
+- **Diverse Scenarios**: Customizable sales scenes with VRM avatar upload support
 - **Detailed Analysis Reports**: Improvement suggestions and feedback after each session
-- **Video Analysis During Conversation**: Analyzes video during sessions to verify effective eye contact and gestures
-- **Compliance Violation Check**: Identifies statements that violate compliance rules
-- **Reference Check**: Verifies whether user statements are based on reference materials
+- **Video Analysis During Conversation**: Gaze, expression, and gesture analysis with Amazon Nova Premiere
+- **Compliance Violation Check**: Real-time violation detection with Amazon Bedrock Guardrails
+- **Reference Check**: Reference material accuracy evaluation using Amazon Bedrock Knowledge Base
+- **Ranking**: Performance comparison between users for motivation
+- **Internationalization**: Japanese and English multilingual support
+
+### Screenshots
 
 ![](./docs/image/demo_image_1_en.png)
-
 ![](./docs/image/demo_image_2_en.png)
-
 ![](./docs/image/demo_image_4_en.png)
 
 ### Technology Stack
 
 **Frontend**
-- React 19 + TypeScript
+- React 19 + TypeScript 5.9
 - Material UI 7
-- Vite 6 (Build tool)
+- Vite 7 (Build tool)
 - AWS Amplify v6 (Authentication)
 - React Context API (State management)
+- three.js + @pixiv/three-vrm (3D Avatar)
+- i18next + react-i18next (Internationalization)
+- Chart.js + react-chartjs-2 (Data visualization)
+- React Router DOM 7 (Routing)
+- Jest 30 + React Testing Library + Playwright (Testing)
 
 **Backend**
-- AWS CDK (Infrastructure as Code)
-- AWS Lambda (Python 3.13) + API Gateway
-- Amazon Bedrock (Claude 3.5 Haiku, Claude Sonnet 4.5)
-- Amazon Polly (Text-to-speech)
+- AWS CDK 2.x (Infrastructure as Code)
+- Amazon Bedrock AgentCore Runtime (AI agent execution platform)
+- AWS Lambda (Python 3.9 / TypeScript) + API Gateway (REST + WebSocket)
+- Amazon Bedrock (Claude 3.5 Haiku)
+- Amazon Nova Premiere (Video analysis)
+- Amazon Polly (Text-to-speech with SSML)
+- Amazon Transcribe Streaming (Real-time speech recognition via WebSocket)
 - Amazon Bedrock Guardrails (Compliance check)
+- Amazon Bedrock Knowledge Base (PDF reference evaluation)
 - DynamoDB + RDS PostgreSQL
-- Amazon S3 (PDF materials, audio files)
+- Amazon S3 (PDF materials, audio files, video recordings, VRM avatars)
+- Amazon CloudFront (Static delivery + VRM file delivery)
 - Amazon Cognito (Authentication)
+- CDK Nag (Security checks)
 
 ### Architecture
 ![](./docs/image/Architecture_en.png)
@@ -134,12 +150,18 @@ Refer to [AI Sales Roleplay Environment Setup](./cdk/README.md) (Japanese)
 ├── frontend/                    # React application
 │   ├── src/
 │   │   ├── components/         # UI components
+│   │   │   ├── avatar/         # 3D avatar (VRM display, lip sync, expressions, gestures)
+│   │   │   ├── conversation/   # Conversation screen components
+│   │   │   ├── compliance/     # Compliance related
+│   │   │   ├── recording/      # Recording related
+│   │   │   ├── referenceCheck/ # Reference check
+│   │   │   └── common/         # Common components
 │   │   ├── pages/              # Application pages
 │   │   ├── services/           # API services, authentication, etc.
 │   │   ├── hooks/              # Custom React hooks
 │   │   ├── types/              # TypeScript type definitions
 │   │   ├── utils/              # Utility functions
-│   │   ├── i18n/               # Internationalization settings
+│   │   ├── i18n/               # Internationalization (Japanese & English)
 │   │   └── config/             # Configuration files
 │   └── docs/                   # Frontend-specific documentation
 ├── cdk/                        # AWS CDK infrastructure code
@@ -149,21 +171,33 @@ Refer to [AI Sales Roleplay Environment Setup](./cdk/README.md) (Japanese)
 │   │   │   ├── storage/        # S3, DynamoDB related
 │   │   │   └── compute/        # Lambda related
 │   │   └── stacks/             # Deployable stacks
+│   ├── agents/                 # Bedrock AgentCore agent definitions
+│   │   ├── npc-conversation/   # NPC conversation agent
+│   │   ├── realtime-scoring/   # Real-time scoring agent
+│   │   ├── audio-analysis/     # Audio analysis agent
+│   │   ├── feedback-analysis/  # Feedback analysis agent
+│   │   └── video-analysis/     # Video analysis agent
 │   ├── lambda/                 # Lambda function implementations
-│   │   ├── bedrock/            # Amazon Bedrock integration
+│   │   ├── agentcore-api/      # AgentCore Runtime API integration
+│   │   ├── evaluation-api/     # Evaluation API
 │   │   ├── scoring/            # Scoring engine
-│   │   ├── textToSpeech/       # Text-to-speech synthesis
+│   │   ├── textToSpeech/       # Text-to-speech (SSML support)
+│   │   ├── transcribeWebSocket/ # Speech recognition WebSocket
 │   │   ├── scenarios/          # Scenario management
 │   │   ├── sessions/           # Session management
+│   │   ├── sessionAnalysis/    # Session analysis
+│   │   ├── audioAnalysis/      # Audio analysis
 │   │   ├── guardrails/         # Guardrails management
 │   │   ├── rankings/           # Ranking features
-│   │   └── videos/             # Video processing
+│   │   ├── videos/             # Video processing (Nova Premiere)
+│   │   ├── avatars/            # Avatar management (VRM upload)
+│   │   └── custom-resources/   # Custom resource management
 │   └── data/                   # Initial data (scenarios, Guardrails config)
 ├── docs/                       # Project documentation
-│   ├── api/                    # API specifications
 │   ├── cost/                   # Cost estimation
 │   ├── custom-resources/       # Custom resource guides
-│   └── features/               # Feature specifications
+│   ├── deployment/             # Deployment guides
+│   └── image/                  # Screenshots & architecture diagrams
 └── .kiro/                      # Kiro AI configuration files
 ```
 

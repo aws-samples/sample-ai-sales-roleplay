@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react";
-import { Box, Typography, Alert, Snackbar } from "@mui/material";
+import { Box, Alert, Snackbar } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import type { VideoRecorderRef } from "../../../types/components";
 
@@ -43,17 +43,17 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
 
   // カメラアクセスの初期化 - コンポーネントがマウントされた時に一度だけ実行
   useEffect(() => {
-    console.log(t("recording.componentMounted"));
+    if (import.meta.env.DEV) console.log("Component mounted");
 
     // カメラアクセス初期化関数
     const initializeCamera = async () => {
       try {
-        console.log(t("recording.cameraAccessRequested"));
+        if (import.meta.env.DEV) console.log("Requesting camera access");
         setError("");
 
         // タイムアウト処理を追加（10秒）
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("カメラ初期化タイムアウト")), 10000);
+          setTimeout(() => reject(new Error("Camera initialization timeout")), 10000);
         });
 
         const stream = await Promise.race([
@@ -74,12 +74,12 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           setIsAccessGranted(true);
-          console.log(t("recording.cameraInitialized"));
+          if (import.meta.env.DEV) console.log("Camera initialized");
           // 親コンポーネントにカメラ初期化完了を通知
           if (onCameraInitialized) onCameraInitialized(true);
         }
       } catch (error) {
-        console.error("カメラアクセスエラー:", error);
+        console.error("Camera access error:", error);
         setError(t("recording.cameraAccessError"));
         setSnackbarOpen(true);
         if (onError) onError(t("recording.cameraAccessError"));
@@ -93,7 +93,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
 
     // クリーンアップ関数
     return () => {
-      console.log(t("recording.componentUnmounted"));
+      if (import.meta.env.DEV) console.log("Component unmounting - releasing resources");
       stopRecording();
       releaseCamera();
     };
@@ -102,14 +102,14 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
 
   // isActive プロパティが変更された時の処理
   useEffect(() => {
-    console.log(
-      t("recording.isActiveChanged") + ":",
+    if (import.meta.env.DEV) console.log(
+      "isActive changed:",
       isActive,
-      "録画状態:",
+      "recording:",
       isRecording,
       "sessionId:",
       sessionId,
-      "カメラ初期化状態:",
+      "camera initialized:",
       isAccessGranted,
     );
 
@@ -117,17 +117,17 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
       // セッションがアクティブで、sessionIdが有効な場合のみ録画開始
       // カメラ初期化が完了していれば即座に録画開始
       if (isAccessGranted) {
-        console.log("カメラ初期化完了、録画を開始します");
+        if (import.meta.env.DEV) console.log("Camera initialized, starting recording");
         startRecording();
       } else {
-        console.log("カメラ初期化待機中：録画開始は保留");
+        if (import.meta.env.DEV) console.log("Waiting for camera initialization, recording deferred");
       }
     } else if (!isActive && isRecording) {
       // セッションが非アクティブになったら録画停止
       stopRecording();
     } else if (isActive && !sessionId) {
       // sessionIdが無効な場合は警告を出力
-      console.warn(t("recording.recordingStartRequested"));
+      console.warn("Recording start requested but sessionId is empty");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, isRecording, sessionId]);
@@ -157,10 +157,10 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
   const startRecording = () => {
     if (isRecording || !isAccessGranted) return;
 
-    console.log(t("recording.recordingStarted"));
+    if (import.meta.env.DEV) console.log("Recording started");
 
     if (!streamRef.current) {
-      console.error("カメラストリームがありません");
+      console.error("Camera stream not available");
       setError(t("recording.cameraNotInitialized"));
       setSnackbarOpen(true);
       return;
@@ -192,16 +192,16 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
 
       // 録画停止時の処理
       mediaRecorderRef.current.onstop = () => {
-        console.log(t("recording.recordingStopped"));
+        if (import.meta.env.DEV) console.log("Recording stopped");
 
         try {
           // MP4形式でBlobを作成
           const blob = new Blob(chunksRef.current, { type: "video/mp4" });
-          console.log(
-            t("recording.recordingBlobSize") + ":",
+          if (import.meta.env.DEV) console.log(
+            "Recording blob size:",
             blob.size,
-            "バイト",
-            "MIMEタイプ: video/mp4",
+            "bytes",
+            "MIME type: video/mp4",
           );
 
           // 以前のURLを解放
@@ -217,10 +217,10 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
             // 録画データを保存
             saveRecordingData(blob);
           } else {
-            console.warn(t("recording.emptyBlobGenerated"));
+            console.warn("Empty blob generated");
           }
         } catch (err) {
-          console.error(t("recording.recordingDataProcessingError") + ":", err);
+          console.error("Recording data processing error:", err);
         }
 
         // 録画時間をリセット
@@ -233,7 +233,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
       setIsRecording(true);
       startDurationTimer();
     } catch (error) {
-      console.error(t("recording.startError") + ":", error);
+      console.error("Recording start error:", error);
       setError(t("recording.startError"));
       setSnackbarOpen(true);
       if (onError) onError(t("recording.startError"));
@@ -244,7 +244,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
   const stopRecording = () => {
     if (!isRecording || !mediaRecorderRef.current) return;
 
-    console.log(t("recording.recordingStopped"));
+    if (import.meta.env.DEV) console.log("Recording stopped");
 
     try {
       if (mediaRecorderRef.current.state !== "inactive") {
@@ -252,7 +252,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
         setIsRecording(false);
       }
     } catch (error) {
-      console.error(t("recording.recordingStopError") + ":", error);
+      console.error("Recording stop error:", error);
     }
   };
 
@@ -276,8 +276,8 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
   const uploadWithRetry = async (uploadInfo: { uploadUrl: string; formData: Record<string, string> }, blob: Blob, videoKey: string, maxRetries = 3) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`アップロード試行 ${attempt}/${maxRetries}`);
-        console.log("フォームデータフィールド:", Object.keys(uploadInfo.formData));
+        if (import.meta.env.DEV) console.log(`Upload attempt ${attempt}/${maxRetries}`);
+        if (import.meta.env.DEV) console.log("Form data fields:", Object.keys(uploadInfo.formData));
 
         const formData = new FormData();
 
@@ -290,7 +290,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
         orderedFields.forEach(fieldName => {
           if (uploadInfo.formData[fieldName]) {
             formData.append(fieldName, uploadInfo.formData[fieldName]);
-            console.log(`フィールド追加: ${fieldName}`);
+            if (import.meta.env.DEV) console.log(`Field added: ${fieldName}`);
           }
         });
 
@@ -298,14 +298,14 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
         Object.entries(uploadInfo.formData).forEach(([key, value]) => {
           if (!orderedFields.includes(key)) {
             formData.append(key, value);
-            console.log(`追加フィールド: ${key}`);
+            if (import.meta.env.DEV) console.log(`Additional field: ${key}`);
           }
         });
 
         // fileフィールドは必ず最後に追加（ファイル名も指定）
         const file = new File([blob], videoKey.split('/').pop() || 'recording.mp4', { type: 'video/mp4' });
         formData.append("file", file);
-        console.log(`ファイル追加: サイズ=${file.size}, 名前=${file.name}, タイプ=${file.type}`);
+        if (import.meta.env.DEV) console.log(`File added: size=${file.size}, name=${file.name}, type=${file.type}`);
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 300000); // 5分タイムアウト
@@ -319,9 +319,9 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
         clearTimeout(timeoutId);
 
         if (response.ok || response.status === 204) {
-          console.log(t("recording.s3UploadSuccess"), response.status);
+          if (import.meta.env.DEV) console.log("S3 upload success:", response.status);
           localStorage.setItem("lastRecordingKey", videoKey);
-          console.log("録画キーをlocalStorageに保存:", videoKey);
+          if (import.meta.env.DEV) console.log("Recording key saved to localStorage:", videoKey);
 
           // 録画完了イベントを発火
           const event = new CustomEvent('recordingComplete', {
@@ -332,11 +332,11 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
         } else {
           // エラーレスポンスの詳細を取得
           const errorText = await response.text();
-          console.error(`S3エラーレスポンス: ${errorText}`);
+          console.error(`S3 error response: ${errorText}`);
           throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
         }
       } catch (error) {
-        console.error(`アップロード試行 ${attempt} 失敗:`, error);
+        console.error(`Upload attempt ${attempt} failed:`, error);
 
         if (attempt === maxRetries) {
           throw error; // 最後の試行で失敗したらエラーを投げる
@@ -357,7 +357,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
       }
 
       const videoKey = `session_${sessionId}_${new Date().getTime()}.mp4`;
-      console.log(t("recording.s3UploadStart") + ": " + videoKey, "サイズ:", Math.round(blob.size / 1024 / 1024 * 100) / 100, "MB");
+      if (import.meta.env.DEV) console.log("S3 upload start:", videoKey, "size:", Math.round(blob.size / 1024 / 1024 * 100) / 100, "MB");
 
       // APIサービスを使用して署名付きURLを取得してS3にアップロード
       try {
@@ -372,28 +372,28 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
           contentType,
           videoKey,
         );
-        console.log(t("recording.signedUrlObtained") + ":", uploadInfo.uploadUrl);
+        if (import.meta.env.DEV) console.log("Signed URL obtained:", uploadInfo.uploadUrl);
 
         // BlobをS3にPOSTフォームでアップロード（リトライ機能付き）
         await uploadWithRetry(uploadInfo, blob, videoKey);
 
       } catch (uploadError) {
-        console.error(t("recording.s3UploadProcessError") + ":", uploadError);
+        console.error("S3 upload process error:", uploadError);
         // エラーが発生した場合でも、親コンポーネントにエラー情報を渡す
         if (onError) {
-          onError(`アップロードエラー: ${uploadError}`);
+          onError(t("recording.uploadError"));
         }
         // エラーが発生してもvideoKeyは渡して処理を続行
       }
 
-      console.log(t("recording.recordingDataSaved") + ":", videoKey);
+      if (import.meta.env.DEV) console.log("Recording data saved:", videoKey);
 
       // コールバックを呼び出し（エラーが発生してもvideoKeyは渡す）
       if (onRecordingComplete) {
         onRecordingComplete(videoKey);
       }
     } catch (err) {
-      console.error(t("recording.recordingDataProcessingFailed") + ":", err);
+      console.error("Recording data processing failed:", err);
       if (onError) {
         onError(t("recording.recordingDataProcessingFailed"));
       }
@@ -403,14 +403,14 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
   // 明示的な録画停止のためのメソッドを外部に公開
   useImperativeHandle(ref, () => ({
     forceStopRecording: async () => {
-      console.log("VideoRecorder: forceStopRecording呼び出し");
+      if (import.meta.env.DEV) console.log("VideoRecorder: forceStopRecording called");
       return new Promise<void>((resolve) => {
         if (isRecording && mediaRecorderRef.current) {
-          console.log("VideoRecorder: 録画中のため停止処理を実行");
+          if (import.meta.env.DEV) console.log("VideoRecorder: Recording in progress, stopping");
 
           // 録画停止完了を待つためのイベントリスナーを設定
           const handleStop = () => {
-            console.log("VideoRecorder: 録画停止完了");
+            if (import.meta.env.DEV) console.log("VideoRecorder: Recording stopped");
             if (mediaRecorderRef.current) {
               mediaRecorderRef.current.removeEventListener('stop', handleStop);
             }
@@ -420,7 +420,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
           mediaRecorderRef.current.addEventListener('stop', handleStop);
           stopRecording();
         } else {
-          console.log("VideoRecorder: 録画していないため停止処理をスキップ");
+          if (import.meta.env.DEV) console.log("VideoRecorder: Not recording, skipping stop");
           resolve();
         }
       });
@@ -433,7 +433,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
   };
 
   return (
-    <Box sx={{ border: 1, borderColor: "grey.300", borderRadius: 1, p: 2 }}>
+    <Box sx={{ borderRadius: 1, overflow: "hidden", lineHeight: 0 }}>
       {/* エラー表示用Snackbar */}
       <Snackbar
         open={snackbarOpen && !!error}
@@ -451,19 +451,8 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
         </Alert>
       </Snackbar>
 
-      {/* isActiveステータス表示（開発用） */}
-      <Typography
-        variant="caption"
-        color={isActive ? "success.main" : "text.secondary"}
-        sx={{ display: "block", mb: 1 }}
-      >
-        {isActive
-          ? t("recording.recordingActive")
-          : t("recording.recordingStandby")}
-      </Typography>
-
       {/* ビデオプレビュー */}
-      <Box sx={{ position: "relative", mb: 2 }}>
+      <Box sx={{ position: "relative" }}>
         {previewUrl ? (
           <Box sx={{ position: "relative" }}>
             <video
@@ -472,8 +461,9 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
               controls
               width="100%"
               height="auto"
+              style={{ display: "block", borderRadius: 4 }}
               onError={(e) => {
-                console.error(t("recording.videoLoadError") + ":", e);
+                console.error("Video load error:", e);
                 if (previewUrl) {
                   URL.revokeObjectURL(previewUrl);
                   setPreviewUrl("");
@@ -489,9 +479,34 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
             playsInline
             width="100%"
             height="auto"
+            style={{ display: "block", borderRadius: 4 }}
           />
         )}
       </Box>
+
+      {/* 録画ステータスインジケーター */}
+      {isActive && (
+        <Box
+          sx={{
+            position: "absolute",
+            top: 4,
+            right: 4,
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            backgroundColor: "#ef4444",
+            animation: "pulse 1.5s infinite",
+            "@keyframes pulse": {
+              "0%, 100%": { opacity: 1 },
+              "50%": { opacity: 0.4 },
+            },
+            "@media (prefers-reduced-motion: reduce)": {
+              animation: "none",
+            },
+          }}
+          aria-label={t("recording.recordingActive")}
+        />
+      )}
     </Box>
   );
 });

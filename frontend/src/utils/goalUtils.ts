@@ -6,17 +6,17 @@ import type { Goal, GoalStatus, Scenario } from "../types/index";
  * @returns 初期化されたゴールステータスの配列
  */
 export const initializeGoalStatuses = (scenario: Scenario): GoalStatus[] => {
-  // goalsが空の場合は、objectivesからgoalsを生成
+  // goalsが空の場合は空配列を返す（objectivesはレガシーフィールド）
   const effectiveGoals =
     scenario.goals && scenario.goals.length > 0
       ? scenario.goals
-      : (scenario.objectives || []).map((obj, index) => ({
-          id: `goal-${index}`,
-          description: obj,
-          priority: 3,
-          criteria: [],
-          isRequired: index === 0, // 最初の目標は必須とする
-        }));
+      : ((scenario as Scenario & { objectives?: string[] }).objectives || []).map((obj: string, index: number) => ({
+        id: `goal-${index}`,
+        description: obj,
+        priority: 3,
+        criteria: [] as string[],
+        isRequired: index === 0,
+      }));
 
   if (!effectiveGoals || effectiveGoals.length === 0) {
     return [];

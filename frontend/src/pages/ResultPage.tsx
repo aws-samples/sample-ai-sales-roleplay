@@ -186,6 +186,60 @@ const ResultPage: React.FC = () => {
             setVideoAnalysisData(completeData.videoAnalysis);
           }
 
+          // ゴール結果を設定（初回取得時に未完了だった場合の反映）
+          if (completeData.goalResults) {
+            const updatedGoalStatuses = completeData.goalResults.goalStatuses.map(
+              (status) => ({
+                goalId: status.goalId,
+                achieved: status.achieved,
+                achievedAt: status.achievedAt && status.achievedAt !== "null"
+                  ? (() => {
+                    try {
+                      const date = new Date(status.achievedAt);
+                      return isNaN(date.getTime()) ? undefined : date;
+                    } catch {
+                      return undefined;
+                    }
+                  })()
+                  : undefined,
+                progress: Number(status.progress),
+              }),
+            );
+            const updatedGoalScore = Number(completeData.goalResults.goalScore);
+            const updatedScenarioGoals = completeData.goalResults.scenarioGoals.map(
+              (goal) => ({
+                id: goal.id,
+                description: goal.description,
+                isRequired: goal.isRequired,
+                priority: Number(goal.priority),
+                criteria: goal.criteria,
+              }),
+            );
+
+            setScenarioGoals(updatedScenarioGoals);
+
+            // セッションのゴール情報も更新
+            setSession((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                goalStatuses: updatedGoalStatuses,
+                goalScore: updatedGoalScore,
+              };
+            });
+          }
+
+          // 最終スコアを更新（フィードバックのoverallスコア）
+          if (completeData.feedback?.scores?.overall) {
+            setSession((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                finalScore: completeData.feedback!.scores.overall,
+              };
+            });
+          }
+
           setAnalysisProgress(t("results.analysisCompleted"));
         } else if (statusResponse.status === "failed" || statusResponse.status === "timeout") {
           // 分析失敗 - ポーリング停止
@@ -382,33 +436,10 @@ const ResultPage: React.FC = () => {
               criteria: goal.criteria,
             }),
           );
-        } else if (completeData.realtimeMetrics && completeData.realtimeMetrics.length > 0) {
-          // リアルタイムメトリクスからゴール情報を取得
-          const latestMetricsWithGoals = completeData.realtimeMetrics.find(
-            (m) => m.goalStatuses && m.goalStatuses.length > 0,
-          );
-          if (latestMetricsWithGoals && latestMetricsWithGoals.goalStatuses) {
-            // 型変換: string | number → number, string | null → Date | undefined
-            goalStatuses = latestMetricsWithGoals.goalStatuses.map(
-              (status) => ({
-                goalId: status.goalId,
-                achieved: status.achieved,
-                achievedAt: status.achievedAt && status.achievedAt !== "null"
-                  ? (() => {
-                    try {
-                      const date = new Date(status.achievedAt);
-                      return isNaN(date.getTime()) ? undefined : date;
-                    } catch {
-                      return undefined;
-                    }
-                  })()
-                  : undefined,
-                progress: Number(status.progress),
-              }),
-            );
-            goalScore = Number(latestMetricsWithGoals.goalScore);
-          }
         }
+        // 注: リアルタイムメトリクスからのgoalStatusesフォールバックは削除
+        // バックエンドのformatted_realtime_metricsにgoalStatusesが含まれないため機能しない
+        // goalResultsはfinal-feedbackレコードから取得される
 
         // scenarioGoalsが空の場合、シナリオ情報から取得を試みる
         if (scenarioGoals.length === 0 && sessionInfo.scenarioId) {
