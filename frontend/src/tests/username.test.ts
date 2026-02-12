@@ -4,7 +4,7 @@ import { mockAmplifyAuth } from "./mocks/auth-mock";
 test.describe("ユーザー名登録・編集機能", () => {
   // ステージング環境ではAmplify認証モックが機能しないためスキップ
   // ローカル開発環境でのみ実行可能
-  test.skip(({ browserName }) => true, 'ステージング環境ではAmplify認証モックが未対応のためスキップ');
+  test.skip();
 
   test.beforeEach(async ({ page }) => {
     // Amplify認証のモック

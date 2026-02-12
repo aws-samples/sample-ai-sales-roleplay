@@ -41,53 +41,78 @@ test.describe('3Dアバター感情表現テスト', () => {
     await clickStartConversationButton(page);
     console.log('商談開始');
 
-    // VRMアバターの読み込みを待機
-    await page.waitForTimeout(5000);
+    // アバター表示エリア（region）が表示されるまで待機
+    const avatarRegion = page.locator('[role="region"][aria-label*="アバター"], [role="region"][aria-label*="Avatar"]');
+    await expect(avatarRegion.first()).toBeVisible({ timeout: 30000 });
+    console.log('アバター表示エリアが表示されています');
+
+    // canvas、エラー表示、またはローディング表示のいずれかがDOMに存在するまで待機
+    const canvasOrErrorOrLoading = page.locator('canvas')
+      .or(page.locator('[role="alert"]'))
+      .or(page.locator('[role="status"][aria-busy="true"]'));
+    await expect(canvasOrErrorOrLoading.first()).toBeAttached({ timeout: 30000 });
 
     // スクリーンショット: 商談中（VRMアバター表示）
     await page.screenshot({ path: 'test-results/03-conversation-with-avatar.png', fullPage: true });
 
-    // canvasがDOMに存在することを確認（VRMアバターのレンダリング先）
-    // ヘッドレスブラウザではWebGLの制約によりcanvasサイズが0x0になる場合があるため、
-    // DOM上の存在確認（attached）で検証する
     const canvas = page.locator('canvas');
-    if (await canvas.count() > 0) {
-      console.log('Canvas要素が表示されています（VRMアバター描画領域）');
+    const canvasExists = await canvas.count() > 0;
+    if (canvasExists) {
+      console.log('Canvas要素がDOMに存在しています（VRMアバター描画領域）');
       await expect(canvas.first()).toBeAttached();
+    } else {
+      const errorAlert = page.locator('[role="alert"]');
+      if (await errorAlert.first().isVisible().catch(() => false)) {
+        console.log('アバター読み込みエラーが表示されています（ヘッドレスブラウザのWebGL制約の可能性）');
+      } else {
+        console.log('アバターがローディング中です');
+      }
     }
 
-    // リアルタイム評価パネルを確認
-    const angerMeter = page.locator('text=/怒りメーター|Anger/i');
-    const trustMeter = page.locator('text=/信頼度|Trust/i');
-    const progressMeter = page.locator('text=/進捗度|Progress/i');
+    // リアルタイム評価パネルを確認（progressbarのaria-labelで検索）
+    const angerProgress = page.locator('[role="progressbar"][aria-label*="怒り"]')
+      .or(page.locator('[role="progressbar"][aria-label*="Anger"]'));
+    const trustProgress = page.locator('[role="progressbar"][aria-label*="信頼"]')
+      .or(page.locator('[role="progressbar"][aria-label*="Trust"]'));
+    const progressProgress = page.locator('[role="progressbar"][aria-label*="進捗"]')
+      .or(page.locator('[role="progressbar"][aria-label*="Progress"]'));
 
-    if (await angerMeter.count() > 0) {
+    if (await angerProgress.count() > 0) {
       console.log('怒りメーター表示確認');
     }
-    if (await trustMeter.count() > 0) {
+    if (await trustProgress.count() > 0) {
       console.log('信頼度表示確認');
     }
-    if (await progressMeter.count() > 0) {
+    if (await progressProgress.count() > 0) {
       console.log('進捗度表示確認');
     }
 
     // メッセージ入力欄を探す
-    const messageInput = page.locator('textarea, input[type="text"]').last();
-    if (await messageInput.isVisible()) {
+    const messageInput = page.locator('textarea').first();
+    if (await messageInput.isVisible().catch(() => false)) {
       // テストメッセージを入力
       await messageInput.fill('はじめまして。本日はお時間をいただきありがとうございます。');
 
       // 送信ボタンをクリック
-      const sendButton = page.getByRole('button', { name: /送信|Send/i });
+      const sendButton = page.locator('button[aria-label*="送信"]')
+        .or(page.getByRole('button', { name: /送信|Send/i }));
       if (await sendButton.count() > 0) {
-        await sendButton.click();
+        await sendButton.first().click();
         console.log('メッセージ送信');
 
         // 応答を待機
-        await page.waitForTimeout(10000);
+        await page.waitForTimeout(15000);
 
         // スクリーンショット: メッセージ送信後
         await page.screenshot({ path: 'test-results/04-after-message.png', fullPage: true });
+
+        // メッセージ送信後もアバター表示エリアが存在するか確認
+        const regionStillVisible = await avatarRegion.first().isVisible().catch(() => false);
+        if (regionStillVisible) {
+          console.log('メッセージ送信後もアバター表示エリアは正常に表示されています');
+        } else {
+          console.log('メッセージ送信後にアバター表示エリアが消失しました（APIエラーの可能性）');
+        }
       }
     }
 
