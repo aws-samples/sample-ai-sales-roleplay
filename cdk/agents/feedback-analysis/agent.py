@@ -21,7 +21,7 @@ from models import FeedbackAnalysisResult
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BEDROCK_MODEL = os.environ.get('BEDROCK_MODEL_FEEDBACK', 'us.anthropic.claude-haiku-4-5-20251001-v1:0')
+BEDROCK_MODEL = os.environ.get('BEDROCK_MODEL_FEEDBACK', 'global.anthropic.claude-sonnet-4-5-20250929-v1:0')
 AWS_REGION = os.environ.get('AWS_REGION', os.environ.get('AWS_DEFAULT_REGION', 'us-west-2'))
 AGENTCORE_MEMORY_ID = os.environ.get('AGENTCORE_MEMORY_ID', '')
 

@@ -20,7 +20,7 @@ logger = Logger(service="session-analysis-reference")
 
 # 環境変数
 KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID")
-BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_REFERENCE", "amazon.nova-pro-v1:0")
+BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_REFERENCE", "global.anthropic.claude-sonnet-4-5-20250929-v1:0")
 
 # 起動時に環境変数をログ出力
 logger.info("Lambda初期化", extra={

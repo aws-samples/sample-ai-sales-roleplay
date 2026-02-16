@@ -21,7 +21,7 @@ from prompts import build_feedback_prompt, get_structured_output_prompt, create_
 logger = Logger(service="session-analysis-feedback")
 
 # 環境変数
-BEDROCK_MODEL_FEEDBACK = os.environ.get("BEDROCK_MODEL_FEEDBACK", "amazon.nova-pro-v1:0")
+BEDROCK_MODEL_FEEDBACK = os.environ.get("BEDROCK_MODEL_FEEDBACK", "global.anthropic.claude-sonnet-4-5-20250929-v1:0")
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 
 # Bedrockモデル設定（リトライ設定付き）

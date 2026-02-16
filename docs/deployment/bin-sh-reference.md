@@ -47,23 +47,17 @@ export AWS_DEFAULT_REGION=ap-northeast-1
 
 ## リージョン対応について
 
-### 対応リージョンタイプ
+### Global Cross Region Inference
 
-本アプリケーションは、リージョンごとに利用可能な Bedrock モデルが異なることに対応しています：
+本アプリケーションは、Amazon Bedrock の Global Cross Region Inference (CRIS) を使用しています。`global.*` プレフィックスのモデルIDを使用することで、リージョンに依存せず全商用リージョンで利用可能です。
 
-- **US リージョン** (`us-*`): `us-east-1`, `us-west-2` など
-- **AP リージョン** (`ap-*`): `ap-northeast-1`, `ap-southeast-1` など  
-- **EU リージョン** (`eu-*`): `eu-west-1`, `eu-central-1` など
+### デフォルトモデル設定
 
-### 自動モデル選択機能
-
-指定したリージョンに基づいて、以下のように適切なモデルが自動選択されます：
-
-| リージョンタイプ | 対話用モデル | フィードバック用モデル | 動画分析用モデル |
-|------------------|--------------|----------------------|------------------|
-| US リージョン | `us.anthropic.claude-3-5-haiku-20241022-v1:0` | `us.anthropic.claude-3-7-sonnet-20250219-v1:0` | `us.amazon.nova-lite-v1:0` |
-| AP リージョン | `apac.anthropic.claude-3-haiku-20240307-v1:0` | `apac.anthropic.claude-3-7-sonnet-20250219-v1:0` | `apac.amazon.nova-lite-v1:0` |
-| EU リージョン | `eu.anthropic.claude-3-haiku-20240307-v1:0` | `eu.anthropic.claude-3-7-sonnet-20250219-v1:0` | `eu.amazon.nova-lite-v1:0` |
+| 用途 | モデル ID |
+|------|----------|
+| 対話・スコアリング・ガードレール | `global.anthropic.claude-haiku-4-5-20251001-v1:0` |
+| フィードバック・リファレンスチェック | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` |
+| 動画分析 | `global.amazon.nova-2-lite-v1:0` |
 
 ## 使用例
 
@@ -98,8 +92,8 @@ export AWS_DEFAULT_REGION=ap-northeast-1
 
 ```bash
 export AWS_DEFAULT_REGION=us-east-1
-./bin.sh --conversation-model "us.anthropic.claude-3-5-sonnet-20241022-v2:0" \
-         --feedback-model "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+./bin.sh --conversation-model "global.anthropic.claude-sonnet-4-5-20250929-v1:0" \
+         --feedback-model "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
 ```
 
 ### 開発ブランチからのデプロイ
@@ -145,26 +139,14 @@ export AWS_DEFAULT_REGION=ap-northeast-1
 
 | モデル ID | 特徴 | 推奨用途 | 対応リージョン |
 |----------|------|----------|----------------|
-| `us.anthropic.claude-3-5-haiku-20241022-v1:0` | 高速・低コスト | 対話、スコアリング、ガードレール | US |
-| `us.anthropic.claude-3-5-sonnet-20241022-v2:0` | バランス型・高品質 | 対話（高品質が必要な場合） | US |
-| `us.anthropic.claude-3-7-sonnet-20250219-v1:0` | 最高品質・高コスト | フィードバック、リファレンスチェック | US, AP, EU |
-| `us.anthropic.claude-sonnet-4-20250514-v1:0` | 次世代高性能 | フィードバック、リファレンスチェック | US |
-| `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | 最新最高性能 | フィードバック、リファレンスチェック | US |
-| `global.anthropic.claude-sonnet-4-5-20250929-v1:0` | 最新最高性能 | フィードバック、リファレンスチェック | Global |
-| `jp.anthropic.claude-sonnet-4-5-20250929-v1:0` | 最新最高性能 | フィードバック、リファレンスチェック | Japan |
-| `apac.anthropic.claude-sonnet-4-20250514-v1:0` | 次世代高性能 | フィードバック、リファレンスチェック | AP |
-| `apac.anthropic.claude-3-haiku-20240307-v1:0` | 高速・低コスト | 対話、スコアリング、ガードレール | AP |
-| `eu.anthropic.claude-sonnet-4-20250514-v1:0` | 次世代高性能 | フィードバック、リファレンスチェック | EU |
-| `eu.anthropic.claude-3-haiku-20240307-v1:0` | 高速・低コスト | 対話、スコアリング、ガードレール | EU |
+| `global.anthropic.claude-haiku-4-5-20251001-v1:0` | 高速・低コスト（4.5世代） | 対話、スコアリング、ガードレール | Global |
+| `global.anthropic.claude-sonnet-4-5-20250929-v1:0` | 最新最高性能（4.5世代） | フィードバック、リファレンスチェック | Global |
 
 ### Amazon Nova モデル
 
 | モデル ID | 特徴 | 推奨用途 | 対応リージョン |
 |----------|------|----------|----------------|
-| `us.amazon.nova-lite-v1:0` | 軽量・マルチモーダル | 動画分析（基本） | US |
-| `us.amazon.nova-pro-v1:0` | 高性能・マルチモーダル | 動画分析（高精度） | US |
-| `apac.amazon.nova-lite-v1:0` | 軽量・マルチモーダル | 動画分析（基本） | AP |
-| `eu.amazon.nova-lite-v1:0` | 軽量・マルチモーダル | 動画分析（基本） | EU |
+| `global.amazon.nova-2-lite-v1:0` | 軽量・マルチモーダル（第2世代） | 動画分析 | Global |
 
 ## セキュリティ考慮事項
 

@@ -304,7 +304,7 @@ def generate_feedback_for_audio_analysis(
         import random
         
         # Bedrockモデル設定
-        BEDROCK_MODEL_FEEDBACK = os.environ.get("BEDROCK_MODEL_FEEDBACK", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
+        BEDROCK_MODEL_FEEDBACK = os.environ.get("BEDROCK_MODEL_FEEDBACK", "global.anthropic.claude-sonnet-4-5-20250929-v1:0")
         REGION = os.environ.get("AWS_REGION", "us-west-2")
         
         boto_config = BotocoreConfig(
