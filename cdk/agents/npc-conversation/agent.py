@@ -29,7 +29,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 AWS_REGION = os.environ.get('AWS_REGION', os.environ.get('AWS_DEFAULT_REGION', 'us-west-2'))
-BEDROCK_MODEL = os.environ.get('BEDROCK_MODEL_CONVERSATION', 'us.anthropic.claude-haiku-4-5-20251001-v1:0')
+BEDROCK_MODEL = os.environ.get('BEDROCK_MODEL_CONVERSATION', 'global.anthropic.claude-haiku-4-5-20251001-v1:0')
 AGENTCORE_MEMORY_ID = os.environ.get('AGENTCORE_MEMORY_ID', '')
 
 app = FastAPI(title="NPC Conversation Agent", version="1.0.0")

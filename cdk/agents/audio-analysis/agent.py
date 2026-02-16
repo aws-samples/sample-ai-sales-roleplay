@@ -21,7 +21,7 @@ from models import SpeakerAnalysisResult
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BEDROCK_MODEL = os.environ.get('BEDROCK_MODEL_ANALYSIS', 'us.anthropic.claude-haiku-4-5-20251001-v1:0')
+BEDROCK_MODEL = os.environ.get('BEDROCK_MODEL_ANALYSIS', 'global.anthropic.claude-haiku-4-5-20251001-v1:0')
 AUDIO_STORAGE_BUCKET = os.environ.get('AUDIO_STORAGE_BUCKET')
 AWS_REGION = os.environ.get('AWS_REGION', os.environ.get('AWS_DEFAULT_REGION', 'us-west-2'))
 

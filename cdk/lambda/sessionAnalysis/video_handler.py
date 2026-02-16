@@ -17,10 +17,10 @@ logger = Logger(service="session-analysis-video")
 
 # 環境変数
 VIDEO_BUCKET = os.environ.get("VIDEO_BUCKET")
-# Cross-region inference profile IDを使用（us.amazon.nova-premier-v1:0）
+# Global Cross-region inference profile IDを使用
 # これにより、Lambdaと同じリージョンでBedrockを呼び出しつつ、
 # 実際の推論は利用可能なリージョンで実行される
-VIDEO_ANALYSIS_MODEL_ID = os.environ.get("VIDEO_ANALYSIS_MODEL_ID", "us.amazon.nova-premier-v1:0")
+VIDEO_ANALYSIS_MODEL_ID = os.environ.get("VIDEO_ANALYSIS_MODEL_ID", "global.amazon.nova-2-lite-v1:0")
 
 # Bedrockクライアント（Lambdaと同じリージョンで作成）
 # Cross-region inference profileを使用するため、S3と同じリージョンで呼び出す

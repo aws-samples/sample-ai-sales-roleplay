@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 VIDEO_BUCKET = os.environ.get('VIDEO_BUCKET')
-VIDEO_ANALYSIS_MODEL_ID = os.environ.get('VIDEO_ANALYSIS_MODEL_ID', 'us.amazon.nova-premier-v1:0')
+VIDEO_ANALYSIS_MODEL_ID = os.environ.get('VIDEO_ANALYSIS_MODEL_ID', 'global.amazon.nova-2-lite-v1:0')
 AWS_REGION = os.environ.get('AWS_REGION', os.environ.get('AWS_DEFAULT_REGION', 'us-west-2'))
 
 app = FastAPI(title="Video Analysis Agent", version="1.0.0")

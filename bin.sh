@@ -67,15 +67,9 @@ while [[ "$#" -gt 0 ]]; do
             echo "  --reference-check-model MODEL リファレンスチェック用モデルを指定"
             echo ""
             echo "モデル例:"
-            echo "  us.anthropic.claude-3-5-haiku-20241022-v1:0"
-            echo "  us.anthropic.claude-3-5-sonnet-20241022-v2:0"
-            echo "  us.anthropic.claude-3-7-sonnet-20250219-v1:0"
-            echo "  us.anthropic.claude-sonnet-4-20250514-v1:0"
-            echo "  us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+            echo "  global.anthropic.claude-haiku-4-5-20251001-v1:0"
             echo "  global.anthropic.claude-sonnet-4-5-20250929-v1:0"
-            echo "  jp.anthropic.claude-sonnet-4-5-20250929-v1:0"
-            echo "  us.amazon.nova-lite-v1:0"
-            echo "  us.amazon.nova-pro-v1:0"
+            echo "  global.amazon.nova-2-lite-v1:0"
             exit 0
             ;;
         *) echo "不明なパラメータ: $1"; echo "ヘルプを表示するには --help を使用してください"; exit 1 ;;
@@ -136,7 +130,7 @@ validate_model_id() {
     if [[ ! "$model_id" =~ ^[a-z-]+\.[a-z]+\.[a-z0-9.-]+:[0-9]+$ ]]; then
         echo "警告: $model_type モデルID '$model_id' の形式が正しくない可能性があります"
         echo "  期待される形式: region.provider.model-name:version"
-        echo "  例: us.anthropic.claude-3-5-haiku-20241022-v1:0"
+        echo "  例: global.anthropic.claude-haiku-4-5-20251001-v1:0"
         echo ""
         read -p "このまま続行しますか？ (y/N): " confirm
         case ${confirm:0:1} in
@@ -148,43 +142,27 @@ validate_model_id() {
     return 0
 }
 
-# Bedrockリージョンからリージョンタイプを判定
-determine_region_type() {
-    local region="$1"
-    case $region in
-        us-*) echo "us-regions" ;;
-        ap-*) echo "ap-regions" ;;
-        eu-*) echo "eu-regions" ;;
-        *) echo "us-regions" ;; # デフォルトはUSリージョン
-    esac
-}
-
-# 個別モデル指定からCDK JSONオーバーライドを生成
+# 個別モデル指定からCDK JSONオーバーライドを生成（Global CRISのためリージョン分岐不要）
 generate_model_override_json() {
     local model_override="{}"
     
-    # bedrockModelsの部分的オーバーライドを構築
+    # bedrockModelsのオーバーライドを構築
     if [[ -n "$CONVERSATION_MODEL" || -n "$SCORING_MODEL" || -n "$FEEDBACK_MODEL" || -n "$GUARDRAIL_MODEL" || -n "$VIDEO_MODEL" || -n "$REFERENCE_CHECK_MODEL" ]]; then
-        local region_type=$(determine_region_type "$AWS_DEFAULT_REGION")
-        
-        # リージョンタイプに対応したモデル設定の基本構造を作成
-        model_override=$(jq -n --arg region_type "$region_type" '{
+        model_override=$(jq -n '{
             "context": {
                 "default": {
-                    "bedrockModels": {
-                        ($region_type): {}
-                    }
+                    "bedrockModels": {}
                 }
             }
         }')
         
-        # 指定されたモデルのみをリージョンタイプ配下に設定
-        [[ -n "$CONVERSATION_MODEL" ]] && model_override=$(echo "$model_override" | jq --arg region_type "$region_type" --arg model "$CONVERSATION_MODEL" '.context.default.bedrockModels[$region_type].conversation = $model')
-        [[ -n "$SCORING_MODEL" ]] && model_override=$(echo "$model_override" | jq --arg region_type "$region_type" --arg model "$SCORING_MODEL" '.context.default.bedrockModels[$region_type].scoring = $model')
-        [[ -n "$FEEDBACK_MODEL" ]] && model_override=$(echo "$model_override" | jq --arg region_type "$region_type" --arg model "$FEEDBACK_MODEL" '.context.default.bedrockModels[$region_type].feedback = $model')
-        [[ -n "$GUARDRAIL_MODEL" ]] && model_override=$(echo "$model_override" | jq --arg region_type "$region_type" --arg model "$GUARDRAIL_MODEL" '.context.default.bedrockModels[$region_type].guardrail = $model')
-        [[ -n "$VIDEO_MODEL" ]] && model_override=$(echo "$model_override" | jq --arg region_type "$region_type" --arg model "$VIDEO_MODEL" '.context.default.bedrockModels[$region_type].video = $model')
-        [[ -n "$REFERENCE_CHECK_MODEL" ]] && model_override=$(echo "$model_override" | jq --arg region_type "$region_type" --arg model "$REFERENCE_CHECK_MODEL" '.context.default.bedrockModels[$region_type].referenceCheck = $model')
+        # 指定されたモデルをフラットに設定
+        [[ -n "$CONVERSATION_MODEL" ]] && model_override=$(echo "$model_override" | jq --arg model "$CONVERSATION_MODEL" '.context.default.bedrockModels.conversation = $model')
+        [[ -n "$SCORING_MODEL" ]] && model_override=$(echo "$model_override" | jq --arg model "$SCORING_MODEL" '.context.default.bedrockModels.scoring = $model')
+        [[ -n "$FEEDBACK_MODEL" ]] && model_override=$(echo "$model_override" | jq --arg model "$FEEDBACK_MODEL" '.context.default.bedrockModels.feedback = $model')
+        [[ -n "$GUARDRAIL_MODEL" ]] && model_override=$(echo "$model_override" | jq --arg model "$GUARDRAIL_MODEL" '.context.default.bedrockModels.guardrail = $model')
+        [[ -n "$VIDEO_MODEL" ]] && model_override=$(echo "$model_override" | jq --arg model "$VIDEO_MODEL" '.context.default.bedrockModels.video = $model')
+        [[ -n "$REFERENCE_CHECK_MODEL" ]] && model_override=$(echo "$model_override" | jq --arg model "$REFERENCE_CHECK_MODEL" '.context.default.bedrockModels.referenceCheck = $model')
     fi
     
     echo "$model_override"

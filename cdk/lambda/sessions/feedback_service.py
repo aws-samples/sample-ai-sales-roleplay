@@ -47,7 +47,7 @@ def generate_feedback_with_bedrock(
     Returns:
         詳細なフィードバック分析とスコアを含む辞書
     """
-    model_id = os.environ.get('BEDROCK_MODEL_FEEDBACK', 'amazon.nova-pro-v1:0')
+    model_id = os.environ.get('BEDROCK_MODEL_FEEDBACK', 'global.anthropic.claude-sonnet-4-5-20250929-v1:0')
     
     # 会話履歴をテキスト形式に整形
     if language == "en":

@@ -81,7 +81,7 @@ export AWS_DEFAULT_REGION=ap-northeast-1
 ./bin.sh
 
 # Specify individual models
-./bin.sh --conversation-model "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+./bin.sh --conversation-model "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 # Detailed customization
 ./bin.sh --cdk-json-override '{"context":{"default":{"allowedSignUpEmailDomains":["example.com"]}}}'
