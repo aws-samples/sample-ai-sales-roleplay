@@ -163,6 +163,20 @@ Amazon Bedrock AgentCore Runtimeを使用したエージェント実行基盤を
 | **realtime-scoring** | リアルタイムスコアリング | AgentCore Identity (JWT) |
 | **feedback-analysis** | フィードバック分析 | IAMロール |
 
+### ⚠️ サードパーティモデル利用時の注意（Cross-Region Inference Profile）
+
+AgentCore Runtimeから `global.anthropic.claude-*` 等のcross-region inference profileモデルを利用する場合、以下の前提条件を満たす必要があります。不足している場合、初回呼び出しは成功しても2回目以降で `AccessDeniedException` が発生します。
+
+1. **AWS Marketplace権限**: AgentCore Runtime実行ロールに `aws-marketplace:Subscribe`、`aws-marketplace:Unsubscribe`、`aws-marketplace:ViewSubscriptions` 権限が必要です。Bedrockがサードパーティモデル（Anthropic等）の自動サブスクリプションを行う際に使用されます。
+
+2. **Inference Profile ARN**: IAMポリシーのリソースに `arn:aws:bedrock:*:<account>:inference-profile/*` を含める必要があります。`foundation-model/*` だけでは不十分です。
+
+3. **Anthropic FTUフォーム**: Anthropicモデルを初めて利用する場合、Bedrock コンソールでFirst Time Use（FTU）フォームの完了が必要です。
+
+4. **有効な支払い方法**: AWSアカウントにAWS Marketplace購入用の有効な支払い方法が設定されている必要があります。
+
+詳細: [Understanding automatic model access - Amazon Bedrock](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html)
+
 ### AgentCore Memory
 
 AgentCore Memoryを使用して会話履歴とメトリクスを管理します：
