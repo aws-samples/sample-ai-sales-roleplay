@@ -15,7 +15,8 @@
     "test:e2e": "playwright test",
     "test:coverage": "jest --config jest.config.cjs --coverage",
     "validate-i18n": "node scripts/validate-i18n.js",
-    "postinstall": "cd eslint-plugin-i18n-keys && npm install || true"
+    "postinstall": "cd eslint-plugin-i18n-keys && npm install || true",
+    "update_package": "npm i --package-lock-only"
   },
   "dependencies": {
     "@aws-amplify/pubsub": "^6.1.65",
