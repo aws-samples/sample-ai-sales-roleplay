@@ -16,7 +16,8 @@
     "synth:dev": "env $(cat .env.dev | xargs) cdk synth --context env=dev",
     "synth:staging": "env $(cat .env.staging | xargs) cdk synth --context env=staging",
     "synth:prod": "env $(cat .env.prod | xargs) cdk synth --context env=prod",
-    "destroy:dev": "env $(cat .env.dev | xargs) cdk destroy --all --require-approval never --context env=dev"
+    "destroy:dev": "env $(cat .env.dev | xargs) cdk destroy --all --require-approval never --context env=dev",
+    "update_package": "npm i --package-lock-only"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.159",
