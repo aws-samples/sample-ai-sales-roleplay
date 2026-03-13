@@ -42,7 +42,8 @@ def build_npc_system_prompt(
 - Stay in character as {npc_name}
 - Respond in 1-3 sentences
 - Do not include your name at the beginning of your response
-- Remember the conversation context from previous messages"""
+- Remember the conversation context from previous messages
+- Do not use any emoji or emoticons in your response"""
     else:
         description_section = f"\n## 背景情報\n{npc_description}" if npc_description else ""
         return f"""あなたは{npc_company}の{npc_role}である{npc_name}です。
@@ -61,7 +62,8 @@ def build_npc_system_prompt(
 - {npc_name}としてのキャラクターを維持してください
 - 1〜3文程度で応答してください
 - 応答の冒頭に名前を含めないでください
-- 前のメッセージからの会話の文脈を覚えておいてください"""
+- 前のメッセージからの会話の文脈を覚えておいてください
+- 絵文字や顔文字は一切使用しないでください"""
 
 
 def get_default_npc_info() -> Dict[str, Any]:

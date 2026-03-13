@@ -318,6 +318,9 @@ export class AgentCoreService {
     analysis?: string;
     goalStatuses?: GoalStatus[];
     compliance?: ComplianceCheck;
+    npcEmotion?: string;
+    npcEmotionIntensity?: number;
+    gesture?: string;
   }> {
     if (!this.isAvailable()) {
       throw new Error('AgentCore Runtimeが利用できません');
@@ -398,6 +401,9 @@ export class AgentCoreService {
           reason?: string;
         }>;
         compliance?: ComplianceCheck;
+        npcEmotion?: string;
+        npcEmotionIntensity?: number;
+        gesture?: string;
         sessionId?: string;
         memoryEnabled?: boolean;
         error?: string;
@@ -432,6 +438,9 @@ export class AgentCoreService {
           analysis: result.analysis || "",
           goalStatuses: convertedGoalStatuses,
           ...(result.compliance ? { compliance: result.compliance } : {}),
+          npcEmotion: result.npcEmotion || 'neutral',
+          npcEmotionIntensity: result.npcEmotionIntensity ?? 0.5,
+          gesture: result.gesture || 'none',
         };
       }
 

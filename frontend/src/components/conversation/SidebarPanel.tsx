@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Tabs, Tab, IconButton, Tooltip } from "@mui/material";
 import { ChevronLeft, ChevronRight } from "@mui/icons-material";
-import AudioSettingsPanel from "./AudioSettingsPanel";
+import SessionSettingsPanel from "./SessionSettingsPanel";
 import MetricsPanel from "./MetricsPanel";
 import GoalsPanel from "./GoalsPanel";
 import { Metrics, Goal, GoalStatus } from "../../types/index";
@@ -150,7 +150,7 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
 
           {/* 設定パネル - 常に表示 */}
           <Box mt={2}>
-            <AudioSettingsPanel
+            <SessionSettingsPanel
               audioEnabled={audioEnabled}
               setAudioEnabled={setAudioEnabled}
               audioVolume={audioVolume}

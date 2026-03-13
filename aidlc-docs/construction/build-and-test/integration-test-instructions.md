@@ -1,86 +1,46 @@
-# Integration Test Instructions: AgentCore Runtime Migration
+# Integration Test Instructions - アバター表示On/Off機能
 
-## 概要
-AgentCore Runtime移行の統合テスト手順を記載します。
-
----
-
-## 前提条件
-
-- CDKデプロイ完了
-- AgentCore Runtimeが稼働中
-- フロントエンドがデプロイ済み
-
----
-
-## 統合テスト手順
-
-### Step 1: AgentCore Runtime疎通確認
-
-```bash
-# NPC会話エージェント
-aws bedrock-agentcore invoke-runtime \
-  --runtime-arn <NPC_CONVERSATION_RUNTIME_ARN> \
-  --payload '{"message": "こんにちは", "sessionId": "test-session"}'
-
-# スコアリングエージェント
-aws bedrock-agentcore invoke-runtime \
-  --runtime-arn <REALTIME_SCORING_RUNTIME_ARN> \
-  --payload '{"message": "テスト", "sessionId": "test-session"}'
-```
-
-### Step 2: 評価画面API疎通確認
-
-```bash
-# 会話履歴取得
-curl -H "Authorization: Bearer <ID_TOKEN>" \
-  https://<API_ENDPOINT>/evaluation/test-session/history
-
-# メトリクス取得
-curl -H "Authorization: Bearer <ID_TOKEN>" \
-  https://<API_ENDPOINT>/evaluation/test-session/metrics
-```
-
-### Step 3: E2Eテスト
-
-```bash
-cd frontend
-npm run test:e2e
-```
-
----
+## 目的
+フロントエンドとバックエンド間の `enableAvatar` フィールドの連携を検証する。
 
 ## テストシナリオ
 
-### シナリオ1: NPC会話フロー
+### シナリオ1: シナリオ作成 → 会話画面（アバターON）
+1. シナリオ作成画面でアバタートグルをONにする
+2. VRMファイルをアップロードする
+3. シナリオを保存する
+4. 作成したシナリオの会話画面を開く
+5. **期待結果**: AvatarStageが表示され、アップロードしたVRMアバターが表示される
 
-1. セッション開始
-2. ユーザーメッセージ送信
-3. NPC応答受信
-4. スコアリング結果確認
-5. セッション終了
+### シナリオ2: シナリオ作成 → 会話画面（アバターOFF）
+1. シナリオ作成画面でアバタートグルをOFFにする
+2. シナリオを保存する
+3. 作成したシナリオの会話画面を開く
+4. **期待結果**: AvatarStageが非表示、チャットログが全画面に拡張される
 
-### シナリオ2: 評価画面表示
+### シナリオ3: シナリオ編集でアバターON→OFF切り替え
+1. アバターONのシナリオを編集画面で開く
+2. アバタートグルをOFFに切り替える
+3. **期待結果**: VRMアップロードUIが非表示になり、アバターファイル情報がクリアされる
+4. シナリオを保存する
+5. 会話画面を開く
+6. **期待結果**: AvatarStageが非表示
 
-1. セッション完了後
-2. 評価画面遷移
-3. 会話履歴表示確認
-4. メトリクスグラフ表示確認
-5. フィードバック表示確認
+### シナリオ4: 既存シナリオ（enableAvatar未設定）の後方互換性
+1. `enableAvatar` フィールドが未設定の既存シナリオを会話画面で開く
+2. **期待結果**: アバターが非表示（`false` として扱われる）
+3. 同シナリオを編集画面で開く
+4. **期待結果**: アバタートグルがOFF状態で表示される
 
----
+## API連携テスト
 
-## 期待結果
+### DynamoDB保存確認
+```bash
+# シナリオ作成後にDynamoDBのenableAvatarフィールドを確認
+aws dynamodb get-item --table-name [テーブル名] --key '{"scenarioId": {"S": "[シナリオID]"}}' --query 'Item.enableAvatar'
+```
 
-| テスト項目 | 期待結果 |
-|-----------|---------|
-| NPC応答時間 | 5秒以内 |
-| スコアリング時間 | 3秒以内 |
-| 評価画面読み込み | 2秒以内 |
-| エラー率 | 1%未満 |
-
----
-
-## 次のステップ
-
-統合テストが成功したら、本番デプロイを検討してください。
+### API レスポンス確認
+- GET `/scenarios/{id}` のレスポンスに `enableAvatar` フィールドが含まれること
+- POST `/scenarios` のリクエストボディに `enableAvatar` が正しく送信されること
+- PUT `/scenarios/{id}` のリクエストボディに `enableAvatar` が正しく送信されること

@@ -1,112 +1,66 @@
-# Build and Test Summary: AgentCore Runtime Migration
+# Build and Test Summary - アバター表示On/Off機能
 
-## 概要
-AgentCore Runtime移行のビルド・テスト全体サマリーです。
+## Build Status
+- **Build Tool**: Vite 7.1.3 + TypeScript 5.9.2
+- **Build Status**: 型チェック通過（getDiagnostics: エラー0件）
+- **Build Artifacts**: frontend/dist/
+- **変更ファイル数**: 9ファイル
 
----
+## 変更ファイル一覧
 
-## ✅ 完了済みタスク
+### バックエンド
+| ファイル | 変更内容 |
+|---------|---------|
+| `cdk/lambda/scenarios/index.py` | enableAvatar フィールドの作成・更新API対応 |
 
-### InfrastructureStack統合 ✅
-- AgentCore Runtimeコンストラクト追加完了
-- 5つのエージェント（NPC会話、リアルタイムスコアリング、フィードバック分析、動画分析、音声分析）統合
-- JWT認証設定（フロントエンド直接呼び出し用）
-- IAMロール認証設定（Step Functions呼び出し用）
-- Bedrockモデル設定（cdk.jsonから動的取得）
-- CfnOutput追加（AgentCore Runtime ARN）
+### フロントエンド - 型定義
+| ファイル | 変更内容 |
+|---------|---------|
+| `frontend/src/types/api.ts` | ScenarioInfo に enableAvatar 追加 |
+| `frontend/src/types/index.ts` | Scenario に enableAvatar 追加 |
+| `frontend/src/types/components.ts` | NPCInfoStepProps に enableAvatar/onEnableAvatarChange 追加 |
 
-### ビルド・テスト結果 ✅
+### フロントエンド - ページコンポーネント
+| ファイル | 変更内容 |
+|---------|---------|
+| `frontend/src/pages/scenarios/creation/NPCInfoStep.tsx` | アバターOn/Offトグル追加、VRMアップロード条件表示 |
+| `frontend/src/pages/scenarios/ScenarioCreatePage.tsx` | enableAvatar state追加（デフォルト: true）、API送信 |
+| `frontend/src/pages/scenarios/ScenarioEditPage.tsx` | enableAvatar state追加、復元、アバターOFF時クリア |
+| `frontend/src/pages/ConversationPage.tsx` | enableAvatar条件分岐、チャットログレイアウト調整 |
 
-| 項目 | 結果 | 詳細 |
-|------|------|------|
-| CDK型チェック | ✅ | TypeScriptコンパイル成功 |
-| CDK Synth | ✅ | CloudFormationテンプレート生成成功 |
-| フロントエンドビルド | ✅ | React + TypeScriptビルド成功 |
-| ユニットテスト | ✅ | 119 tests passed |
+### i18n
+| ファイル | 変更内容 |
+|---------|---------|
+| `frontend/src/i18n/locales/ja.json` | enableToggle/enableToggleHelp キー追加 |
+| `frontend/src/i18n/locales/en.json` | enableToggle/enableToggleHelp キー追加 |
 
----
+## Test Execution Summary
 
-## 🔄 残タスク（優先度順）
+### 型チェック
+- **Status**: ✅ Pass（getDiagnostics: 全変更ファイルでエラー0件）
 
-### 高優先度
+### Unit Tests
+- **Status**: 実行待ち
+- **コマンド**: `cd frontend && npm run test`
 
-| タスク | ファイル | 説明 | ステータス |
-|-------|---------|------|----------|
-| CDKデプロイ実行 | - | `npm run deploy:dev` | 🔄 次のステップ |
-| Step Functions更新 | `session-analysis-stepfunctions.ts` | AgentCore呼び出しに変更 | ⏳ デプロイ後 |
+### Integration Tests
+- **Status**: 実行待ち（手動テスト推奨）
+- **テストシナリオ**: 4シナリオ（作成ON/OFF、編集切り替え、後方互換性）
 
-### 中優先度
+### E2E Tests
+- **Status**: 実行待ち
+- **コマンド**: `cd frontend && npx playwright test --project=chromium`
 
-| タスク | ファイル | 説明 | ステータス |
-|-------|---------|------|----------|
-| ApiService更新 | `ApiService.ts` | 評価画面API呼び出し追加 | ⏳ 待機中 |
-| SessionPage更新 | `SessionPage.tsx` | AgentCoreService統合 | ⏳ 待機中 |
-| ResultPage更新 | `ResultPage.tsx` | 新API呼び出し | ⏳ 待機中 |
+### Performance Tests
+- **Status**: N/A（条件分岐のみの変更、パフォーマンスリスク低）
 
-### 低優先度（移行完了後）
+## Overall Status
+- **Build**: ✅ Success（型チェック通過）
+- **Ready for Manual Testing**: Yes
 
-| タスク | ファイル | 説明 | ステータス |
-|-------|---------|------|----------|
-| 旧Lambda削除 | `cdk/lambda/bedrock/` | 移行完了後に削除 | ⏳ 最終段階 |
-| 旧Lambda削除 | `cdk/lambda/scoring/` | 移行完了後に削除 | ⏳ 最終段階 |
-| 旧Lambda削除 | `cdk/lambda/sessionAnalysis/` | 移行完了後に削除 | ⏳ 最終段階 |
-| 旧Lambda削除 | `cdk/lambda/audioAnalysis/` | 移行完了後に削除 | ⏳ 最終段階 |
-
----
-
-## 🎯 成功基準
-
-- [x] CDK Synthが成功する
-- [x] フロントエンドビルドが成功する
-- [x] ユニットテストが全てパスする（16 suites, 119 tests）
-- [ ] CDKデプロイが成功する
-- [ ] AgentCore Runtimeが正常に起動する
-- [ ] 統合テストが全てパスする
-- [ ] E2Eテストが全てパスする
-
----
-
-## 📋 AgentCore Runtime設定詳細
-
-### 作成されたエージェント
-
-| エージェント名 | 機能 | 認証方式 | 使用モデル |
-|--------------|------|----------|-----------|
-| npc-conversation | NPC会話応答生成 | JWT（フロントエンド直接） | conversation（cdk.json） |
-| realtime-scoring | リアルタイムスコアリング | JWT（フロントエンド直接） | scoring（cdk.json） |
-| feedback-analysis | フィードバック分析 | IAM（Step Functions） | feedback（cdk.json） |
-| video-analysis | 動画分析 | IAM（Step Functions） | video（cdk.json） |
-| audio-analysis | 音声分析 | IAM（Step Functions） | guardrail（cdk.json） |
-
-### 出力されるCfnOutput
-
-- `NpcConversationAgentArn`
-- `RealtimeScoringAgentArn`
-- `FeedbackAnalysisAgentArn`
-- `VideoAnalysisAgentArn`
-- `AudioAnalysisAgentArn`
-
----
-
-## ⚠️ リスクと対策
-
-| リスク | 影響 | 対策 | ステータス |
-|-------|------|------|----------|
-| CfnRuntime未対応 | デプロイ失敗 | CDKバージョン確認、L1コンストラクト直接使用 | ✅ 解決済み |
-| AgentCore Memory未対応 | データ取得失敗 | S3フォールバック実装済み | ✅ 対策済み |
-| 認証エラー | API呼び出し失敗 | JWT設定確認、Cognito設定確認 | ⏳ デプロイ時確認 |
-
----
-
-## 📚 関連ドキュメント
-
-- [Build Instructions](./build-instructions.md)
-- [Unit Test Instructions](./unit-test-instructions.md)
-- [Integration Test Instructions](./integration-test-instructions.md)
-- [Code Generation Plan](../plans/agentcore-migration-code-generation-plan.md)
-
----
-
-**作成日**: 2026-01-08  
-**最終更新**: 2026-01-08  
-**ステータス**: InfrastructureStack統合完了 - デプロイ準備完了
+## 推奨テスト手順
+1. `cd frontend && npm run lint` でリントチェック
+2. `cd frontend && npm run test` でユニットテスト実行
+3. `cd cdk && npm run deploy:dev` でバックエンドデプロイ
+4. 開発環境で手動テスト（シナリオ作成/編集/会話画面）
+5. 必要に応じてE2Eテスト実行

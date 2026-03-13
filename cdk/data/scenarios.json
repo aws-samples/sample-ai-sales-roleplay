@@ -2,7 +2,7 @@
   "npcs": [
     {
       "id": "super-salty-youth",
-      "name": "鈴木",
+      "name": "美咲",
       "role": "大学生",
       "company": "無所属",
       "personality": [
@@ -12,7 +12,7 @@
         "塩対応"
       ],
       "avatar": "😐",
-      "description": "基本的には無関心で淡々と応答する若者。ほとんどの話題には興味を示さないが、特定のトピック（ゲーム、音楽、テクノロジー）には突然興味を示し、その時だけは会話が弾む特徴がある。"
+      "description": "基本的には無関心で淡々と応答する若い女性。ほとんどの話題には興味を示さないが、特定のトピック（ゲーム、音楽、テクノロジー）には突然興味を示し、その時だけは会話が弾む特徴がある。"
     },
     {
       "id": "harsh-buyer",
@@ -25,7 +25,7 @@
         "コスト重視",
         "実績重視"
       ],
-      "avatar": "👨‍💼",
+      "avatar": "👩‍💼",
       "description": "IT業界で20年の経験を持つベテラン購買担当者。予算に厳しく、ROIを重視する。"
     },
     {
@@ -53,7 +53,7 @@
         "リスク回避",
         "長期視点"
       ],
-      "avatar": "👔",
+      "avatar": "👩‍💼",
       "description": "伝統的な企業文化を重んじ、新しい投資には慎重な姿勢を取る財務責任者。"
     },
     {
@@ -67,12 +67,12 @@
         "細部へのこだわり",
         "革新性重視"
       ],
-      "avatar": "🧑‍💻",
+      "avatar": "👩‍💻",
       "description": "最新技術に精通し、技術的な価値と実装の実現性を重視する。表面的な提案には厳しい姿勢を示す。"
     },
     {
       "id": "healthcare-manager",
-      "name": "鈴木院長",
+      "name": "松本院長",
       "role": "病院長",
       "company": "中央メディカルセンター",
       "personality": [
@@ -95,7 +95,7 @@
         "将来不安",
         "安定志向"
       ],
-      "avatar": "👨‍💼",
+      "avatar": "👩‍💼",
       "description": "従業員50名の町工場を経営。資産1-2億円を保有するが、老後や事業承継に不安を抱えている。安全性を重視する傾向がある。"
     },
     {
@@ -109,7 +109,7 @@
         "分析的",
         "独立志向"
       ],
-      "avatar": "🧓",
+      "avatar": "👩‍💼",
       "description": "大手商社の元役員で現在は複数企業の社外取締役。資産10億円以上を保有し、国内株式と不動産に偏った資産構成。世界経済の変化に関心がある。"
     },
     {
@@ -123,7 +123,7 @@
         "情報収集重視",
         "安定志向"
       ],
-      "avatar": "👨‍💼",
+      "avatar": "👩‍💼",
       "description": "50代会社員。投資未経験で老後資金に不安を抱いている。リスクを恐れており、安全性を最重視する。専門用語には困惑しやすい。"
     },
     {
@@ -151,7 +151,7 @@
         "忙しい",
         "IT知識少なめ"
       ],
-      "avatar": "👨‍💻",
+      "avatar": "👩‍💻",
       "description": "製造部門の責任者でシステム導入の決裁権を持つ。業務効率化に関心があるが、技術的な詳細には興味がない。具体的な効果とROIを重視する。"
     },
     {
@@ -165,7 +165,7 @@
         "変化に慎重",
         "業績プレッシャー"
       ],
-      "avatar": "👨‍💼",
+      "avatar": "👩‍💼",
       "description": "伝統的な企業で30年以上のキャリアを持つ管理職。デジタル化の必要性は感じているが、具体的な進め方がわからず不安を感じている。成果に対するプレッシャーが大きい。"
     },
     {
@@ -193,7 +193,7 @@
         "従業員思い",
         "決断力"
       ],
-      "avatar": "👔",
+      "avatar": "👩‍💼",
       "description": "従業員50名の製造業社長。従業員の福利厚生に関心が高く、企業年金制度の導入を検討中。コスト効果と従業員満足度を重視する。"
     }
   ],
@@ -208,10 +208,10 @@
       "category": "Technology",
       "guardrail": "TechCompliance",
       "language": "en",
-      "initialMessage": "Hello. I'm Michael Chen, IT Director at Horizon Manufacturing Inc. Thank you for taking the time to meet with me today. I'm interested in hearing about your cloud migration services, but I have several concerns about security, potential downtime, and the overall ROI of such a significant change to our infrastructure.",
+      "initialMessage": "Hello. I'm Sarah Chen, IT Director at Horizon Manufacturing Inc. Thank you for taking the time to meet with me today. I'm interested in hearing about your cloud migration services, but I have several concerns about security, potential downtime, and the overall ROI of such a significant change to our infrastructure.",
       "npc": {
         "id": "tech-director",
-        "name": "Michael Chen",
+        "name": "Sarah Chen",
         "role": "IT Director",
         "company": "Horizon Manufacturing Inc.",
         "personality": [
@@ -220,8 +220,9 @@
           "Detail-oriented",
           "Cost-conscious"
         ],
-        "avatar": "👨‍💼",
-        "description": "IT Director at a manufacturing company considering cloud migration. Analytical and risk-averse with concerns about security, service disruption, and cost justification."
+        "avatar": "👩‍💼",
+        "description": "IT Director at a manufacturing company considering cloud migration. Analytical and risk-averse with concerns about security, service disruption, and cost justification.",
+        "voiceId": "Danielle"
       },
       "objectives": [
         "Understand the client's current infrastructure and pain points",
@@ -292,7 +293,7 @@
       "category": "一般",
       "npc": {
         "id": "super-salty-youth",
-        "name": "鈴木",
+        "name": "美咲",
         "role": "大学生",
         "company": "無所属",
         "personality": [
@@ -302,7 +303,8 @@
           "塩対応"
         ],
         "avatar": "😐",
-        "description": "基本的には無関心で淡々と応答する若者。ほとんどの話題には興味を示さないが、特定のトピック（ゲーム、音楽、テクノロジー）には突然興味を示し、その時だけは会話が弾む特徴がある。"
+        "description": "基本的には無関心で淡々と応答する若い女性。ほとんどの話題には興味を示さないが、特定のトピック（ゲーム、音楽、テクノロジー）には突然興味を示し、その時だけは会話が弾む特徴がある。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "相手の関心を引き出すトピックを見つける",
@@ -397,8 +399,9 @@
           "将来不安",
           "安定志向"
         ],
-        "avatar": "👨‍💼",
-        "description": "従業員50名の町工場を経営。資産1-2億円を保有するが、老後や事業承継に不安を抱えている。安全性を重視する傾向がある。"
+        "avatar": "👩‍💼",
+        "description": "従業員50名の町工場を経営。資産1-2億円を保有するが、老後や事業承継に不安を抱えている。安全性を重視する傾向がある。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "現在の資産運用状況を把握する",
@@ -480,8 +483,9 @@
           "コスト重視",
           "実績重視"
         ],
-        "avatar": "👨‍💼",
-        "description": "IT業界で20年の経験を持つベテラン購買担当者。予算に厳しく、ROIを重視する。"
+        "avatar": "👩‍💼",
+        "description": "IT業界で20年の経験を持つベテラン購買担当者。予算に厳しく、ROIを重視する。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "顧客の課題を正確に把握する",
@@ -553,7 +557,8 @@
           "成果重視"
         ],
         "avatar": "👩‍💼",
-        "description": "新しいソリューションに前向きだが、具体的な成果を求める若手管理職。"
+        "description": "新しいソリューションに前向きだが、具体的な成果を求める若手管理職。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "スケーラビリティの重要性を伝える",
@@ -625,8 +630,9 @@
           "リスク回避",
           "長期視点"
         ],
-        "avatar": "👔",
-        "description": "伝統的な企業文化を重んじ、新しい投資には慎重な姿勢を取る財務責任者。"
+        "avatar": "👩‍💼",
+        "description": "伝統的な企業文化を重んじ、新しい投資には慎重な姿勢を取る財務責任者。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "段階的な導入計画を提示",
@@ -697,8 +703,9 @@
           "コスト重視",
           "実績重視"
         ],
-        "avatar": "👨‍💼",
-        "description": "IT業界で20年の経験を持つベテラン購買担当者。予算に厳しく、ROIを重視する。"
+        "avatar": "👩‍💼",
+        "description": "IT業界で20年の経験を持つベテラン購買担当者。予算に厳しく、ROIを重視する。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "過去の成果を具体的に示す",
@@ -770,7 +777,8 @@
           "成果重視"
         ],
         "avatar": "👩‍💼",
-        "description": "新しいソリューションに前向きだが、具体的な成果を求める若手管理職。"
+        "description": "新しいソリューションに前向きだが、具体的な成果を求める若手管理職。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "価値に見合った価格であることを説明",
@@ -842,8 +850,9 @@
           "忙しい",
           "IT知識少なめ"
         ],
-        "avatar": "👨‍💻",
-        "description": "製造部門の責任者でシステム導入の決裁権を持つ。業務効率化に関心があるが、技術的な詳細には興味がない。具体的な効果とROIを重視する。"
+        "avatar": "👩‍💻",
+        "description": "製造部門の責任者でシステム導入の決裁権を持つ。業務効率化に関心があるが、技術的な詳細には興味がない。具体的な効果とROIを重視する。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "現行業務フローを理解する",
@@ -925,8 +934,9 @@
           "細部へのこだわり",
           "革新性重視"
         ],
-        "avatar": "🧑‍💻",
-        "description": "最新技術に精通し、技術的な価値と実装の実現性を重視する。表面的な提案には厳しい姿勢を示す。"
+        "avatar": "👩‍💻",
+        "description": "最新技術に精通し、技術的な価値と実装の実現性を重視する。表面的な提案には厳しい姿勢を示す。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "技術的優位性を具体的に示す",
@@ -986,10 +996,10 @@
       "industry": "医療",
       "category": "医療",
       "guardrail": "MedicalCompliance",
-      "initialMessage": "こんにちは、中央メディカルセンターの鈴木です。当院ではスタッフの疲弊が深刻で、業務効率化が急務なんです。ただ、患者の安全性が何よりも優先されるべきで、そこは絶対に妥協できません。今回はそのバランスが取れたシステムについて相談したくて。",
+      "initialMessage": "こんにちは、中央メディカルセンターの松本です。当院ではスタッフの疲弊が深刻で、業務効率化が急務なんです。ただ、患者の安全性が何よりも優先されるべきで、そこは絶対に妥協できません。今回はそのバランスが取れたシステムについて相談したくて。",
       "npc": {
         "id": "healthcare-manager",
-        "name": "鈴木院長",
+        "name": "松本院長",
         "role": "病院長",
         "company": "中央メディカルセンター",
         "personality": [
@@ -999,7 +1009,8 @@
           "堅実"
         ],
         "avatar": "🩺",
-        "description": "医療現場の効率化に興味を持つ一方で、患者安全を最優先し、医療従事者の負担軽減につながるソリューションを求めている。"
+        "description": "医療現場の効率化に興味を持つ一方で、患者安全を最優先し、医療従事者の負担軽減につながるソリューションを求めている。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "患者安全性の向上を最優先にした設計を説明",
@@ -1070,8 +1081,9 @@
           "変化に慎重",
           "業績プレッシャー"
         ],
-        "avatar": "👨‍💼",
-        "description": "伝統的な企業で30年以上のキャリアを持つ管理職。デジタル化の必要性は感じているが、具体的な進め方がわからず不安を感じている。成果に対するプレッシャーが大きい。"
+        "avatar": "👩‍💼",
+        "description": "伝統的な企業で30年以上のキャリアを持つ管理職。デジタル化の必要性は感じているが、具体的な進め方がわからず不安を感じている。成果に対するプレッシャーが大きい。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "業界のデジタルトレンドを説明する",
@@ -1153,8 +1165,9 @@
           "情報収集重視",
           "安定志向"
         ],
-        "avatar": "👨‍💼",
-        "description": "50代会社員。投資未経験で老後資金に不安を抱いている。リスクを恐れており、安全性を最重視する。専門用語には困惑しやすい。"
+        "avatar": "👩‍💼",
+        "description": "50代会社員。投資未経験で老後資金に不安を抱いている。リスクを恐れており、安全性を最重視する。専門用語には困惑しやすい。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "顧客の不安に共感し信頼関係を構築する",
@@ -1226,7 +1239,8 @@
           "損失回避"
         ],
         "avatar": "😰",
-        "description": "投資経験3年の個人投資家。現在の含み損で動揺しており、感情的になりやすい。市場下落時にパニック売りをしがちな性格。"
+        "description": "投資経験3年の個人投資家。現在の含み損で動揺しており、感情的になりやすい。市場下落時にパニック売りをしがちな性格。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "顧客の感情的な不安を受け止める",
@@ -1298,7 +1312,8 @@
           "デジタルネイティブ"
         ],
         "avatar": "👩‍💻",
-        "description": "20代後半のIT企業勤務。投資に興味があるが知識が不足。忙しく時間が限られているため、効率的で分かりやすい説明を好む。"
+        "description": "20代後半のIT企業勤務。投資に興味があるが知識が不足。忙しく時間が限られているため、効率的で分かりやすい説明を好む。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "若年層の興味を引く説明を行う",
@@ -1369,8 +1384,9 @@
           "分析的",
           "独立志向"
         ],
-        "avatar": "🧓",
-        "description": "大手商社の元役員で現在は複数企業の社外取締役。資産10億円以上を保有し、国内株式と不動産に偏った資産構成。世界経済の変化に関心がある。"
+        "avatar": "👩‍💼",
+        "description": "大手商社の元役員で現在は複数企業の社外取締役。資産10億円以上を保有し、国内株式と不動産に偏った資産構成。世界経済の変化に関心がある。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "リスク許容度を正確に把握する",
@@ -1452,8 +1468,9 @@
           "従業員思い",
           "決断力"
         ],
-        "avatar": "👔",
-        "description": "従業員50名の製造業社長。従業員の福利厚生に関心が高く、企業年金制度の導入を検討中。コスト効果と従業員満足度を重視する。"
+        "avatar": "👩‍💼",
+        "description": "従業員50名の製造業社長。従業員の福利厚生に関心が高く、企業年金制度の導入を検討中。コスト効果と従業員満足度を重視する。",
+        "voiceId": "Kazuha"
       },
       "objectives": [
         "従業員満足度向上効果を定量的に示す",

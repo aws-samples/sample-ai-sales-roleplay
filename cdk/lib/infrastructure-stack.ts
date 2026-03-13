@@ -129,6 +129,9 @@ export class InfrastructureStack extends cdk.Stack {
       enableJwtAuth: true,
       sessionBucket: undefined,
       memoryId: this.sessionMemory.memoryId,
+      additionalEnvironmentVariables: {
+        BEDROCK_MODEL_CONVERSATION: props!.bedrockModels.conversation,
+      },
     });
 
     // リアルタイムスコアリングエージェント（フロントエンド直接呼び出し - JWT認証）
@@ -145,6 +148,7 @@ export class InfrastructureStack extends cdk.Stack {
       memoryId: this.sessionMemory.memoryId,
       additionalEnvironmentVariables: {
         SESSION_FEEDBACK_TABLE: databaseTables.sessionFeedbackTable.tableName,
+        BEDROCK_MODEL_SCORING: props!.bedrockModels.scoring,
       },
       additionalPolicies: [
         new cdk.aws_iam.PolicyStatement({
@@ -168,6 +172,9 @@ export class InfrastructureStack extends cdk.Stack {
       enableJwtAuth: false,
       sessionBucket: undefined,
       memoryId: this.sessionMemory.memoryId,
+      additionalEnvironmentVariables: {
+        BEDROCK_MODEL_FEEDBACK: props!.bedrockModels.feedback,
+      },
     });
 
     // 動画分析エージェント（Step Functions呼び出し - IAMロール認証）
@@ -181,6 +188,9 @@ export class InfrastructureStack extends cdk.Stack {
       description: `動画分析エージェント - ${props!.bedrockModels.video}使用`,
       enableJwtAuth: false,
       sessionBucket: undefined,
+      additionalEnvironmentVariables: {
+        VIDEO_ANALYSIS_MODEL_ID: props!.bedrockModels.video,
+      },
     });
 
     // 音声分析エージェント（Step Functions呼び出し - IAMロール認証）
@@ -194,6 +204,9 @@ export class InfrastructureStack extends cdk.Stack {
       description: `音声分析エージェント - ${props!.bedrockModels.guardrail}使用（コンプライアンスチェック）`,
       enableJwtAuth: false,
       sessionBucket: undefined,
+      additionalEnvironmentVariables: {
+        BEDROCK_MODEL_ANALYSIS: props!.bedrockModels.guardrail,
+      },
     });
 
     const api = new Api(this, 'API', {
@@ -240,6 +253,7 @@ export class InfrastructureStack extends cdk.Stack {
       webAclId: props?.webAclId,
       resourceNamePrefix: resourcePrefix,
       transcribeWebSocketEndpoint: api.transcribeWebSocket.webSocketApiEndpoint,
+      avatarBucket: api.avatarStorage.bucket,
       agentCoreEnabled: true,
       npcConversationAgentArn: this.npcConversationAgent.runtimeArn,
       realtimeScoringAgentArn: this.realtimeScoringAgent.runtimeArn,

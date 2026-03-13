@@ -175,7 +175,8 @@ export async function handler(event: CloudFormationEvent): Promise<void> {
                   company: npc.company || '',
                   personality: npc.personality || [],
                   avatar: npc.avatar || '',
-                  description: npc.description || ''
+                  description: npc.description || '',
+                  voiceId: npc.voiceId || '',
                 },
                 initialMetrics: {
                   angerLevel: scenario.initialMetrics?.angerLevel || 0,

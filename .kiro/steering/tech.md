@@ -22,7 +22,7 @@
 - **ストレージ**: Amazon S3 (PDF資料、音声ファイル、動画録画)
 - **音声認識**: Amazon Transcribe Streaming (WebSocket)
 - **AI/ML**:
-  - Amazon Bedrock (Claude 3.5 Haiku)
+  - Amazon Bedrock (Claude 4.5 Haiku)
   - Amazon Nova Premiere (動画分析)
   - Amazon Polly (音声合成、SSML対応)
   - Amazon Bedrock Guardrails (コンプライアンスチェック)

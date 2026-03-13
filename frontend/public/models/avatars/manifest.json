@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "defaultAvatarId": "default",
+  "avatars": [
+    {
+      "id": "default",
+      "name": "デフォルトアバター",
+      "modelPath": "default_girl1.vrm",
+      "description": "標準的なビジネスパーソンのアバター",
+      "isDefault": true
+    },
+    {
+      "id": "business-man",
+      "name": "ビジネスマン",
+      "modelPath": "business_man.vrm",
+      "description": "男性ビジネスパーソンのアバター",
+      "isDefault": false
+    },
+    {
+      "id": "business-woman",
+      "name": "ビジネスウーマン",
+      "modelPath": "business_woman.vrm",
+      "description": "女性ビジネスパーソンのアバター",
+      "isDefault": false
+    }
+  ]
+}

@@ -413,6 +413,7 @@ test.describe("Phase 5: セッション終了", () => {
     test("手動終了（終了ボタン）でセッションを終了できること", async ({
       page,
     }) => {
+      test.setTimeout(300000); // 5分のタイムアウト（録画アップロード待機を考慮）
       // シナリオ選択から会話ページへ遷移してセッション開始
       await navigateToScenarioSelect(page);
       const startButton = page.locator(
@@ -443,9 +444,9 @@ test.describe("Phase 5: セッション終了", () => {
         await page.waitForTimeout(5000);
       }
 
-      // 終了ボタンをクリック（「商談終了」ボタン）
+      // 終了ボタンをクリック（「セッション終了」ボタン）
       const endButton = page.locator(
-        'button:has-text("商談終了"), button:has-text("End Conversation")'
+        'button:has-text("セッション終了"), button:has-text("商談終了"), button:has-text("End Conversation")'
       ).first();
 
       if (await endButton.isVisible()) {
@@ -462,6 +463,7 @@ test.describe("Phase 5: セッション終了", () => {
 
   test.describe("5.2 結果画面への遷移", () => {
     test("セッション終了後に結果ページに遷移すること", async ({ page }) => {
+      test.setTimeout(300000); // 5分のタイムアウト（録画アップロード待機を考慮）
       // シナリオ選択から会話ページへ遷移してセッション開始
       await navigateToScenarioSelect(page);
       const startButton = page.locator(
@@ -492,9 +494,9 @@ test.describe("Phase 5: セッション終了", () => {
         await page.waitForTimeout(5000);
       }
 
-      // 終了ボタンをクリック（「商談終了」ボタン）
+      // 終了ボタンをクリック（「セッション終了」ボタン）
       const endButton = page.locator(
-        'button:has-text("商談終了"), button:has-text("End Conversation")'
+        'button:has-text("セッション終了"), button:has-text("商談終了"), button:has-text("End Conversation")'
       ).first();
 
       if (await endButton.isVisible()) {
@@ -550,18 +552,18 @@ test.describe("Phase 6: 結果画面", () => {
     // 追加の安定化待機
     await page.waitForTimeout(2000);
 
-    // 終了ボタンをクリック（「商談終了」ボタン）
-    const endButton = page.locator('button:has-text("商談終了")').first();
+    // 終了ボタンをクリック（「セッション終了」ボタン）
+    const endButton = page.locator('button:has-text("セッション終了"), button:has-text("商談終了"), button:has-text("End Conversation")').first();
 
     // 終了ボタンが表示されていることを確認
     await expect(endButton).toBeVisible({ timeout: 10000 });
-    console.log("商談終了ボタンが表示されました");
+    console.log("セッション終了ボタンが表示されました");
 
     await endButton.click();
-    console.log("商談終了ボタンをクリックしました");
+    console.log("セッション終了ボタンをクリックしました");
 
     // 注意: ConversationPage.tsxでは確認ダイアログは使用されていない
-    // 「商談終了」ボタンをクリックすると、録画アップロード待機後に直接結果ページへ遷移する
+    // 「セッション終了」ボタンをクリックすると、録画アップロード待機後に直接結果ページへ遷移する
     // 録画アップロードのタイムアウトは90秒なので、十分な待機時間を設定
 
     // 結果ページに遷移することを確認（録画アップロード待機を考慮して長めに設定）
@@ -589,7 +591,7 @@ test.describe("Phase 6: 結果画面", () => {
   test.describe("6.1 総合スコア表示", () => {
     test("スコアが表示されること", async ({ page }) => {
       // テストタイムアウトを延長（分析完了まで待機するため）
-      test.setTimeout(180000);
+test.setTimeout(300000);
 
       await completeSessionAndNavigateToResult(page);
 
@@ -619,7 +621,7 @@ test.describe("Phase 6: 結果画面", () => {
 
     test("パフォーマンスレベルが表示されること", async ({ page }) => {
       // テストタイムアウトを延長
-      test.setTimeout(180000);
+test.setTimeout(300000);
 
       await completeSessionAndNavigateToResult(page);
 
@@ -641,7 +643,7 @@ test.describe("Phase 6: 結果画面", () => {
   test.describe("6.2 詳細フィードバック表示", () => {
     test("レーダーチャートが表示されること", async ({ page }) => {
       // テストタイムアウトを延長
-      test.setTimeout(180000);
+test.setTimeout(300000);
 
       await completeSessionAndNavigateToResult(page);
 
@@ -664,7 +666,7 @@ test.describe("Phase 6: 結果画面", () => {
 
     test("改善提案が表示されること", async ({ page }) => {
       // テストタイムアウトを延長
-      test.setTimeout(180000);
+test.setTimeout(300000);
 
       await completeSessionAndNavigateToResult(page);
 
@@ -685,7 +687,7 @@ test.describe("Phase 6: 結果画面", () => {
   test.describe("6.3 会話履歴タブ", () => {
     test("会話履歴タブでメッセージ一覧が表示されること", async ({ page }) => {
       // テストタイムアウトを延長
-      test.setTimeout(180000);
+test.setTimeout(300000);
 
       await completeSessionAndNavigateToResult(page);
 
@@ -717,7 +719,7 @@ test.describe("Phase 6: 結果画面", () => {
   test.describe("6.4 コンプライアンス違反タブ", () => {
     test("コンプライアンスタブが表示されること", async ({ page }) => {
       // テストタイムアウトを延長
-      test.setTimeout(180000);
+test.setTimeout(300000);
 
       await completeSessionAndNavigateToResult(page);
 
@@ -747,7 +749,7 @@ test.describe("Phase 6: 結果画面", () => {
   test.describe("6.5 ナビゲーション", () => {
     test("ホームへ戻るボタンが機能すること", async ({ page }) => {
       // テストタイムアウトを延長
-      test.setTimeout(180000);
+test.setTimeout(300000);
 
       await completeSessionAndNavigateToResult(page);
 

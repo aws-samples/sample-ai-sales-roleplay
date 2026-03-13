@@ -1,6 +1,6 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Container, Box } from "@mui/material";
+import { Box } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import type {
   Message,
@@ -31,14 +31,31 @@ import VideoManager from "../components/recording/v2/VideoManager";
 
 // 分割したコンポーネントをインポート
 import ConversationHeader from "../components/conversation/ConversationHeader";
-import NPCInfoCard from "../components/conversation/NPCInfoCard";
-import EmojiFeedbackContainer from "../components/conversation/EmojiFeedbackContainer";
+import { AvatarProvider } from "../components/avatar";
+import type { GestureType } from "../types/avatar";
 import MessageList from "../components/conversation/MessageList";
 import MessageInput from "../components/conversation/MessageInput";
 // クリーンアップ用のuseEffectを追加
 import { useEffect, useState, useCallback, useRef } from "react";
-import SidebarPanel from "../components/conversation/SidebarPanel";
 import ComplianceAlert from "../components/compliance/ComplianceAlert";
+// 新規コンポーネント
+import MetricsOverlay from "../components/conversation/MetricsOverlay";
+import RightPanelContainer from "../components/conversation/RightPanelContainer";
+import CoachingHintBar from "../components/conversation/CoachingHintBar";
+import AvatarStage from "../components/conversation/AvatarStage";
+import SessionSettingsPanel from "../components/conversation/SessionSettingsPanel";
+import { Dialog, DialogTitle, DialogContent } from "@mui/material";
+
+/**
+ * NPC応答遅延設定（ミリ秒）
+ * テスト環境では0に設定してテスタビリティを向上させる
+ */
+const NPC_RESPONSE_BASE_DELAY = import.meta.env.VITE_NPC_RESPONSE_DELAY
+  ? Number(import.meta.env.VITE_NPC_RESPONSE_DELAY)
+  : 1000;
+const NPC_RESPONSE_RANDOM_DELAY = import.meta.env.VITE_NPC_RESPONSE_DELAY
+  ? 0
+  : 1000;
 
 /**
  * 会話ページコンポーネント
@@ -46,7 +63,7 @@ import ComplianceAlert from "../components/compliance/ComplianceAlert";
 const ConversationPage: React.FC = () => {
   const { scenarioId } = useParams<{ scenarioId: string }>();
   const navigate = useNavigate();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // 状態管理
   const [scenario, setScenario] = useState<Scenario | null>(null);
@@ -71,6 +88,20 @@ const ConversationPage: React.FC = () => {
   const [sessionId, setSessionId] = useState<string>("");
   // アバターの表情状態管理用の状態変数
   const [currentEmotion, setCurrentEmotion] = useState<string>("neutral");
+  // NPC感情状態（リアルタイム評価から取得、アバターに直接渡す）
+  const [npcDirectEmotion, setNpcDirectEmotion] = useState<EmotionState | undefined>(undefined);
+  // NPCジェスチャー状態（リアルタイム評価から取得、アバターに渡す）
+  const [npcGesture, setNpcGesture] = useState<GestureType>('none');
+  // シナリオに紐づくアバターID
+  const [scenarioAvatarId, setScenarioAvatarId] = useState<string | undefined>(undefined);
+  // シナリオに紐づくアバターS3キー
+  const [scenarioAvatarS3Key, setScenarioAvatarS3Key] = useState<string | undefined>(undefined);
+  // シナリオNPCの音声モデルID
+  const [scenarioVoiceId, setScenarioVoiceId] = useState<string | undefined>(undefined);
+  // シナリオのアバター表示On/Off
+  const [enableAvatar, setEnableAvatar] = useState<boolean>(false);
+  // セッション中のアバター表示切替（ランタイムトグル）
+  const [avatarVisible, setAvatarVisible] = useState<boolean>(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [audioVolume, setAudioVolume] = useState<number>(80);
   const [speechRate, setSpeechRate] = useState<number>(1.15);
@@ -91,11 +122,22 @@ const ConversationPage: React.FC = () => {
   const userInputRef = useRef<string>("");
   // ゴールの達成スコア（セッション終了時に使用）
   const [goalScore, setGoalScore] = useState<number>(0);
+  // ジェスチャーリセット用タイマー
+  const gestureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // CR-007: NPC応答タイマーRef管理（アンマウント時クリーンアップ用）
+  const npcResponseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // CR-006: isSpeakingをRef経由で参照し、依存配列から除外
+  const isSpeakingRef = useRef(isSpeaking);
 
   // userInputの変更をrefに同期
   useEffect(() => {
     userInputRef.current = userInput;
   }, [userInput]);
+  // CR-006: isSpeakingの変更をrefに同期
+  useEffect(() => {
+    isSpeakingRef.current = isSpeaking;
+  }, [isSpeaking]);
   // コンプライアンス違反の通知管理
   const [activeViolation, setActiveViolation] =
     useState<ComplianceViolation | null>(null);
@@ -106,35 +148,48 @@ const ConversationPage: React.FC = () => {
   // カメラエラー状態管理
   const [cameraError, setCameraError] = useState<boolean>(false);
 
+  // 新レイアウト用state
+  const [rightPanelsVisible, setRightPanelsVisible] = useState<boolean>(true);
+  const [metricsVisible, setMetricsVisible] = useState<boolean>(true);
+  const [chatLogExpanded] = useState<boolean>(false);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
+
 
   // コンポーネントの初期マウント時のフラグ設定
   useEffect(() => {
     hasComponentMounted.current = true;
-    // コンポーネントのマウント状態をログ出力
-    console.log("ConversationPageコンポーネントがマウントされました");
 
     // TranscribeServiceの初期化
     transcribeServiceRef.current = TranscribeService.getInstance();
 
     // 接続状態変更コールバックを設定
     transcribeServiceRef.current.setOnConnectionStateChange((state: ConnectionState) => {
-      console.log(`接続状態変更コールバック: ${state}`);
       setConnectionState(state);
     });
 
     // 環境変数からWebSocketエンドポイントを取得
     const websocketEndpoint = import.meta.env.VITE_TRANSCRIBE_WEBSOCKET_URL;
     if (websocketEndpoint) {
-      console.log("Transcribe WebSocketエンドポイントを設定:", websocketEndpoint);
       transcribeServiceRef.current.setWebSocketEndpoint(websocketEndpoint);
-    } else {
-      console.warn("Transcribe WebSocketエンドポイントが設定されていません");
     }
 
     return () => {
       // コンポーネントのアンマウント時にリソース解放
       if (transcribeServiceRef.current) {
         transcribeServiceRef.current.dispose();
+      }
+
+      // ジェスチャータイマーのクリーンアップ
+      if (gestureTimerRef.current) {
+        clearTimeout(gestureTimerRef.current);
+      }
+
+      // CR-007: NPC応答タイマーのクリーンアップ
+      if (npcResponseTimerRef.current) {
+        clearTimeout(npcResponseTimerRef.current);
+      }
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
       }
 
       // 音声認識関連の状態もクリアする
@@ -151,7 +206,6 @@ const ConversationPage: React.FC = () => {
           const scenarioInfo = await apiService.getScenarioDetail(scenarioId);
 
           if (scenarioInfo) {
-            console.log("取得したシナリオ情報:", scenarioInfo); // デバッグ用
 
             // APIから取得したScenarioInfo型をScenario型に変換
             const convertedScenario: Scenario = {
@@ -234,6 +288,34 @@ const ConversationPage: React.FC = () => {
             setScenario(convertedScenario);
             setCurrentMetrics(convertedScenario.initialMetrics);
 
+            // シナリオのアバター表示On/Off設定を読み込み（未設定時はfalse）
+            setEnableAvatar(scenarioInfo.enableAvatar ?? false);
+            // ランタイムトグルの初期値もシナリオ設定に合わせる
+            setAvatarVisible(scenarioInfo.enableAvatar ?? false);
+
+            // シナリオNPCの音声モデルIDを設定（アバターAPI取得前に即座に設定）
+            // アバター詳細APIの完了を待つとvoiceId設定が遅延し、
+            // 初期メッセージの音声合成でデフォルト（Takumi/男性）にフォールバックする問題を防止
+            const npcVoiceId = scenarioInfo.npc?.voiceId || scenarioInfo.npcInfo?.voiceId;
+            if (npcVoiceId) {
+              setScenarioVoiceId(npcVoiceId);
+            }
+
+            // シナリオに紐づくアバターIDを設定
+            if (scenarioInfo.avatarId) {
+              setScenarioAvatarId(scenarioInfo.avatarId);
+              // アバター詳細APIからs3Keyを取得
+              try {
+                const { AvatarService } = await import("../services/AvatarService");
+                const avatarDetail = await AvatarService.getInstance().getAvatarDetail(scenarioInfo.avatarId);
+                if (avatarDetail?.s3Key) {
+                  setScenarioAvatarS3Key(avatarDetail.s3Key);
+                }
+              } catch {
+                // アバターs3Key取得失敗時はCloudFrontフォールバックを使用
+              }
+            }
+
             // ゴール情報の初期化
             setGoals(
               convertedScenario.goals && convertedScenario.goals.length > 0
@@ -244,10 +326,6 @@ const ConversationPage: React.FC = () => {
               initializeGoalStatuses(convertedScenario);
             setGoalStatuses(initialGoalStatuses);
 
-            // AudioServiceの初期設定
-            const audioSvc = AudioService.getInstance();
-            audioSvc.setAudioEnabled(audioEnabled);
-            audioSvc.setVolume(audioVolume / 100);
           } else {
             navigate("/scenarios");
           }
@@ -259,21 +337,28 @@ const ConversationPage: React.FC = () => {
     };
 
     fetchScenario();
-  }, [scenarioId, navigate, audioEnabled, audioVolume]);
+  }, [scenarioId, navigate]);
 
-  // メトリクス更新の初期化
+  // 音声設定の初期適用（シナリオ取得後）
   useEffect(() => {
     if (scenario) {
-      // メトリクスは直接APIから取得します
-      console.log("メトリクス更新の初期化");
+      const audioSvc = AudioService.getInstance();
+      audioSvc.setAudioEnabled(audioEnabled);
+      audioSvc.setVolume(audioVolume / 100);
     }
-  }, [scenario]);
+  }, [scenario, audioEnabled, audioVolume]);
 
   // 音声設定変更時の処理
   useEffect(() => {
     const audioSvc = AudioService.getInstance();
     audioSvc.setAudioEnabled(audioEnabled);
     audioSvc.setVolume(audioVolume / 100);
+
+    // 音声出力OFF時：再生中の音声を停止し、口パクをリセット
+    if (!audioEnabled) {
+      audioSvc.stopAllAudio();
+      setIsSpeaking(false);
+    }
   }, [audioEnabled, audioVolume]);
 
   // 読み上げ速度変更時の処理
@@ -297,9 +382,6 @@ const ConversationPage: React.FC = () => {
 
       // シナリオの言語がUIの言語と異なる場合、UI言語も変更する
       if (scenario.language !== currentLang) {
-        console.log(
-          `シナリオの言語(${scenario.language})に合わせてUI言語を変更します`,
-        );
         languageService
           .changeLanguage(scenario.language)
           .catch((err) => console.error("言語設定の変更に失敗しました:", err));
@@ -316,13 +398,11 @@ const ConversationPage: React.FC = () => {
 
     // React 18のStrictモードで二重レンダリングを防止
     if (sessionStarted) {
-      console.log("商談はすでに開始されています");
       return;
     }
 
     // フロントエンド側でセッションIDを生成
     const newSessionId = crypto.randomUUID();
-    console.log("新しいセッションIDを生成:", newSessionId);
 
     // セッションIDを先に設定し、状態更新を確実に行う
     setSessionId(newSessionId);
@@ -342,7 +422,6 @@ const ConversationPage: React.FC = () => {
           description: scenario.npc.description,
         }
       );
-      console.log("セッションをDynamoDBに保存しました:", newSessionId);
     } catch (error) {
       console.error("セッション保存エラー（会話は続行）:", error);
       // エラーが発生しても会話は続行できるようにする
@@ -359,7 +438,6 @@ const ConversationPage: React.FC = () => {
 
     // 短い遅延を入れてセッションIDの状態更新を確実に反映させる
     setTimeout(() => {
-      console.log("セッション開始状態を更新 - sessionId:", newSessionId);
       setSessionStarted(true);
     }, 50);
 
@@ -393,12 +471,10 @@ const ConversationPage: React.FC = () => {
       const audioSvc = AudioService.getInstance();
       const initialMessageId = crypto.randomUUID();
       audioSvc
-        .synthesizeAndQueueAudio(initialContent, initialMessageId)
+        .synthesizeAndQueueAudio(initialContent, initialMessageId, scenarioVoiceId)
         .then(() => {
           // 音声合成が成功したら、音声再生完了リスナーを追加
           audioSvc.addPlaybackCompleteListener(initialMessageId, () => {
-            // 音声再生完了時に話している状態を更新
-            console.log(`初期メッセージの音声再生が完了しました。`);
             setIsSpeaking(false);
           });
         })
@@ -488,14 +564,10 @@ const ConversationPage: React.FC = () => {
     setCurrentEmotion("neutral");
 
     // NPCの応答を生成
-    setTimeout(
+    npcResponseTimerRef.current = setTimeout(
       async () => {
-        console.log("=== ConversationPage: NPC応答生成開始 ===");
         // 安全なプリミティブ型に変換して循環参照を避ける
         const cleanMessageText = messageText ? String(messageText) : "";
-        console.log("userInput:", cleanMessageText);
-        console.log("currentMetrics:", currentMetrics);
-        console.log("scenario.npc:", scenario.npc);
 
         try {
           const apiService = ApiService.getInstance();
@@ -513,8 +585,6 @@ const ConversationPage: React.FC = () => {
 
           // messagesRef経由で確実に最新のメッセージ履歴を取得（バグ修正）
           const currentMessages = messagesRef.current;
-
-          console.log(`API呼び出し時のメッセージ数: ${currentMessages.length}`);
 
           // メッセージ配列をディープコピーし、純粋なデータ構造にする（sender型を正しくキャスト）
           const cleanMessages = currentMessages.map(msg => ({
@@ -557,11 +627,6 @@ const ConversationPage: React.FC = () => {
           // メトリクスは現在の値を維持
           const newMetrics = { ...currentMetrics };
 
-          console.log("=== API応答受信 ===");
-          console.log("response:", response);
-          console.log("newMetrics:", newMetrics);
-          console.log("activeSessionId:", activeSessionId);
-
           const npcMessage: Message = {
             id: crypto.randomUUID(),
             sender: "npc",
@@ -590,13 +655,11 @@ const ConversationPage: React.FC = () => {
           if (audioEnabled) {
             const audioService = AudioService.getInstance();
             audioService
-              .synthesizeAndQueueAudio(response, messageId)
+              .synthesizeAndQueueAudio(response, messageId, scenarioVoiceId)
               .then(() => {
                 // 音声合成が成功したら、音声再生完了リスナーを追加
                 // このリスナーは音声再生が完了したときに実行される
                 audioService.addPlaybackCompleteListener(messageId, () => {
-                  // 音声再生完了時に話している状態のみを更新
-                  console.log(`メッセージID ${messageId} の音声再生が完了しました。`);
                   setIsSpeaking(false);
                 });
               })
@@ -615,11 +678,6 @@ const ConversationPage: React.FC = () => {
           // NPCの応答後にリアルタイム評価を実行（有効なsessionIDがある場合のみ）
           if (activeSessionId) {
             try {
-              console.log(
-                "リアルタイム評価API呼び出し開始",
-                "activeSessionId:",
-                activeSessionId,
-              );
               // 安全な文字列に変換
               const cleanMessageText = messageText ? String(messageText) : "";
 
@@ -690,13 +748,35 @@ const ConversationPage: React.FC = () => {
                 // 最も重大な違反を通知用に設定
                 setActiveViolation(sortedViolations[0]);
                 setShowComplianceAlert(true);
-
-                console.log("コンプライアンス違反を検出:", sortedViolations[0]);
               }
 
               if (evaluationResult) {
                 // 前回のメトリクスを保存
                 setPrevMetrics(currentMetrics);
+
+                // NPC感情状態をアバターに反映
+                if (evaluationResult.npcEmotion) {
+                  const validEmotions: EmotionState[] = ['happy', 'angry', 'neutral', 'annoyed', 'satisfied'];
+                  const emotion = evaluationResult.npcEmotion as EmotionState;
+                  if (validEmotions.includes(emotion)) {
+                    setNpcDirectEmotion(emotion);
+                  }
+                } else {
+                  // APIがnpcEmotionを返さない場合はリセットし、メトリクスベースの計算にフォールバック
+                  setNpcDirectEmotion(undefined);
+                }
+
+                // NPCジェスチャーをアバターに反映
+                if (evaluationResult.gesture) {
+                  const validGestures: GestureType[] = ['nod', 'headTilt', 'none'];
+                  const gesture = evaluationResult.gesture as GestureType;
+                  if (validGestures.includes(gesture)) {
+                    if (gestureTimerRef.current) clearTimeout(gestureTimerRef.current);
+                    setNpcGesture(gesture);
+                    // ジェスチャー実行後にリセット
+                    gestureTimerRef.current = setTimeout(() => setNpcGesture('none'), 1500);
+                  }
+                }
 
                 // 新しいメトリクスを設定
                 setCurrentMetrics((prevMetrics) => ({
@@ -717,12 +797,29 @@ const ConversationPage: React.FC = () => {
                 setMetricsUpdating(true);
                 setTimeout(() => setMetricsUpdating(false), 1000);
 
-                // ゴールステータス更新
+                // ゴールステータス更新（既存のステータスとマージ）
                 if (evaluationResult.goalStatuses) {
-                  setGoalStatuses(evaluationResult.goalStatuses);
-                  setGoalScore(
-                    calculateGoalScore(evaluationResult.goalStatuses, goals),
-                  );
+                  setGoalStatuses((prevStatuses) => {
+                    const merged = prevStatuses.map((prev) => {
+                      const update = evaluationResult.goalStatuses!.find(
+                        (u) => u.goalId === prev.goalId,
+                      );
+                      if (update) {
+                        return {
+                          ...prev,
+                          ...update,
+                          // 達成時にタイムスタンプを記録（未設定の場合のみ）
+                          achievedAt:
+                            update.achieved && !prev.achievedAt
+                              ? new Date()
+                              : prev.achievedAt,
+                        };
+                      }
+                      return prev;
+                    });
+                    setGoalScore(calculateGoalScore(merged, goals));
+                    return merged;
+                  });
                 }
               }
             } catch (error) {
@@ -732,15 +829,11 @@ const ConversationPage: React.FC = () => {
 
           // 音声再生完了イベントが発火しない場合のフォールバック
           // 音声が無限に再生され続けることを防止
-          const fallbackTimerId = setTimeout(() => {
-            if (isSpeaking) {
-              console.warn("音声再生完了イベントが検出されませんでした。フォールバックタイマーにより話している状態をリセットします。");
+          fallbackTimerRef.current = setTimeout(() => {
+            if (isSpeakingRef.current) {
               setIsSpeaking(false);
             }
           }, 30000); // 長めのタイムアウト - 通常は音声再生が完了するはず
-
-          // クリーンアップ関数
-          return () => clearTimeout(fallbackTimerId);
 
         } catch (error) {
           console.error("=== ConversationPage: API呼び出しエラー ===");
@@ -752,9 +845,9 @@ const ConversationPage: React.FC = () => {
           throw error; // エラーを再スロー
         }
       },
-      1000 + Math.random() * 1000,
-    ); // 1-2秒の遅延でリアル感を演出
-  }, [userInput, scenario, isProcessing, currentMetrics, sessionId, audioEnabled, isSpeaking, goalStatuses, goals]);
+      NPC_RESPONSE_BASE_DELAY + Math.random() * NPC_RESPONSE_RANDOM_DELAY,
+    ); // NPC応答遅延（設定可能: VITE_NPC_RESPONSE_DELAY環境変数で制御）
+  }, [userInput, scenario, isProcessing, currentMetrics, sessionId, audioEnabled, goalStatuses, goals, scenarioVoiceId]);
 
   /**
    * セッション終了処理
@@ -766,7 +859,6 @@ const ConversationPage: React.FC = () => {
    */
   const endSession = useCallback(
     async (finalMessages: Message[], finalMetrics: Metrics) => {
-      console.log("セッション終了処理を開始します");
       setSessionEnded(true);
 
       // 最終的なゴールスコアを計算
@@ -807,11 +899,9 @@ const ConversationPage: React.FC = () => {
 
           // 前回の録画キーを保存（新しいセッションの録画を待つため）
           const previousKey = localStorage.getItem("lastRecordingKey");
-          console.log("録画アップロード待機開始, 前回のキー:", previousKey, "セッションID:", session.id);
 
           // 90秒でタイムアウト（大きなファイル対応）
           const timeoutId = setTimeout(() => {
-            console.warn("録画アップロード待機がタイムアウトしました（90秒経過）");
             window.removeEventListener('recordingComplete', handleRecordingComplete as EventListener);
             resolve();
           }, 90000);
@@ -827,20 +917,18 @@ const ConversationPage: React.FC = () => {
             if (videoKey && videoKey.includes(session.id)) {
               if (!previousKey || videoKey !== previousKey) {
                 uploadCompleted = true;
-                console.log(`録画アップロード完了確認: ${videoKey}`);
                 localStorage.setItem(`session_${session.id}_videoKey`, videoKey);
                 clearTimeout(timeoutId);
                 window.removeEventListener('recordingComplete', handleRecordingComplete as EventListener);
                 resolve();
               } else {
-                console.log("前回と同じキーのためスキップ:", videoKey);
+                // 前回と同じキーのためスキップ
               }
             }
           };
 
           // 録画完了イベントリスナー
           const handleRecordingComplete = (event: CustomEvent) => {
-            console.log("録画完了イベント受信:", event.detail);
             if (event.detail?.videoKey) {
               checkUploadComplete(event.detail.videoKey);
             } else {
@@ -855,7 +943,6 @@ const ConversationPage: React.FC = () => {
             if (!uploadCompleted) {
               const currentKey = localStorage.getItem("lastRecordingKey");
               if (currentKey && currentKey.includes(session.id) && currentKey !== previousKey) {
-                console.log("定期チェックで録画キーを検出:", currentKey);
                 checkUploadComplete(currentKey);
                 clearInterval(checkInterval);
               }
@@ -877,16 +964,14 @@ const ConversationPage: React.FC = () => {
       // セッション分析を非同期で開始（Step Functions）
       try {
         const apiService = ApiService.getInstance();
-        const analysisResponse = await apiService.startSessionAnalysis(
+        await apiService.startSessionAnalysis(
           session.id,
           i18n.language || "ja"
         );
-        console.log("セッション分析開始:", analysisResponse);
 
         // 分析開始情報をlocalStorageに保存
         localStorage.setItem(`session_${session.id}_analysisStarted`, "true");
-      } catch (analysisError) {
-        console.warn("セッション分析開始に失敗しましたが、結果ページへ遷移します:", analysisError);
+      } catch {
         // 分析開始に失敗しても結果ページへ遷移（従来の同期分析にフォールバック）
       }
 
@@ -969,11 +1054,6 @@ const ConversationPage: React.FC = () => {
       await transcribeServiceRef.current.startListening(
         // 文字起こしコールバック（isPartial: true=途中認識、false=最終確定）
         (text, isPartial) => {
-          // デバッグログ（開発環境でのみ出力）
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`音声認識: "${text.trim()}", isPartial: ${isPartial}`);
-          }
-
           if (!isPartial) {
             // 最終確定時の処理（無音検出後に来る場合は既に送信済みのためスキップされる）
             const trimmedText = text.trim();
@@ -1009,27 +1089,12 @@ const ConversationPage: React.FC = () => {
         },
         // 無音検出コールバック（引数化されたsendMessage関数を使用）
         () => {
-          console.log(`🔇 無音検出コールバック実行: userInputRef="${userInputRef.current}"`);
           if (userInputRef.current.trim()) {
-            console.log(`📤 無音検出による自動送信実行 - 現在のメッセージ数: ${messagesRef.current.length}`);
-
             // 現在の入力値を一時変数に保存
             const currentInput = userInputRef.current.trim();
 
-            // メッセージ送信前に音声入力を一時停止（履歴問題を防止）
-            const recognitionActive = transcribeServiceRef.current && transcribeServiceRef.current.isListening();
-
-            // 音声認識を一時停止（停止はしないが、テキスト更新を防止）
-            if (recognitionActive) {
-              console.log('音声認識を一時停止（テキスト更新を防止）');
-            }
-
             // 引数付きでsendMessage関数を呼び出し（完全な送信処理を実行）
             sendMessage(currentInput);
-
-            console.log(`📤 メッセージ送信後 - 現在のメッセージ数: ${messagesRef.current.length}`);
-          } else {
-            console.log(`⚠️ 無音検出: userInputが空のため送信をスキップ`);
           }
         },
         // エラーコールバック
@@ -1074,13 +1139,11 @@ const ConversationPage: React.FC = () => {
 
   // 感情状態変化のハンドラー
   const handleEmotionChange = useCallback((emotion: EmotionState) => {
-    console.log("感情状態変化:", emotion);
     setCurrentEmotion(emotion);
   }, []);
 
   // カメラ初期化状態のハンドラー
   const handleCameraInitialized = useCallback((initialized: boolean) => {
-    console.log("カメラ初期化状態変更:", initialized);
     setIsCameraInitialized(initialized);
     // カメラ初期化に失敗した場合はエラー状態を設定
     if (!initialized) {
@@ -1107,10 +1170,6 @@ const ConversationPage: React.FC = () => {
       const goal = goals.find((g) => g.id === achievedGoal.goalId);
 
       if (goal) {
-        // ここで通知を表示する処理を実装
-        // 例: トースト通知やアラートなど
-        console.log(`ゴール達成: ${goal.description}`);
-
         // 必須ゴールがすべて達成された場合、セッションを終了
         if (areAllRequiredGoalsAchieved(goalStatuses, goals)) {
           setTimeout(async () => {
@@ -1133,10 +1192,17 @@ const ConversationPage: React.FC = () => {
   const emotionClassName = `emotion-${currentEmotion}`;
 
   return (
-    <Container
-      maxWidth="lg"
+    <Box
       className={`conversation-container ${emotionClassName}`}
-      sx={{ py: 2, height: "100vh", display: "flex", flexDirection: "column" }}
+      sx={{
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        position: "relative",
+        my: -2,
+      }}
     >
       {/* ヘッダー */}
       <ConversationHeader
@@ -1145,62 +1211,143 @@ const ConversationPage: React.FC = () => {
         sessionEnded={sessionEnded}
         onManualEnd={handleManualEnd}
         messageCount={messages.length}
+        onToggleRightPanels={() => setRightPanelsVisible((v) => !v)}
+        onToggleMetrics={() => setMetricsVisible((v) => !v)}
+        onOpenSettings={() => setShowSettings(true)}
+        rightPanelsVisible={rightPanelsVisible}
+        metricsVisible={metricsVisible}
       />
 
+      {/* コンプライアンス違反通知 - ヘッダー下スライドイン */}
+      {showComplianceAlert && activeViolation && (
+        <ComplianceAlert
+          violation={activeViolation}
+          open={showComplianceAlert}
+          onClose={() => setShowComplianceAlert(false)}
+        />
+      )}
+
+      {/* メインエリア */}
       <Box
-        display="flex"
-        gap={2}
-        flexGrow={1}
-        minHeight={0}
         sx={{
-          "@media (max-width: 1024px)": {
-            flexDirection: "column",
-          },
+          flex: 1,
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          minHeight: 0,
+          overflow: "hidden",
         }}
       >
-        {/* メイン対話エリア */}
-        <Box flexGrow={1} display="flex" flexDirection="column">
-          {/* ヘッダー部分: NPC情報と絵文字フィードバックを横並びに */}
-          <Box display="flex" gap={2} mb={2}>
-            {/* NPC情報カード - 幅を制限 */}
-            <Box flexGrow={1} maxWidth="60%">
-              <NPCInfoCard npc={scenario.npc} />
-            </Box>
+        {/* メトリクスオーバーレイ（左上） */}
+        {sessionStarted && (
+          <MetricsOverlay
+            currentMetrics={currentMetrics}
+            prevMetrics={prevMetrics}
+            metricsUpdating={metricsUpdating}
+            visible={metricsVisible}
+          />
+        )}
 
-            {/* 絵文字フィードバック表示エリア - 中央に配置 */}
-            {sessionStarted && (
-              <Box
-                sx={{
-                  width: "20%",
-                  minWidth: "100px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <EmojiFeedbackContainer
-                  angerLevel={currentMetrics.angerLevel}
-                  trustLevel={currentMetrics.trustLevel}
-                  progressLevel={currentMetrics.progressLevel}
-                  isSpeaking={isSpeaking}
-                  onEmotionChange={handleEmotionChange}
-                />
-              </Box>
-            )}
+        {/* 右側パネル（ゴール・シナリオ・ペルソナ） */}
+        {sessionStarted && (
+          <RightPanelContainer
+            visible={rightPanelsVisible}
+            goals={goals}
+            goalStatuses={goalStatuses}
+            scenario={scenario}
+          />
+        )}
 
-            {/* 録画コンポーネント - 右側に配置 */}
-            <Box sx={{ width: "20%", minWidth: "100px" }}>
-              {/* 新しいVideoManagerコンポーネントを使用 */}
-              <VideoManager
-                sessionId={sessionId}
-                sessionStarted={sessionStarted}
-                sessionEnded={sessionEnded}
-                onCameraInitialized={handleCameraInitialized}
+        {/* カメラプレビュー（左上、メトリクスの下） */}
+        <Box
+          sx={{
+            position: "absolute",
+            top: metricsVisible && sessionStarted ? 110 : 12,
+            left: 12,
+            zIndex: 10,
+            width: 180,
+            borderRadius: 2,
+            overflow: "hidden",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+            transition: "top 0.2s ease",
+            "@media (prefers-reduced-motion: reduce)": {
+              transition: "none",
+            },
+          }}
+        >
+          <VideoManager
+            ref={undefined}
+            sessionId={sessionId}
+            sessionStarted={sessionStarted}
+            sessionEnded={sessionEnded}
+            onCameraInitialized={handleCameraInitialized}
+          />
+        </Box>
+
+        {/* アバターステージ（中央） — CR-009: AvatarProviderを条件分岐外に配置し再マウント防止 */}
+        {avatarVisible && (
+          <AvatarProvider>
+            <Box sx={{
+              flex: sessionStarted ? "1 1 0" : "0 0 0",
+              minHeight: 0,
+              maxHeight: sessionStarted ? "40vh" : 0,
+              visibility: sessionStarted ? 'visible' : 'hidden',
+              overflow: 'hidden',
+            }}>
+              <AvatarStage
+                avatarId={scenarioAvatarId}
+                avatarS3Key={scenarioAvatarS3Key}
+                angerLevel={currentMetrics.angerLevel}
+                trustLevel={currentMetrics.trustLevel}
+                progressLevel={currentMetrics.progressLevel}
+                isSpeaking={isSpeaking}
+                directEmotion={npcDirectEmotion}
+                gesture={npcGesture}
+                onEmotionChange={handleEmotionChange}
+                npcName={scenario.npc.name}
               />
             </Box>
-          </Box>
+          </AvatarProvider>
+        )}
 
-          {/* メッセージエリア */}
+
+        {/* チャットログ（下部） */}
+        <Box
+          sx={{
+            // セッション開始前はflex:1で全体を使用、開始後は残りスペースを埋める
+            ...(sessionStarted
+              ? {
+                flex: "1 1 auto",
+                minHeight: 100,
+                // アバター非表示時はmaxHeight制限を解除してチャットログを拡張
+                ...(avatarVisible ? { maxHeight: "30vh" } : {}),
+                // 右パネルと重ならないようにマージンを追加
+                mr: rightPanelsVisible ? "280px" : 0,
+                // アバター非表示時はメトリクス・カメラとの重なりを防ぐため左パディング追加
+                ...(!avatarVisible ? { pl: "200px" } : {}),
+                display: "flex",
+                flexDirection: "column",
+              }
+              : {
+                flex: 1,
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                cursor: "default",
+                backgroundColor: "#fafafa",
+              }),
+            overflow: "hidden",
+            "@media (prefers-reduced-motion: reduce)": {
+              transition: "none",
+            },
+          }}
+          role="region"
+          aria-label={
+            chatLogExpanded
+              ? t("conversation.chatLog.collapse")
+              : t("conversation.chatLog.expand")
+          }
+        >
           <MessageList
             messages={messages}
             isProcessing={isProcessing}
@@ -1212,37 +1359,43 @@ const ConversationPage: React.FC = () => {
             isCameraInitialized={isCameraInitialized}
             cameraError={cameraError}
           />
-
-          {/* メッセージ入力エリア */}
-          {/* コンプライアンス違反通知 */}
-          {showComplianceAlert && activeViolation && (
-            <ComplianceAlert
-              violation={activeViolation}
-              open={showComplianceAlert}
-              onClose={() => setShowComplianceAlert(false)}
-            />
-          )}
-
-          <MessageInput
-            userInput={userInput}
-            setUserInput={setUserInput}
-            sendMessage={sendMessage}
-            isProcessing={isProcessing}
-            isListening={isListening}
-            isConnecting={connectionState === ConnectionState.CONNECTING}
-            speechRecognitionError={speechRecognitionError}
-            startSpeechRecognition={startSpeechRecognition}
-            switchToTextInput={switchToTextInput}
-            handleKeyDown={handleKeyDown}
-            sessionStarted={sessionStarted}
-            sessionEnded={sessionEnded}
-            continuousListening={continuousListening}
-          />
         </Box>
 
-        {/* サイドバー - 評価指標と録画 */}
-        <Box display="flex" flexDirection="column" width="300px">
-          <SidebarPanel
+      </Box>
+
+      {/* コーチングヒントバー（入力エリア上部） */}
+      <CoachingHintBar hint={currentMetrics.analysis} />
+
+      {/* メッセージ入力エリア */}
+      <MessageInput
+        userInput={userInput}
+        setUserInput={setUserInput}
+        sendMessage={sendMessage}
+        isProcessing={isProcessing}
+        isListening={isListening}
+        isConnecting={connectionState === ConnectionState.CONNECTING}
+        speechRecognitionError={speechRecognitionError}
+        startSpeechRecognition={startSpeechRecognition}
+        switchToTextInput={switchToTextInput}
+        handleKeyDown={handleKeyDown}
+        sessionStarted={sessionStarted}
+        sessionEnded={sessionEnded}
+        continuousListening={continuousListening}
+      />
+
+      {/* 設定モーダル（音声設定 + アバター表示切替） */}
+      <Dialog
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        aria-labelledby="settings-dialog-title"
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle id="settings-dialog-title">
+          {t("conversation.settings.title")}
+        </DialogTitle>
+        <DialogContent>
+          <SessionSettingsPanel
             audioEnabled={audioEnabled}
             setAudioEnabled={setAudioEnabled}
             audioVolume={audioVolume}
@@ -1251,15 +1404,13 @@ const ConversationPage: React.FC = () => {
             setSpeechRate={setSpeechRate}
             silenceThreshold={silenceThreshold}
             setSilenceThreshold={setSilenceThreshold}
-            currentMetrics={currentMetrics}
-            prevMetrics={prevMetrics}
-            metricsUpdating={metricsUpdating}
-            goals={goals}
-            goalStatuses={goalStatuses}
+            avatarVisible={avatarVisible}
+            setAvatarVisible={setAvatarVisible}
+            avatarEnabled={enableAvatar}
           />
-        </Box>
-      </Box>
-    </Container>
+        </DialogContent>
+      </Dialog>
+    </Box>
   );
 };
 

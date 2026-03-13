@@ -24,13 +24,9 @@ import { LanguageService } from "../services/LanguageService";
  */
 const LanguageSettings: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const [selectedLanguage, setSelectedLanguage] = useState(
-    i18n.language.split("-")[0],
-  );
   const languageService = LanguageService.getInstance();
 
-  // 初期値設定
-  const [selectedLanguage, setSelectedLanguage] = useState(() => 
+  const [selectedLanguage, setSelectedLanguage] = useState(() =>
     i18n.language.split("-")[0]
   );
 

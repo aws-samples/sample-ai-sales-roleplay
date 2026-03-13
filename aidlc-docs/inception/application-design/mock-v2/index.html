@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI営業ロールプレイ - UI/UXモック v2</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div id="app" class="app">
+
+    <!-- ========== グローバルナビゲーション ========== -->
+    <nav class="global-nav" id="globalNav">
+      <div class="nav-left">
+        <button class="nav-logo" onclick="navigateTo('home')" aria-label="ホームに戻る">
+          <span class="logo-icon">🎯</span>
+          <span class="logo-text">AI営業ロールプレイ</span>
+        </button>
+      </div>
+      <div class="nav-right">
+        <button class="nav-btn" onclick="navigateTo('history')" aria-label="履歴">
+          <span>📋</span><span class="nav-label">履歴</span>
+        </button>
+        <button class="nav-btn" onclick="navigateTo('ranking')" aria-label="ランキング">
+          <span>🏆</span><span class="nav-label">ランキング</span>
+        </button>
+        <button class="nav-btn" onclick="toggleLang()" aria-label="言語切替">
+          <span id="langToggle">🇯🇵</span>
+        </button>
+        <div class="user-avatar" onclick="navigateTo('profile')" role="button" tabindex="0" aria-label="プロフィール">
+          <span>👤</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ========== ホーム画面 ========== -->
+    <section class="page page-home" id="page-home">
+      <div class="home-hero">
+        <div class="hero-content">
+          <h1 class="hero-title">AIと対話して<br>営業スキルを磨こう</h1>
+          <p class="hero-subtitle">リアルなAIアバターとの会話シミュレーションで、実践的な営業力を身につけましょう</p>
+          <button class="btn-cta" onclick="navigateTo('scenarios')">
+            トレーニングを始める
+            <span class="cta-arrow">→</span>
+          </button>
+        </div>
+        <div class="hero-visual">
+          <div class="hero-avatar-preview">
+            <div class="preview-avatar-face">
+              <div class="preview-eyes">
+                <div class="preview-eye left"></div>
+                <div class="preview-eye right"></div>
+              </div>
+              <div class="preview-mouth"></div>
+            </div>
+            <div class="preview-body"></div>
+            <div class="preview-speech-bubble">
+              <p>こんにちは！<br>本日はどのようなご用件でしょうか？</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- クイックスタート: 最近のシナリオ -->
+      <div class="home-section">
+        <h2 class="section-title">最近のトレーニング</h2>
+        <div class="recent-sessions" id="recentSessions">
+          <!-- JSで生成 -->
+        </div>
+      </div>
+
+      <!-- 統計サマリー -->
+      <div class="home-section">
+        <h2 class="section-title">あなたの成長</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-value">12</span>
+            <span class="stat-label">完了セッション</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value">78<small>点</small></span>
+            <span class="stat-label">平均スコア</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value">+15<small>%</small></span>
+            <span class="stat-label">先月比</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value">3<small>位</small></span>
+            <span class="stat-label">ランキング</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== シナリオ選択画面 ========== -->
+    <section class="page page-scenarios" id="page-scenarios" hidden>
+      <div class="scenarios-header">
+        <h1>シナリオを選択</h1>
+        <p>練習したい営業シーンを選んでください</p>
+      </div>
+
+      <!-- フィルター -->
+      <div class="scenario-filters">
+        <button class="filter-chip active" onclick="filterScenarios('all', this)">すべて</button>
+        <button class="filter-chip" onclick="filterScenarios('beginner', this)">初級</button>
+        <button class="filter-chip" onclick="filterScenarios('intermediate', this)">中級</button>
+        <button class="filter-chip" onclick="filterScenarios('advanced', this)">上級</button>
+        <span class="filter-divider"></span>
+        <button class="filter-chip" onclick="filterScenarios('it', this)">IT業界</button>
+        <button class="filter-chip" onclick="filterScenarios('finance', this)">金融</button>
+        <button class="filter-chip" onclick="filterScenarios('retail', this)">小売</button>
+      </div>
+
+      <!-- シナリオカード一覧 -->
+      <div class="scenario-grid" id="scenarioGrid">
+        <!-- JSで生成 -->
+      </div>
+    </section>
+
+    <!-- ========== 会話画面（メイン体験） ========== -->
+    <section class="page page-conversation" id="page-conversation" hidden>
+      <!-- 会話ヘッダー -->
+      <div class="conv-header">
+        <button class="conv-back" onclick="confirmExit()" aria-label="戻る">
+          <span>←</span>
+        </button>
+        <div class="conv-scenario-info">
+          <span class="conv-scenario-title" id="convScenarioTitle">新規提案商談</span>
+          <span class="conv-scenario-badge" id="convDifficulty">中級</span>
+        </div>
+
+        <div class="conv-header-actions">
+          <button class="conv-header-btn" id="toggleInfoDrawerBtn" onclick="togglePersonaPanel()"
+            aria-label="シナリオ・ペルソナ情報">
+            👤
+          </button>
+          <button class="conv-header-btn" id="toggleMetricsBtn" onclick="toggleMetricsPanel()" aria-label="メトリクス表示切替">
+            📊
+          </button>
+          <button class="conv-header-btn" id="toggleGoalsBtn" onclick="toggleGoalsPanel()" aria-label="ゴール表示切替">
+            🎯
+          </button>
+          <button class="conv-header-btn" onclick="openAudioSettings()" aria-label="音声設定">
+            🔊
+          </button>
+        </div>
+      </div>
+
+      <!-- コンプライアンスアラート（ヘッダー下スライドイン） -->
+      <div class="compliance-alert" id="complianceAlert" hidden role="alert">
+        <div class="compliance-alert-icon" id="complianceAlertIcon">⚠️</div>
+        <div class="compliance-alert-body">
+          <span class="compliance-alert-label" id="complianceAlertLabel">コンプライアンス</span>
+          <span class="compliance-alert-msg" id="complianceAlertMsg"></span>
+        </div>
+        <button class="compliance-alert-close" onclick="dismissComplianceAlert()" aria-label="閉じる">✕</button>
+      </div>
+
+      <!-- 会話メインエリア -->
+      <div class="conv-main">
+        <!-- メトリクスオーバーレイ（左上） -->
+        <div class="metrics-overlay" id="metricsOverlay">
+          <div class="metric-bar">
+            <span class="metric-label anger-label" aria-hidden="true">怒り</span>
+            <div class="metric-track">
+              <div class="metric-fill anger" id="angerBar" style="width: 30%" role="progressbar" aria-valuenow="3"
+                aria-valuemin="0" aria-valuemax="10" aria-label="怒りレベル"></div>
+            </div>
+            <span class="metric-val" id="angerVal">3</span>
+          </div>
+          <div class="metric-bar">
+            <span class="metric-label trust-label" aria-hidden="true">信頼</span>
+            <div class="metric-track">
+              <div class="metric-fill trust" id="trustBar" style="width: 50%" role="progressbar" aria-valuenow="5"
+                aria-valuemin="0" aria-valuemax="10" aria-label="信頼度"></div>
+            </div>
+            <span class="metric-val" id="trustVal">5</span>
+          </div>
+          <div class="metric-bar">
+            <span class="metric-label progress-label" aria-hidden="true">進捗</span>
+            <div class="metric-track">
+              <div class="metric-fill progress" id="progressBar" style="width: 40%" role="progressbar" aria-valuenow="4"
+                aria-valuemin="0" aria-valuemax="10" aria-label="進捗度"></div>
+            </div>
+            <span class="metric-val" id="progressVal">4</span>
+          </div>
+        </div>
+
+        <!-- 右側パネルコンテナ（ゴール＋ペルソナ） -->
+        <div class="right-panels" id="rightPanels">
+          <!-- ゴールパネル -->
+          <div class="goals-overlay" id="goalsOverlay">
+            <h3 class="goals-title">ゴール</h3>
+            <div class="goals-list" id="goalsList" role="list">
+              <!-- JSで生成 -->
+            </div>
+          </div>
+
+          <!-- シナリオパネル -->
+          <div class="scenario-overlay" id="scenarioOverlay">
+            <h3 class="scenario-overlay-title">シナリオ</h3>
+            <div class="scenario-overlay-desc" id="scenarioDesc"></div>
+          </div>
+
+          <!-- ペルソナパネル -->
+          <div class="persona-overlay" id="personaOverlay">
+            <h3 class="persona-overlay-title">ペルソナ</h3>
+            <div class="persona-overlay-header">
+              <span class="persona-overlay-avatar" id="personaAvatar"></span>
+              <div>
+                <div class="persona-overlay-name" id="personaName"></div>
+                <div class="persona-overlay-role" id="personaRole"></div>
+              </div>
+            </div>
+            <div class="persona-overlay-desc" id="personaDesc"></div>
+          </div>
+        </div>
+
+        <!-- アバター表示エリア（中央） -->
+        <div class="avatar-stage" id="avatarStage">
+          <div class="avatar-character" id="avatarCharacter">
+            <div class="avatar-npc-name" id="avatarNpcName">田中部長</div>
+            <div class="avatar-face-v2" id="avatarFaceV2">
+              <div class="v2-eyes">
+                <div class="v2-eye left" id="v2EyeLeft"></div>
+                <div class="v2-eye right" id="v2EyeRight"></div>
+              </div>
+              <div class="v2-mouth" id="v2Mouth"></div>
+            </div>
+            <div class="avatar-body-v2"></div>
+          </div>
+
+          <!-- 発話中インジケーター -->
+          <div class="speaking-indicator-v2" id="speakingIndicatorV2" hidden>
+            <div class="sound-wave">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 会話ログ（下部） -->
+        <div class="chat-log" id="chatLog">
+          <div class="chat-log-messages" id="chatLogMessages">
+            <!-- JSで生成 -->
+          </div>
+        </div>
+      </div>
+
+      <!-- コーチングヒントバー（入力エリア上部固定） -->
+      <div class="coaching-bar" id="coachingBar" hidden>
+        <span class="coaching-bar-icon">💡</span>
+        <span class="coaching-bar-text" id="coachingBarText"></span>
+      </div>
+
+      <!-- 入力エリア -->
+      <div class="conv-input-area">
+        <div class="input-wrapper">
+          <button class="mic-btn" id="micBtn" onclick="toggleMic()" aria-label="音声入力">
+            <span id="micIcon">🎤</span>
+          </button>
+          <input type="text" class="text-input" id="textInput" placeholder="メッセージを入力..."
+            onkeydown="if(event.key==='Enter')sendMessage()" aria-label="メッセージ入力">
+          <button class="send-btn" onclick="sendMessage()" aria-label="送信">
+            <span>➤</span>
+          </button>
+        </div>
+        <div class="input-hint" id="inputHint">
+          <span id="micStatus"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 結果画面 ========== -->
+    <section class="page page-result" id="page-result" hidden>
+      <div class="result-header">
+        <h1>セッション結果</h1>
+        <p class="result-scenario-name" id="resultScenarioName">新規提案商談</p>
+      </div>
+
+      <!-- 総合スコア -->
+      <div class="result-score-hero">
+        <div class="score-circle" id="scoreCircle">
+          <svg viewBox="0 0 120 120">
+            <circle class="score-bg" cx="60" cy="60" r="54" />
+            <circle class="score-fill" cx="60" cy="60" r="54" id="scoreFillCircle" />
+          </svg>
+          <div class="score-text">
+            <span class="score-number" id="scoreNumber">78</span>
+            <span class="score-unit">点</span>
+          </div>
+        </div>
+        <div class="score-grade" id="scoreGrade">B+</div>
+        <p class="score-comment" id="scoreComment">良い営業対話ができました。信頼構築のスキルが向上しています。</p>
+      </div>
+
+      <!-- タブ切替 -->
+      <div class="result-tabs">
+        <button class="result-tab active" onclick="switchResultTab('summary', this)">概要</button>
+        <button class="result-tab" onclick="switchResultTab('conversation', this)">会話履歴</button>
+        <button class="result-tab" onclick="switchResultTab('video', this)">動画分析</button>
+        <button class="result-tab" onclick="switchResultTab('compliance', this)">コンプライアンス</button>
+      </div>
+
+      <!-- タブコンテンツ: 概要 -->
+      <div class="result-tab-content" id="tab-summary">
+        <div class="result-metrics-grid">
+          <div class="result-metric-card">
+            <h3>最終メトリクス</h3>
+            <div class="result-metric-row">
+              <span>怒りレベル</span>
+              <div class="result-metric-bar">
+                <div class="fill anger" style="width:20%"></div>
+              </div>
+              <span>2</span>
+            </div>
+            <div class="result-metric-row">
+              <span>信頼度</span>
+              <div class="result-metric-bar">
+                <div class="fill trust" style="width:80%"></div>
+              </div>
+              <span>8</span>
+            </div>
+            <div class="result-metric-row">
+              <span>進捗度</span>
+              <div class="result-metric-bar">
+                <div class="fill progress" style="width:70%"></div>
+              </div>
+              <span>7</span>
+            </div>
+          </div>
+          <div class="result-metric-card">
+            <h3>ゴール達成</h3>
+            <div class="goal-result-list" id="goalResultList">
+              <!-- JSで生成 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- フィードバック -->
+        <div class="feedback-section">
+          <h3>AIフィードバック</h3>
+          <div class="feedback-card good">
+            <h4>💪 強み</h4>
+            <ul>
+              <li>顧客のニーズを丁寧にヒアリングできていました</li>
+              <li>具体的な数値を用いた提案が効果的でした</li>
+              <li>適切なタイミングでクロージングに移行できました</li>
+            </ul>
+          </div>
+          <div class="feedback-card improve">
+            <h4>📝 改善点</h4>
+            <ul>
+              <li>初回の自己紹介がやや長く、相手の関心を引くのに時間がかかりました</li>
+              <li>競合との差別化ポイントをもう少し明確に伝えると良いでしょう</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- タブコンテンツ: 会話履歴 -->
+      <div class="result-tab-content" id="tab-conversation" hidden>
+        <div class="conversation-replay" id="conversationReplay">
+          <!-- JSで生成 -->
+        </div>
+      </div>
+
+      <!-- タブコンテンツ: 動画分析 -->
+      <div class="result-tab-content" id="tab-video" hidden>
+        <div class="video-analysis-grid">
+          <div class="video-score-card">
+            <span class="video-score-icon">👁️</span>
+            <span class="video-score-value">85</span>
+            <span class="video-score-label">アイコンタクト</span>
+          </div>
+          <div class="video-score-card">
+            <span class="video-score-icon">😊</span>
+            <span class="video-score-value">72</span>
+            <span class="video-score-label">表情</span>
+          </div>
+          <div class="video-score-card">
+            <span class="video-score-icon">🤲</span>
+            <span class="video-score-value">68</span>
+            <span class="video-score-label">ジェスチャー</span>
+          </div>
+          <div class="video-score-card">
+            <span class="video-score-icon">🎭</span>
+            <span class="video-score-value">90</span>
+            <span class="video-score-label">感情表現</span>
+          </div>
+        </div>
+        <div class="video-feedback">
+          <p>カメラ目線を意識した良い姿勢が保たれていました。手振りをもう少し活用すると、説得力が増すでしょう。</p>
+        </div>
+      </div>
+
+      <!-- タブコンテンツ: コンプライアンス -->
+      <div class="result-tab-content" id="tab-compliance" hidden>
+        <div class="compliance-status passed">
+          <span class="compliance-icon">✅</span>
+          <span>コンプライアンスチェック: 合格</span>
+        </div>
+        <p class="compliance-note">会話内容に問題のある表現は検出されませんでした。</p>
+      </div>
+
+      <!-- アクションボタン -->
+      <div class="result-actions">
+        <button class="btn-secondary" onclick="navigateTo('scenarios')">別のシナリオを試す</button>
+        <button class="btn-primary" onclick="retryScenario()">もう一度挑戦</button>
+      </div>
+    </section>
+
+    <!-- ========== 履歴画面 ========== -->
+    <section class="page page-history" id="page-history" hidden>
+      <div class="page-header">
+        <h1>セッション履歴</h1>
+      </div>
+      <div class="history-list" id="historyList">
+        <!-- JSで生成 -->
+      </div>
+    </section>
+
+    <!-- ========== ランキング画面 ========== -->
+    <section class="page page-ranking" id="page-ranking" hidden>
+      <div class="page-header">
+        <h1>ランキング</h1>
+      </div>
+      <div class="ranking-list" id="rankingList">
+        <!-- JSで生成 -->
+      </div>
+    </section>
+
+    <!-- ========== プロフィール画面 ========== -->
+    <section class="page page-profile" id="page-profile" hidden>
+      <div class="page-header">
+        <h1>プロフィール</h1>
+      </div>
+      <div class="profile-card">
+        <div class="profile-avatar-large">👤</div>
+        <h2>山田 太郎</h2>
+        <p class="profile-role">営業部 2年目</p>
+        <div class="profile-stats">
+          <div><strong>12</strong><br>セッション</div>
+          <div><strong>78</strong><br>平均スコア</div>
+          <div><strong>3位</strong><br>ランキング</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 音声設定モーダル ========== -->
+    <div class="modal-overlay" id="audioSettingsModal" hidden>
+      <div class="modal" role="dialog" aria-labelledby="audioSettingsTitle">
+        <div class="modal-header">
+          <h2 id="audioSettingsTitle">音声設定</h2>
+          <button class="modal-close" onclick="closeAudioSettings()" aria-label="閉じる">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="setting-row">
+            <label for="volumeSlider">音量</label>
+            <input type="range" id="volumeSlider" min="0" max="100" value="80">
+          </div>
+          <div class="setting-row">
+            <label for="speedSlider">読み上げ速度</label>
+            <input type="range" id="speedSlider" min="50" max="150" value="100">
+          </div>
+          <div class="setting-row">
+            <label for="silenceThreshold">無音検出感度</label>
+            <input type="range" id="silenceThreshold" min="1" max="5" value="3">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 終了確認モーダル ========== -->
+    <div class="modal-overlay" id="exitModal" hidden>
+      <div class="modal" role="dialog" aria-labelledby="exitModalTitle">
+        <div class="modal-header">
+          <h2 id="exitModalTitle">セッションを終了しますか？</h2>
+        </div>
+        <div class="modal-body">
+          <p>現在のセッションの結果を保存して終了します。</p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="closeExitModal()">キャンセル</button>
+          <button class="btn-primary" onclick="endSession()">終了して結果を見る</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>

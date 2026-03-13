@@ -2,54 +2,84 @@
 
 ## Project Information
 - **Project Type**: Brownfield
-- **Start Date**: 2026-01-08T00:00:00Z
-- **Current Stage**: INCEPTION - Workflow Planning (Complete)
+- **Start Date**: 2026-02-10T10:00:00Z
+- **Current Stage**: IDLE - 次の作業待ち
+- **Feature**: なし（前回の作業完了済み）
 
 ## Workspace State
 - **Existing Code**: Yes
 - **Programming Languages**: TypeScript, Python
 - **Build System**: npm (frontend), CDK (backend)
 - **Project Structure**: Full-stack application (React frontend + AWS CDK backend)
-- **Reverse Engineering Needed**: Yes (Completed)
+- **Reverse Engineering Needed**: No (既存成果物あり)
 
-## Execution Plan Summary
-- **Total Stages**: 11
-- **Stages to Execute**: 5 (NFR Requirements, NFR Design, Infrastructure Design, Code Generation, Build and Test)
-- **Stages to Skip**: 4 (User Stories, Application Design, Units Generation, Functional Design)
-- **Stages Completed**: 4 (Workspace Detection, Reverse Engineering, Requirements Analysis, Workflow Planning)
+## 完了済み作業一覧
 
-## Stage Progress
+### 3Dアバター機能 Phase 1（MVP） ✅ 完了
+- VRMモデルの基本表示
+- 音量ベースのリップシンク
+- 瞬きアニメーション
+- 単一デフォルトアバター
 
-### 🔵 INCEPTION PHASE
-- [x] Workspace Detection - COMPLETED (2026-01-08)
-- [x] Reverse Engineering - COMPLETED (2026-01-08)
-- [x] Requirements Analysis - COMPLETED (2026-01-08)
-- [x] User Stories - SKIP (技術移行、ユーザー機能変更なし)
-- [x] Workflow Planning - COMPLETED (2026-01-08)
-- [x] Application Design - SKIP (新規コンポーネント設計不要)
-- [x] Units Generation - SKIP (単一移行作業)
+### 3Dアバター機能 Phase 2（標準実装） ✅ 完了
+- Amazon Polly Visemeによる母音リップシンク
+- AI感情分析（realtime-scoring）による表情自動連動
+- 複数アバター切り替え対応（manifest.json管理）
+- ExpressionControllerによるスムーズな感情トランジション
+- AnimationControllerによる瞬き・呼吸アニメーション
 
-### 🟢 CONSTRUCTION PHASE
-- [ ] Functional Design - SKIP (ビジネスロジック変更なし)
-- [x] NFR Requirements - COMPLETED (2026-01-08)
-- [x] NFR Design - COMPLETED (2026-01-08)
-- [x] Infrastructure Design - COMPLETED (2026-01-08)
-- [ ] Code Generation - IN PROGRESS
-- [ ] Build and Test - EXECUTE
+### 3Dアバター機能 Phase 3（拡張実装） ✅ 完了
+- AI駆動ジェスチャーアニメーション（うなずき・首かしげ）
+- 感情トランジションの高度化（中間状態、速度調整）
+- アイドルモーションの多様化（視線移動、体の揺れ）
+- VRMファイルアップロード機能（S3 + DynamoDB + CloudFront）
+- アバター管理UI
+- レスポンシブレイアウト対応
 
-### 🟡 OPERATIONS PHASE
-- [ ] Operations - PLACEHOLDER
+### VRMアップロード + Polly音声モデル選択 ✅ 完了
+- シナリオNPC設定内VRMファイルアップロードUI
+- Polly音声モデル選択ドロップダウン（言語別動的フィルタリング）
+- エンジン自動選択ロジック（generative優先）
+- CloudFrontアバターS3オリジン追加
+- manifest.json廃止・DynamoDB + S3管理に統一
+- ハードコード音声マッピング廃止・シナリオ設定voiceIdに統一
+- 未使用コード・API削除（技術的負債解消）
+
+### 会話画面UI/UXリデザイン ✅ 完了
+- ConversationPage全面改修（モックv2ベース）
+- オーバーレイコンポーネント群（MetricsOverlay、RightPanelContainer等）
+- 既存コンポーネント削除・改修
+
+### AgentCore Runtime移行 ✅ 完了
+- Strands Agent → Bedrock AgentCore Runtime移行
+- NFR要件・設計・インフラ設計
+- CDKコンストラクト・エージェントコード・フロントエンド変更
+
+### アバター表示On/Off機能 ✅ 完了
+- INCEPTION - Workspace Detection: 完了
+- INCEPTION - Requirements Analysis: 完了
+- INCEPTION - User Stories: スキップ（技術的な設定追加、ユーザーストーリー不要）
+- INCEPTION - Workflow Planning: 完了
+- INCEPTION - Application Design: スキップ（既存コンポーネントへのフラグ追加のみ）
+- INCEPTION - Units Generation: スキップ（単一ユニット）
+- CONSTRUCTION - Functional Design: スキップ（単純なboolean条件分岐）
+- CONSTRUCTION - NFR Requirements: スキップ（既存NFR設定で十分）
+- CONSTRUCTION - NFR Design: スキップ
+- CONSTRUCTION - Infrastructure Design: スキップ（既存パターン踏襲）
+- CONSTRUCTION - Code Generation: 完了
+- CONSTRUCTION - Build and Test: 完了
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Code Generation
-- **Next Stage**: Build and Test
-- **Status**: In Progress
+- **Current Stage**: Build and Test 完了
+- **Next Stage**: Operations（プレースホルダー）
+- **Feature**: アバター表示のシナリオ別On/Off機能
+- **Status**: 全ステージ完了
 
 ## Notes
 - AI営業ロールプレイアプリケーション
 - フロントエンド: React 19 + TypeScript + Material UI + Vite
 - バックエンド: AWS CDK + Lambda (Python/TypeScript) + DynamoDB + S3
-- AI/ML: Amazon Bedrock (Claude 3.5 Haiku), Amazon Nova Premiere, Amazon Polly, Amazon Transcribe
-- **移行対象**: Strands Agent (Lambda) → Bedrock AgentCore Runtime
-- **認証変更**: API Gateway + Cognito → AgentCore Identity Inbound Auth
+- AI/ML: Amazon Bedrock, Amazon Nova Premiere, Amazon Polly, Amazon Transcribe
+- 3Dアバター: three.js + @pixiv/three-vrm
+- 全フェーズ（Phase 1〜3 + VRMアップロード + 音声選択 + 会話UI + AgentCore移行）完了済み

@@ -12,7 +12,7 @@ import {
   Button,
   Drawer,
   List,
-  ListItem,
+  ListItemButton,
   ListItemIcon,
   ListItemText,
   Divider,
@@ -148,46 +148,46 @@ const Header: React.FC<HeaderProps> = ({ pageTitle }) => {
   const drawerContent = (
     <Box sx={{ width: 250 }} role="presentation">
       <List>
-        <ListItem button onClick={handleHomeClick}>
+        <ListItemButton onClick={handleHomeClick}>
           <ListItemIcon>
             <HomeIcon />
           </ListItemIcon>
           <ListItemText primary={t("navigation.home")} />
-        </ListItem>
-        <ListItem button onClick={handleScenariosClick}>
+        </ListItemButton>
+        <ListItemButton onClick={handleScenariosClick}>
           <ListItemIcon>
             <PlayArrowIcon />
           </ListItemIcon>
           <ListItemText primary={t("navigation.scenarios")} />
-        </ListItem>
-        <ListItem button onClick={handleHistoryClick}>
+        </ListItemButton>
+        <ListItemButton onClick={handleHistoryClick}>
           <ListItemIcon>
             <HistoryIcon />
           </ListItemIcon>
           <ListItemText primary={t("navigation.history")} />
-        </ListItem>
-        <ListItem button onClick={handleRankingsClick}>
+        </ListItemButton>
+        <ListItemButton onClick={handleRankingsClick}>
           <ListItemIcon>
             <EmojiEventsIcon />
           </ListItemIcon>
           <ListItemText primary={t("navigation.rankings")} />
-        </ListItem>
+        </ListItemButton>
       </List>
       <Divider />
       <List>
-        <ListItem button onClick={handleProfileClick}>
+        <ListItemButton onClick={handleProfileClick}>
           <ListItemIcon>
             <PersonIcon />
           </ListItemIcon>
           <ListItemText primary={t("navigation.profile")} />
-        </ListItem>
+        </ListItemButton>
         {currentUser && (
-          <ListItem button onClick={handleLogout}>
+          <ListItemButton onClick={handleLogout}>
             <ListItemIcon>
               <AccountCircle />
             </ListItemIcon>
             <ListItemText primary={t("auth.signOut")} />
-          </ListItem>
+          </ListItemButton>
         )}
       </List>
     </Box>

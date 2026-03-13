@@ -1,7 +1,8 @@
 import { Stack, CfnOutput, RemovalPolicy } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { CloudFrontToS3 } from '@aws-solutions-constructs/aws-cloudfront-s3';
-import { CfnDistribution, Distribution } from 'aws-cdk-lib/aws-cloudfront';
+import { CfnDistribution, Distribution, ViewerProtocolPolicy, CachePolicy, AllowedMethods, ResponseHeadersPolicy, HeadersFrameOption, HeadersReferrerPolicy } from 'aws-cdk-lib/aws-cloudfront';
+import { S3BucketOrigin } from 'aws-cdk-lib/aws-cloudfront-origins';
 import { NodejsBuild } from 'deploy-time-build';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 
@@ -14,6 +15,7 @@ export interface WebProps {
   webAclId?: string;
   resourceNamePrefix?: string; // リソース名のプレフィックス
   transcribeWebSocketEndpoint: string; // Transcribe WebSocketエンドポイント
+  avatarBucket?: s3.IBucket; // アバターVRMファイル用S3バケット
   // AgentCore Runtime設定
   agentCoreEnabled?: boolean;
   npcConversationAgentArn?: string;
@@ -70,6 +72,35 @@ export class Web extends Construct {
       );
     }
 
+    // アバターS3バケットをCloudFrontの追加オリジンとして設定
+    // 注意: アバター置き換え時は毎回新しいavatarIdが生成されるため、
+    // 同一S3キーへの上書きは発生しない設計。CACHING_OPTIMIZEDで問題なし。
+    // 将来的にavatarIdの再利用が必要になった場合は、キャッシュ無効化戦略の導入を検討すること。
+    if (props.avatarBucket) {
+      const avatarOrigin = S3BucketOrigin.withOriginAccessControl(props.avatarBucket);
+
+      // WR-004: アバターオリジンにレスポンスヘッダーポリシーを設定（XSS防止）
+      const avatarResponseHeadersPolicy = new ResponseHeadersPolicy(this, 'AvatarResponseHeadersPolicy', {
+        securityHeadersBehavior: {
+          contentTypeOptions: { override: true },
+          frameOptions: { frameOption: HeadersFrameOption.DENY, override: true },
+          referrerPolicy: { referrerPolicy: HeadersReferrerPolicy.SAME_ORIGIN, override: true },
+        },
+        customHeadersBehavior: {
+          customHeaders: [
+            { header: 'Content-Disposition', value: 'attachment', override: true },
+          ],
+        },
+      });
+
+      cloudFrontWebDistribution.addBehavior('/avatars/*', avatarOrigin, {
+        viewerProtocolPolicy: ViewerProtocolPolicy.HTTPS_ONLY,
+        cachePolicy: CachePolicy.CACHING_OPTIMIZED,
+        allowedMethods: AllowedMethods.ALLOW_GET_HEAD,
+        responseHeadersPolicy: avatarResponseHeadersPolicy,
+      });
+    }
+
     new NodejsBuild(this, 'BuildWeb', {
       assets: [
         {
@@ -99,6 +130,8 @@ export class Web extends Construct {
         VITE_COGNITO_IDENTITY_POOL_ID: props.idPoolId,
         VITE_APP_SELF_SIGN_UP_ENABLED: props.selfSignUpEnabled.toString(),
         VITE_TRANSCRIBE_WEBSOCKET_URL: props.transcribeWebSocketEndpoint,
+        // アバターCDN URL（CloudFront経由でアバターVRMファイルを配信）
+        VITE_AVATAR_CDN_URL: `https://${cloudFrontWebDistribution.domainName}/avatars`,
         // AgentCore Runtime設定
         VITE_AGENTCORE_ENABLED: (props.agentCoreEnabled ?? false).toString(),
         VITE_AGENTCORE_NPC_CONVERSATION_ARN: props.npcConversationAgentArn ?? '',
@@ -108,6 +141,11 @@ export class Web extends Construct {
 
     new CfnOutput(this, 'WebUrl', {
       value: `https://${cloudFrontWebDistribution.domainName}`,
+    });
+
+    new CfnOutput(this, 'AvatarCdnUrl', {
+      value: `https://${cloudFrontWebDistribution.domainName}/avatars`,
+      description: 'Avatar CDN URL (VITE_AVATAR_CDN_URL)',
     });
 
     this.distribution = cloudFrontWebDistribution;

@@ -27,6 +27,7 @@ export interface Scenario {
   initialMetrics: ExtendedMetrics;
   goals: GoalInfo[]; // シナリオのゴール一覧
   maxTurns?: number; // 最大会話ターン数（指定しない場合はデフォルト値を使用）
+  enableAvatar?: boolean; // アバター表示On/Off（未設定時はfalse）
 }
 
 // 拡張メトリクス（詳細スコア付き）

@@ -31,6 +31,8 @@ export interface ApiGatewayConstructProps {
   audioAnalysisFunction?: lambda.Function;
   /** セッション分析Lambda関数 */
   sessionAnalysisFunction?: lambda.Function;
+  /** アバター管理Lambda関数 */
+  avatarFunction?: lambda.Function;
 }
 
 export class ApiGatewayConstruct extends Construct {
@@ -419,6 +421,74 @@ export class ApiGatewayConstruct extends Construct {
       resultsResource.addMethod(
         'GET',
         new apigateway.LambdaIntegration(props.audioAnalysisFunction),
+        {
+          authorizer: auth,
+          authorizationType: apigateway.AuthorizationType.COGNITO,
+        }
+      );
+    }
+
+    // Avatars API endpoints (アバター管理API)
+    if (props.avatarFunction) {
+      const avatarsResource = this.api.root.addResource('avatars');
+
+      // GET /avatars - アバター一覧取得
+      avatarsResource.addMethod(
+        'GET',
+        new apigateway.LambdaIntegration(props.avatarFunction),
+        {
+          authorizer: auth,
+          authorizationType: apigateway.AuthorizationType.COGNITO,
+        }
+      );
+
+      // POST /avatars - アバター作成（メタデータ登録 + アップロードURL生成）
+      avatarsResource.addMethod(
+        'POST',
+        new apigateway.LambdaIntegration(props.avatarFunction),
+        {
+          authorizer: auth,
+          authorizationType: apigateway.AuthorizationType.COGNITO,
+        }
+      );
+
+      // GET /avatars/{avatar_id} - アバター詳細取得
+      const avatarDetailResource = avatarsResource.addResource('{avatar_id}');
+      avatarDetailResource.addMethod(
+        'GET',
+        new apigateway.LambdaIntegration(props.avatarFunction),
+        {
+          authorizer: auth,
+          authorizationType: apigateway.AuthorizationType.COGNITO,
+        }
+      );
+
+      // DELETE /avatars/{avatar_id} - アバター削除
+      avatarDetailResource.addMethod(
+        'DELETE',
+        new apigateway.LambdaIntegration(props.avatarFunction),
+        {
+          authorizer: auth,
+          authorizationType: apigateway.AuthorizationType.COGNITO,
+        }
+      );
+
+      // GET /avatars/{avatar_id}/download-url - ダウンロード用署名付きURL
+      const downloadUrlResource = avatarDetailResource.addResource('download-url');
+      downloadUrlResource.addMethod(
+        'GET',
+        new apigateway.LambdaIntegration(props.avatarFunction),
+        {
+          authorizer: auth,
+          authorizationType: apigateway.AuthorizationType.COGNITO,
+        }
+      );
+
+      // PUT /avatars/{avatar_id}/confirm - アップロード完了確認
+      const confirmResource = avatarDetailResource.addResource('confirm');
+      confirmResource.addMethod(
+        'PUT',
+        new apigateway.LambdaIntegration(props.avatarFunction),
         {
           authorizer: auth,
           authorizationType: apigateway.AuthorizationType.COGNITO,
