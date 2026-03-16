@@ -33,6 +33,13 @@ export class TranscribeService {
   private silenceThresholdMs: number = 1500;  // 無音判定閾値（ミリ秒）
   private websocketUrl: string = '';
   private language: string = 'ja';  // 言語情報を保持
+  private currentSessionId: string = '';  // 現在のセッションID
+  
+  // 自動再接続とバッファリング
+  private audioBuffer: Array<{audio: string, language: string}> = [];
+  private isReconnecting: boolean = false;
+  private maxBufferSize: number = 50; // 最大バッファサイズ（約5秒分）
+  private reconnectPromise: Promise<void> | null = null;
   
   // コールバック関数
   private onTranscriptCallback: ((text: string, isFinal: boolean) => void) | null = null;
@@ -134,9 +141,10 @@ export class TranscribeService {
    * @param language 言語設定 (例: 'ja', 'en')
    */
   public async initializeConnection(sessionId: string, language?: string): Promise<void> {
-    // 言語情報を保存
+    // セッションIDと言語情報を保存
+    this.currentSessionId = sessionId;
     this.language = language || 'ja';
-    console.log(`言語設定: ${this.language}`);
+    console.log(`セッションID: ${this.currentSessionId}, 言語設定: ${this.language}`);
     if (!this.websocketUrl) {
       this.setConnectionState(ConnectionState.CONNECTION_ERROR);
       throw new Error('WebSocketエンドポイントが設定されていません');
@@ -200,6 +208,11 @@ export class TranscribeService {
 
           this.socket.onclose = (event) => {
             console.log(`WebSocket切断詳細: コード=${event.code}, 理由=${event.reason}, wasClean=${event.wasClean}`);
+            
+            // 音声認識中だった場合は、次の音声検出時に自動再接続を準備
+            if (this.isRecording) {
+              console.log('音声認識中の切断を検出、次の音声で再接続します');
+            }
             this.setConnectionState(ConnectionState.DISCONNECTED);
           };
         } catch (error) {
@@ -215,6 +228,59 @@ export class TranscribeService {
       }
       throw error;
     }
+  }
+
+  /**
+   * 自動再接続（既に再接続中の場合は既存のPromiseを返す）
+   * 
+   * @private
+   * @returns {Promise<void>} 再接続完了のPromise
+   */
+  private async autoReconnect(): Promise<void> {
+    // 既に再接続中なら、その完了を待つ
+    if (this.reconnectPromise) {
+      console.log('既に再接続処理中、完了を待機');
+      return this.reconnectPromise;
+    }
+
+    if (!this.currentSessionId) {
+      console.error('セッションIDが設定されていないため、再接続できません');
+      return;
+    }
+
+    this.isReconnecting = true;
+    console.log('🔄 自動再接続を開始');
+
+    this.reconnectPromise = (async () => {
+      try {
+        await this.initializeConnection(this.currentSessionId, this.language);
+        console.log('✅ 自動再接続完了');
+        
+        // バッファに溜まった音声データを送信
+        if (this.audioBuffer.length > 0) {
+          console.log(`📤 バッファの音声データを送信: ${this.audioBuffer.length}件`);
+          for (const bufferedData of this.audioBuffer) {
+            if (this.socket?.readyState === WebSocket.OPEN) {
+              this.socket.send(JSON.stringify({
+                action: 'sendAudio',
+                audio: bufferedData.audio,
+                language: bufferedData.language
+              }));
+            }
+          }
+          this.audioBuffer = [];
+          console.log('✅ バッファの音声データ送信完了');
+        }
+      } catch (error) {
+        console.error('❌ 自動再接続失敗:', error);
+        throw error;
+      } finally {
+        this.isReconnecting = false;
+        this.reconnectPromise = null;
+      }
+    })();
+
+    return this.reconnectPromise;
   }
 
   /**
@@ -263,53 +329,74 @@ export class TranscribeService {
       this.audioProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
 
       this.audioProcessor.onaudioprocess = (event) => {
-        if (this.socket?.readyState === WebSocket.OPEN) {
-          try {
-            const inputBuffer = event.inputBuffer;
-            const inputData = inputBuffer.getChannelData(0);
+        try {
+          const inputBuffer = event.inputBuffer;
+          const inputData = inputBuffer.getChannelData(0);
+          
+          // 音声レベルを計算（RMS値）
+          let sum = 0;
+          for (let i = 0; i < inputData.length; i++) {
+            sum += inputData[i] * inputData[i];
+          }
+          const rms = Math.sqrt(sum / inputData.length);
+          const audioLevel = rms * 100; // 0-100のスケールに変換
+          
+          // 音声レベルが閾値を超えている場合のみ音声アクティビティを更新
+          const voiceThreshold = 0.5; // 音声判定閾値（調整可能）
+          const isVoiceDetected = audioLevel > voiceThreshold;
+          
+          if (isVoiceDetected) {
+            this.lastVoiceActivityTime = Date.now();
+            // console.log(`🎤 音声検出: レベル=${audioLevel.toFixed(2)} (閾値: ${voiceThreshold})`);
             
-            // 音声レベルを計算（RMS値）
-            let sum = 0;
-            for (let i = 0; i < inputData.length; i++) {
-              sum += inputData[i] * inputData[i];
+            // 音声検出時に接続が切れていたら自動再接続
+            if (!this.isConnected() && !this.isReconnecting && this.currentSessionId) {
+              console.log('🎤 音声検出 & 未接続 → 自動再接続開始');
+              this.autoReconnect().catch(err => {
+                console.error('自動再接続エラー:', err);
+                if (this.onErrorCallback) {
+                  this.onErrorCallback(err instanceof Error ? err : new Error('自動再接続失敗'));
+                }
+              });
             }
-            const rms = Math.sqrt(sum / inputData.length);
-            const audioLevel = rms * 100; // 0-100のスケールに変換
-            
-            // 音声レベルが閾値を超えている場合のみ音声アクティビティを更新
-            const voiceThreshold = 0.5; // 音声判定閾値（調整可能）
-            if (audioLevel > voiceThreshold) {
-              this.lastVoiceActivityTime = Date.now();
-              // console.log(`🎤 音声検出: レベル=${audioLevel.toFixed(2)} (閾値: ${voiceThreshold})`);
-            } else {
-              // 無音状態の詳細ログ
-              // const elapsed = Date.now() - this.lastVoiceActivityTime;
-              // if (elapsed > 500 && elapsed % 500 < 100) { // 500ms以上の無音時に定期的にログ
-              //   console.log(`🔇 無音継続: レベル=${audioLevel.toFixed(2)}, 経過=${elapsed}ms (閾値: ${this.silenceThresholdMs}ms)`);
-              // }
-            }
-            
-            // Float32ArrayをInt16Arrayに変換（PCM 16bit）
-            const pcmData = new Int16Array(inputData.length);
-            for (let i = 0; i < inputData.length; i++) {
-              // -1.0から1.0の範囲を-32768から32767の範囲に変換
-              pcmData[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32767));
-            }
+          }
+          
+          // Float32ArrayをInt16Arrayに変換（PCM 16bit）
+          const pcmData = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            // -1.0から1.0の範囲を-32768から32767の範囲に変換
+            pcmData[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32767));
+          }
 
-            // Int16ArrayをUint8Arrayに変換してBase64エンコード
-            const uint8Array = new Uint8Array(pcmData.buffer);
-            const base64Audio = this.arrayBufferToBase64(uint8Array.buffer);
-            
+          // Int16ArrayをUint8Arrayに変換してBase64エンコード
+          const uint8Array = new Uint8Array(pcmData.buffer);
+          const base64Audio = this.arrayBufferToBase64(uint8Array.buffer);
+          
+          // 接続状態に応じて送信またはバッファリング
+          if (this.socket?.readyState === WebSocket.OPEN && !this.isReconnecting) {
+            // 接続済み：直接送信
             // console.log(`音声データ送信: ${uint8Array.length}バイト, レベル: ${audioLevel.toFixed(2)}`);
-            
             this.socket.send(JSON.stringify({
               action: 'sendAudio',
               audio: base64Audio,
               language: this.language  // 言語情報を追加
             }));
-          } catch (error) {
-            console.error('音声データ処理エラー:', error);
+          } else if (isVoiceDetected) {
+            // 音声検出中で未接続：バッファに保存
+            console.log('🔊 音声データをバッファに保存');
+            this.audioBuffer.push({
+              audio: base64Audio,
+              language: this.language
+            });
+            
+            // バッファサイズ制限
+            if (this.audioBuffer.length > this.maxBufferSize) {
+              this.audioBuffer.shift(); // 古いデータを削除
+              console.warn('⚠️ バッファが満杯、古いデータを削除');
+            }
           }
+        } catch (error) {
+          console.error('音声データ処理エラー:', error);
         }
       };
 
@@ -444,6 +531,11 @@ export class TranscribeService {
   public dispose(): void {
     this.stopListening();
     this.closeConnection();
+    
+    // バッファをクリア
+    this.audioBuffer = [];
+    this.isReconnecting = false;
+    this.reconnectPromise = null;
     
     if (this.audioContext) {
       try {
