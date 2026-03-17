@@ -80,7 +80,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
               <Button
                 variant="contained"
                 onClick={() => sendMessage()}
-                disabled={!userInput.trim() || isProcessing || isListening}
+                disabled={!userInput.trim() || isProcessing}
                 sx={{ minWidth: "auto", px: 3, flex: 1 }}
                 aria-label={t("conversation.input.send")}
               >
@@ -119,6 +119,9 @@ const MessageInput: React.FC<MessageInputProps> = ({
                         '0%': { transform: 'scale(1)', opacity: 0.7 },
                         '50%': { transform: 'scale(1.1)', opacity: 0.4 },
                         '100%': { transform: 'scale(1)', opacity: 0.7 },
+                      },
+                      '@media (prefers-reduced-motion: reduce)': {
+                        animation: 'none',
                       },
                     }}
                   />

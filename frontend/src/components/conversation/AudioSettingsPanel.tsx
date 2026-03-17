@@ -21,8 +21,6 @@ interface AudioSettingsPanelProps {
   setAudioVolume: (volume: number) => void;
   speechRate: number;
   setSpeechRate: (rate: number) => void;
-  silenceThreshold: number;
-  setSilenceThreshold: (threshold: number) => void;
 }
 
 /**
@@ -36,41 +34,44 @@ const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({
   setAudioVolume,
   speechRate,
   setSpeechRate,
-  silenceThreshold,
-  setSilenceThreshold,
 }) => {
   const { t, i18n } = useTranslation();
   const [ready, setReady] = useState<boolean>(i18n.isInitialized);
 
-  // i18n初期化の完了を待つ
+  // i18n初期化の完了を待つ（イベント駆動）
   useEffect(() => {
-    if (!i18n.isInitialized) {
-      const checkInit = () => {
-        if (i18n.isInitialized) {
-          setReady(true);
-        } else {
-          setTimeout(checkInit, 50);
-        }
-      };
-      checkInit();
+    if (i18n.isInitialized) {
+      // 既に初期化済みの場合は初期値で対応済みなのでリスナーのみ登録
+      return;
     }
+    const handleInitialized = () => setReady(true);
+    i18n.on('initialized', handleInitialized);
+    return () => { i18n.off('initialized', handleInitialized); };
   }, [i18n]);
 
   // フォールバックテキスト（翻訳が読み込まれるまでの一時的なテキスト）
+  // ブラウザの言語設定に基づいてフォールバック言語を選択
   const getDefaultText = (key: string): string => {
-    const defaults: Record<string, string> = {
-      "conversation.audioSettings.title": "音声設定",
-      "conversation.audioSettings.outputOn": "音声出力 ON",
-      "conversation.audioSettings.outputOff": "音声出力 OFF",
-      "conversation.audioSettings.volume": `音量: ${audioVolume}%`,
-      "conversation.audioSettings.speechRate": `読み上げ速度: ${speechRate.toFixed(1)}x`,
-      "conversation.audioSettings.silenceThreshold": `無音検出時間: ${(silenceThreshold / 1000).toFixed(1)}秒`,
-      "conversation.audioSettings.npcResponseNote":
-        "※ NPCの応答が音声で再生されます",
-      "conversation.audioSettings.silenceNote":
-        "※ この時間無音が続くと自動送信されます",
+    const browserLang = navigator.language.startsWith('ja') ? 'ja' : 'en';
+    const defaults: Record<string, Record<string, string>> = {
+      ja: {
+        "conversation.audioSettings.title": "音声設定",
+        "conversation.audioSettings.outputOn": "音声出力 ON",
+        "conversation.audioSettings.outputOff": "音声出力 OFF",
+        "conversation.audioSettings.volume": `音量: ${audioVolume}%`,
+        "conversation.audioSettings.speechRate": `読み上げ速度: ${speechRate.toFixed(1)}x`,
+        "conversation.audioSettings.npcResponseNote": "※ NPCの応答が音声で再生されます",
+      },
+      en: {
+        "conversation.audioSettings.title": "Audio Settings",
+        "conversation.audioSettings.outputOn": "Audio Output ON",
+        "conversation.audioSettings.outputOff": "Audio Output OFF",
+        "conversation.audioSettings.volume": `Volume: ${audioVolume}%`,
+        "conversation.audioSettings.speechRate": `Speech Rate: ${speechRate.toFixed(1)}x`,
+        "conversation.audioSettings.npcResponseNote": "※ NPC responses will be played as audio",
+      },
     };
-    return defaults[key] || key;
+    return defaults[browserLang]?.[key] || key;
   };
 
   // 翻訳関数のラッパー - 初期化前はデフォルトテキストを返す
@@ -156,39 +157,6 @@ const AudioSettingsPanel: React.FC<AudioSettingsPanelProps> = ({
             </Box>
           </>
         )}
-
-        {/* 無音検出時間設定 - 音声出力ON/OFFに関係なく常に表示 */}
-        <Box mt={2}>
-          <Typography variant="body2" gutterBottom>
-            {translate("conversation.audioSettings.silenceThreshold", {
-              threshold: (silenceThreshold / 1000).toFixed(1),
-            })}
-          </Typography>
-          <Slider
-            value={silenceThreshold}
-            onChange={(_, value) => setSilenceThreshold(value as number)}
-            aria-labelledby="silence-threshold-slider"
-            step={100}
-            marks={[
-              { value: 500, label: "0.5秒" },
-              { value: 1000, label: "1.0秒" },
-              { value: 1500, label: "1.5秒" },
-              { value: 3000, label: "3.0秒" },
-              { value: 5000, label: "5.0秒" },
-            ]}
-            min={500}
-            max={5000}
-            valueLabelDisplay="auto"
-            valueLabelFormat={(value) => `${(value / 1000).toFixed(1)}秒`}
-          />
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "block", mt: 0.5 }}
-          >
-            {translate("conversation.audioSettings.silenceNote")}
-          </Typography>
-        </Box>
 
         <Typography
           variant="caption"

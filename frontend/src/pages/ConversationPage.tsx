@@ -61,7 +61,7 @@ const ConversationPage: React.FC = () => {
   const [prevMetrics, setPrevMetrics] = useState<Metrics | null>(null);
   const [userInput, setUserInput] = useState("");
   // 音声認識の確定済みテキストを保持
-  const [confirmedTranscripts, setConfirmedTranscripts] = useState<string[]>([]);
+  const [, setConfirmedTranscripts] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
   // セッション開始後、コンポーネントの再マウントを防止するためのRef
@@ -74,7 +74,6 @@ const ConversationPage: React.FC = () => {
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [audioVolume, setAudioVolume] = useState<number>(80);
   const [speechRate, setSpeechRate] = useState<number>(1.15);
-  const [silenceThreshold, setSilenceThreshold] = useState<number>(1500); // 無音検出時間（ミリ秒）
   const [isListening, setIsListening] = useState(false);
   const [continuousListening, setContinuousListening] = useState(false); // 常時マイク入力モード
   const [speechRecognitionError, setSpeechRecognitionError] = useState<
@@ -92,10 +91,28 @@ const ConversationPage: React.FC = () => {
   // ゴールの達成スコア（セッション終了時に使用）
   const [goalScore, setGoalScore] = useState<number>(0);
 
+  // isSpeaking/currentMetricsをrefで管理（sendMessageの依存配列から除外するため）
+  const isSpeakingRef = useRef(false);
+  const currentMetricsRef = useRef<Metrics>({ angerLevel: 0, trustLevel: 0, progressLevel: 0 });
+
+  // NPC応答遅延タイマーとフォールバックタイマーのref（クリーンアップ用）
+  const npcResponseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // userInputの変更をrefに同期
   useEffect(() => {
     userInputRef.current = userInput;
   }, [userInput]);
+
+  // isSpeakingの変更をrefに同期
+  useEffect(() => {
+    isSpeakingRef.current = isSpeaking;
+  }, [isSpeaking]);
+
+  // currentMetricsの変更をrefに同期
+  useEffect(() => {
+    currentMetricsRef.current = currentMetrics;
+  }, [currentMetrics]);
   // コンプライアンス違反の通知管理
   const [activeViolation, setActiveViolation] =
     useState<ComplianceViolation | null>(null);
@@ -136,6 +153,10 @@ const ConversationPage: React.FC = () => {
       if (transcribeServiceRef.current) {
         transcribeServiceRef.current.dispose();
       }
+
+      // NPC応答タイマーとフォールバックタイマーをクリア
+      if (npcResponseTimerRef.current) clearTimeout(npcResponseTimerRef.current);
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
 
       // 音声認識関連の状態もクリアする
       setConfirmedTranscripts([]);
@@ -244,10 +265,7 @@ const ConversationPage: React.FC = () => {
               initializeGoalStatuses(convertedScenario);
             setGoalStatuses(initialGoalStatuses);
 
-            // AudioServiceの初期設定
-            const audioSvc = AudioService.getInstance();
-            audioSvc.setAudioEnabled(audioEnabled);
-            audioSvc.setVolume(audioVolume / 100);
+            // AudioServiceの初期設定は別のuseEffectで管理
           } else {
             navigate("/scenarios");
           }
@@ -259,7 +277,7 @@ const ConversationPage: React.FC = () => {
     };
 
     fetchScenario();
-  }, [scenarioId, navigate, audioEnabled, audioVolume]);
+  }, [scenarioId, navigate]);
 
   // メトリクス更新の初期化
   useEffect(() => {
@@ -281,13 +299,6 @@ const ConversationPage: React.FC = () => {
     const pollySvc = PollyService.getInstance();
     pollySvc.setSpeechRate(speechRate);
   }, [speechRate]);
-
-  // 無音検出時間変更時の処理
-  useEffect(() => {
-    if (transcribeServiceRef.current) {
-      transcribeServiceRef.current.setSilenceThreshold(silenceThreshold);
-    }
-  }, [silenceThreshold]);
 
   // シナリオ言語に応じたUI言語の設定
   useEffect(() => {
@@ -453,9 +464,16 @@ const ConversationPage: React.FC = () => {
 
   // メッセージ送信
   const sendMessage = useCallback(async (inputText?: string) => {
-    // 引数で渡されたテキストまたは現在のuserInputを使用
-    const messageText = inputText || userInput.trim();
+    // 引数で渡されたテキストまたは現在のuserInputを使用（ref経由で最新値を取得）
+    const messageText = inputText || userInputRef.current.trim();
     if (!messageText || !scenario || isProcessing) return;
+
+    // 音声認識中なら停止する（送信時にマイクを自動OFF）
+    if (transcribeServiceRef.current && transcribeServiceRef.current.isListening()) {
+      transcribeServiceRef.current.stopListening();
+      setIsListening(false);
+      setContinuousListening(false);
+    }
 
     // 入力フィールドを無効化（API処理中）
     setIsProcessing(true);
@@ -487,14 +505,14 @@ const ConversationPage: React.FC = () => {
     // ユーザーが入力している間は中立的な状態にする
     setCurrentEmotion("neutral");
 
-    // NPCの応答を生成
-    setTimeout(
+    // NPCの応答を生成（タイマーIDをrefで管理してクリーンアップ可能にする）
+    npcResponseTimerRef.current = setTimeout(
       async () => {
         console.log("=== ConversationPage: NPC応答生成開始 ===");
         // 安全なプリミティブ型に変換して循環参照を避ける
         const cleanMessageText = messageText ? String(messageText) : "";
         console.log("userInput:", cleanMessageText);
-        console.log("currentMetrics:", currentMetrics);
+        console.log("currentMetrics:", currentMetricsRef.current);
         console.log("scenario.npc:", scenario.npc);
 
         try {
@@ -504,11 +522,11 @@ const ConversationPage: React.FC = () => {
           // フロントエンドで生成されたセッションIDを使用
           const currentSessionId = sessionId;
 
-          // 純粋なオブジェクトを作成してAPI呼び出し
+          // 純粋なオブジェクトを作成してAPI呼び出し（ref経由で最新のメトリクスを取得）
           const cleanMetrics = {
-            angerLevel: Number(currentMetrics.angerLevel) || 1,
-            trustLevel: Number(currentMetrics.trustLevel) || 1,
-            progressLevel: Number(currentMetrics.progressLevel) || 1,
+            angerLevel: Number(currentMetricsRef.current.angerLevel) || 1,
+            trustLevel: Number(currentMetricsRef.current.trustLevel) || 1,
+            progressLevel: Number(currentMetricsRef.current.progressLevel) || 1,
           };
 
           // messagesRef経由で確実に最新のメッセージ履歴を取得（バグ修正）
@@ -554,8 +572,8 @@ const ConversationPage: React.FC = () => {
           // フロントエンドで生成されたセッションIDを使用
           const activeSessionId = sessionId;
 
-          // メトリクスは現在の値を維持
-          const newMetrics = { ...currentMetrics };
+          // メトリクスは現在の値を維持（ref経由で最新値を取得）
+          const newMetrics = { ...currentMetricsRef.current };
 
           console.log("=== API応答受信 ===");
           console.log("response:", response);
@@ -659,11 +677,11 @@ const ConversationPage: React.FC = () => {
                 cleanGoals,
                 String(scenario.id), // 安全な文字列に変換
                 String(scenario.language || "ja"), // 安全な文字列に変換
-                // 現在のスコアを渡す（エージェントが差分を計算するため）
+                // 現在のスコアを渡す（エージェントが差分を計算するため）（ref経由で最新値を取得）
                 {
-                  angerLevel: currentMetrics.angerLevel,
-                  trustLevel: currentMetrics.trustLevel,
-                  progressLevel: currentMetrics.progressLevel,
+                  angerLevel: currentMetricsRef.current.angerLevel,
+                  trustLevel: currentMetricsRef.current.trustLevel,
+                  progressLevel: currentMetricsRef.current.progressLevel,
                 },
               );
 
@@ -695,8 +713,8 @@ const ConversationPage: React.FC = () => {
               }
 
               if (evaluationResult) {
-                // 前回のメトリクスを保存
-                setPrevMetrics(currentMetrics);
+                // 前回のメトリクスを保存（ref経由で最新値を取得）
+                setPrevMetrics(currentMetricsRef.current);
 
                 // 新しいメトリクスを設定
                 setCurrentMetrics((prevMetrics) => ({
@@ -731,16 +749,13 @@ const ConversationPage: React.FC = () => {
           }
 
           // 音声再生完了イベントが発火しない場合のフォールバック
-          // 音声が無限に再生され続けることを防止
-          const fallbackTimerId = setTimeout(() => {
-            if (isSpeaking) {
+          // 音声が無限に再生され続けることを防止（ref経由で最新値を取得）
+          fallbackTimerRef.current = setTimeout(() => {
+            if (isSpeakingRef.current) {
               console.warn("音声再生完了イベントが検出されませんでした。フォールバックタイマーにより話している状態をリセットします。");
               setIsSpeaking(false);
             }
           }, 30000); // 長めのタイムアウト - 通常は音声再生が完了するはず
-
-          // クリーンアップ関数
-          return () => clearTimeout(fallbackTimerId);
 
         } catch (error) {
           console.error("=== ConversationPage: API呼び出しエラー ===");
@@ -749,12 +764,11 @@ const ConversationPage: React.FC = () => {
           // エラー時はセッションを終了
           setIsProcessing(false);
           console.error("API呼び出しエラーのため、セッションを終了します");
-          throw error; // エラーを再スロー
         }
       },
       1000 + Math.random() * 1000,
     ); // 1-2秒の遅延でリアル感を演出
-  }, [userInput, scenario, isProcessing, currentMetrics, sessionId, audioEnabled, isSpeaking, goalStatuses, goals]);
+  }, [scenario, isProcessing, sessionId, audioEnabled, goalStatuses, goals]);
 
   /**
    * セッション終了処理
@@ -899,8 +913,6 @@ const ConversationPage: React.FC = () => {
       goalStatuses,
       navigate,
       scenario,
-      setGoalScore,
-      setSessionEnded,
       goalScore,
       sessionId,
       i18n.language,
@@ -999,38 +1011,27 @@ const ConversationPage: React.FC = () => {
             if (!currentPartial) return;
 
             // 確定済みテキストと途中認識を組み合わせて表示
-            const combinedText = confirmedTranscripts.length > 0
-              ? confirmedTranscripts.join("\n") + "\n" + currentPartial
-              : currentPartial;
+            // state updater関数を使ってクロージャ問題を回避
+            setConfirmedTranscripts((prevConfirmed) => {
+              const combinedText = prevConfirmed.length > 0
+                ? prevConfirmed.join("\n") + "\n" + currentPartial
+                : currentPartial;
 
-            setUserInput(combinedText);
-            userInputRef.current = combinedText;
+              setUserInput(combinedText);
+              userInputRef.current = combinedText;
+              return prevConfirmed; // 途中認識では確定リストは変更しない
+            });
           }
         },
-        // 無音検出コールバック（引数化されたsendMessage関数を使用）
+        // 無音検出コールバック（マイクを自動停止し、テキストを確定する。送信はユーザーが手動で行う）
         () => {
-          console.log(`🔇 無音検出コールバック実行: userInputRef="${userInputRef.current}"`);
-          if (userInputRef.current.trim()) {
-            console.log(`📤 無音検出による自動送信実行 - 現在のメッセージ数: ${messagesRef.current.length}`);
-
-            // 現在の入力値を一時変数に保存
-            const currentInput = userInputRef.current.trim();
-
-            // メッセージ送信前に音声入力を一時停止（履歴問題を防止）
-            const recognitionActive = transcribeServiceRef.current && transcribeServiceRef.current.isListening();
-
-            // 音声認識を一時停止（停止はしないが、テキスト更新を防止）
-            if (recognitionActive) {
-              console.log('音声認識を一時停止（テキスト更新を防止）');
-            }
-
-            // 引数付きでsendMessage関数を呼び出し（完全な送信処理を実行）
-            sendMessage(currentInput);
-
-            console.log(`📤 メッセージ送信後 - 現在のメッセージ数: ${messagesRef.current.length}`);
-          } else {
-            console.log(`⚠️ 無音検出: userInputが空のため送信をスキップ`);
+          console.log(`🔇 無音検出: マイクを自動停止`);
+          // マイクを停止（Transcribeセッションのタイムアウトを防止）
+          if (transcribeServiceRef.current && transcribeServiceRef.current.isListening()) {
+            transcribeServiceRef.current.stopListening();
           }
+          setIsListening(false);
+          setContinuousListening(false);
         },
         // エラーコールバック
         (error) => {
@@ -1049,7 +1050,7 @@ const ConversationPage: React.FC = () => {
       setSpeechRecognitionError("not-supported");
       setIsListening(false);
     }
-  }, [isListening, sessionId, sendMessage, confirmedTranscripts, normalizeTranscriptText, scenario?.language]);
+  }, [isListening, sessionId, sendMessage, normalizeTranscriptText, scenario?.language]);
 
   // 音声認識を停止し、テキスト入力モードに切り替え
   const switchToTextInput = useCallback(() => {
@@ -1064,13 +1065,16 @@ const ConversationPage: React.FC = () => {
 
     // 部分認識をクリア（確定済みテキストは保持）
 
-    // ユーザー入力を確定済みテキストのみに更新
-    if (confirmedTranscripts.length > 0) {
-      const confirmedText = confirmedTranscripts.join("\n");
-      setUserInput(confirmedText);
-      userInputRef.current = confirmedText;
-    }
-  }, [confirmedTranscripts]);
+    // ユーザー入力を確定済みテキストのみに更新（state updaterパターンで統一）
+    setConfirmedTranscripts((prevConfirmed) => {
+      if (prevConfirmed.length > 0) {
+        const confirmedText = prevConfirmed.join("\n");
+        setUserInput(confirmedText);
+        userInputRef.current = confirmedText;
+      }
+      return prevConfirmed;
+    });
+  }, []);
 
   // 感情状態変化のハンドラー
   const handleEmotionChange = useCallback((emotion: EmotionState) => {
@@ -1249,8 +1253,6 @@ const ConversationPage: React.FC = () => {
             setAudioVolume={setAudioVolume}
             speechRate={speechRate}
             setSpeechRate={setSpeechRate}
-            silenceThreshold={silenceThreshold}
-            setSilenceThreshold={setSilenceThreshold}
             currentMetrics={currentMetrics}
             prevMetrics={prevMetrics}
             metricsUpdating={metricsUpdating}

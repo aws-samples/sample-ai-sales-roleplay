@@ -19,12 +19,30 @@ const ddbClient = new DynamoDBClient({ region: REGION });
 const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 
 // TranscribeStreamingクライアントの初期化
-const transcribeClient = new TranscribeStreamingClient({ 
+const transcribeClient = new TranscribeStreamingClient({
   region: REGION
 });
 
+// Transcribeセッションの型定義
+interface TranscribeSession {
+  audioInput: {
+    write: (audioData: Buffer) => boolean;
+  };
+  abort: () => void;
+}
+
 // 接続中のセッションを保持するマップ
-const activeTranscribeSessions = new Map<string, any>();
+const activeTranscribeSessions = new Map<string, TranscribeSession>();
+const MAX_TRANSCRIBE_SESSIONS = 100; // セッション数の上限
+
+// セッション作成中の競合防止用Set
+const pendingSessions = new Set<string>();
+
+// 許可される言語コードのホワイトリスト
+const ALLOWED_LANGUAGES = ['ja', 'en'];
+
+// 音声データの最大サイズ（Base64文字列長: 64KB相当）
+const MAX_AUDIO_SIZE = 64 * 1024;
 
 // ApiGatewayManagementApiClientをキャッシュ (パフォーマンス向上・DNS解決負荷軽減)
 const apiClientCache = new Map<string, ApiGatewayManagementApiClient>();
@@ -34,7 +52,7 @@ const apiClientCache = new Map<string, ApiGatewayManagementApiClient>();
  */
 function getApiClient(domainName: string, stage: string): ApiGatewayManagementApiClient {
   const endpoint = `https://${domainName}/${stage}`;
-  
+
   if (!apiClientCache.has(endpoint)) {
     console.log(`新しいAPI Gatewayクライアントを作成: ${endpoint}`);
     apiClientCache.set(endpoint, new ApiGatewayManagementApiClient({
@@ -44,7 +62,7 @@ function getApiClient(domainName: string, stage: string): ApiGatewayManagementAp
   } else {
     console.log(`キャッシュ済みAPI Gatewayクライアントを使用: ${endpoint}`);
   }
-  
+
   return apiClientCache.get(endpoint)!;
 }
 
@@ -56,7 +74,7 @@ function mapLanguageCodeToTranscribe(scenarioLanguage: string): string {
     'en': 'en-US',
     'ja': 'ja-JP'
   };
-  
+
   return languageMapping[scenarioLanguage] || 'ja-JP'; // デフォルトは日本語
 }
 
@@ -83,24 +101,24 @@ export const connectHandler = async (event: APIGatewayProxyEvent): Promise<APIGa
     sourceIp: event.requestContext.identity?.sourceIp,
     userAgent: event.requestContext.identity?.userAgent
   });
-  
+
   try {
     const connectionId = event.requestContext.connectionId;
     const queryParams = event.queryStringParameters || {};
     const sessionId = queryParams.session || 'unknown';
     const token = queryParams.token;
-    
+
     if (!connectionId) {
       console.error('Connection ID missing');
-      return { 
-        statusCode: 400, 
-        body: JSON.stringify({ 
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
           error: 'Connection ID missing',
           code: 'MISSING_CONNECTION_ID'
         })
       };
     }
-    
+
     if (!token) {
       console.error('認証トークンがありません');
       return {
@@ -111,7 +129,7 @@ export const connectHandler = async (event: APIGatewayProxyEvent): Promise<APIGa
         })
       };
     }
-    
+
     // JWT トークンを検証
     let decodedToken: any;
     try {
@@ -131,35 +149,35 @@ export const connectHandler = async (event: APIGatewayProxyEvent): Promise<APIGa
         })
       };
     }
-    
+
     // 認証されたユーザー情報を取得
     const userId = decodedToken.sub || 'unknown';
     const email = decodedToken.email || '';
     const username = decodedToken['cognito:username'] || decodedToken.email || '';
-    
+
     console.log('認証されたユーザー接続:', {
       connectionId,
-      userId,
-      email,
-      username,
+      userId: userId?.substring(0, 8) + '...',
+      hasEmail: !!email,
+      hasUsername: !!username,
       sessionId
     });
-    
-    // 接続情報をDynamoDBに保存（認証済みユーザー情報を含む）
+
+    // 接続情報をDynamoDBに保存（PIIとトークンを除外）
+    const sanitizedQueryParams = { ...event.queryStringParameters };
+    delete sanitizedQueryParams?.token; // JWTトークンをDynamoDBに保存しない
+
     await ddbDocClient.send(new PutCommand({
       TableName: TABLE_NAME,
       Item: {
         connectionId,
         sessionId,
         userId,
-        email,
-        username,
         ttl: Math.floor(Date.now() / 1000) + 3600, // 1時間後に自動削除
         createdAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         connectionInfo: {
-          headers: event.headers || {},
-          queryParams: event.queryStringParameters || {},
+          queryParams: sanitizedQueryParams || {},
           requestContext: {
             domainName: event.requestContext.domainName,
             stage: event.requestContext.stage,
@@ -167,19 +185,17 @@ export const connectHandler = async (event: APIGatewayProxyEvent): Promise<APIGa
           },
           authInfo: {
             userId,
-            email,
-            username,
             tokenVerified: true,
             verificationTime: new Date().toISOString()
           }
         }
       }
     }));
-    
+
     console.log('WebSocket接続確立完了:', { connectionId, userId });
-    
-    return { 
-      statusCode: 200, 
+
+    return {
+      statusCode: 200,
       body: JSON.stringify({
         message: 'Connected successfully',
         connectionId,
@@ -193,8 +209,8 @@ export const connectHandler = async (event: APIGatewayProxyEvent): Promise<APIGa
     };
   } catch (error: any) {
     console.error('接続エラー:', error);
-    return { 
-      statusCode: 500, 
+    return {
+      statusCode: 500,
       body: JSON.stringify({
         error: 'Connection failed',
         code: 'CONNECTION_ERROR',
@@ -210,13 +226,13 @@ export const connectHandler = async (event: APIGatewayProxyEvent): Promise<APIGa
  */
 export const disconnectHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   console.log('WebSocket切断:', event);
-  
+
   try {
     const connectionId = event.requestContext.connectionId;
     if (!connectionId) {
       return { statusCode: 400, body: 'Connection ID missing' };
     }
-    
+
     // Transcribeセッションがあれば終了
     if (activeTranscribeSessions.has(connectionId)) {
       const transcribeSession = activeTranscribeSessions.get(connectionId);
@@ -229,13 +245,13 @@ export const disconnectHandler = async (event: APIGatewayProxyEvent): Promise<AP
       }
       activeTranscribeSessions.delete(connectionId);
     }
-    
+
     // 接続情報をDynamoDBから削除
     await ddbDocClient.send(new DeleteCommand({
       TableName: TABLE_NAME,
       Key: { connectionId }
     }));
-    
+
     return { statusCode: 200, body: 'Disconnected' };
   } catch (error) {
     console.error('切断エラー:', error);
@@ -249,26 +265,33 @@ export const disconnectHandler = async (event: APIGatewayProxyEvent): Promise<AP
  */
 export const defaultHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   console.log('メッセージ受信:', event.body ? event.body.substring(0, 100) + '...' : 'No body');
-  
+
   const connectionId = event.requestContext.connectionId;
   if (!connectionId) {
     return { statusCode: 400, body: 'Connection ID missing' };
   }
-  
+
   try {
     const body = JSON.parse(event.body || '{}');
     const action = body.action;
-    
+
     // 音声データ送信アクション
     if (action === 'sendAudio' && body.audio) {
+      // 音声データのサイズ検証
+      if (typeof body.audio !== 'string' || body.audio.length > MAX_AUDIO_SIZE) {
+        console.warn(`不正な音声データサイズ: ${typeof body.audio === 'string' ? body.audio.length : 'non-string'}`);
+        return { statusCode: 400, body: 'Audio data too large or invalid' };
+      }
+
       const domainName = event.requestContext.domainName || '';
       const stage = event.requestContext.stage || '';
-      const language = body.language || 'ja'; // WebSocketメッセージから言語情報を取得
+      // 言語パラメータのホワイトリスト検証
+      const language = ALLOWED_LANGUAGES.includes(body.language) ? body.language : 'ja';
       console.log(`音声データ受信 - connectionId: ${connectionId}, language: ${language}`);
       await processAudioData(connectionId, body.audio, domainName, stage, language);
       return { statusCode: 200, body: 'Audio data received' };
     }
-    
+
     return { statusCode: 400, body: 'Invalid action' };
   } catch (error) {
     console.error('メッセージ処理エラー:', error);
@@ -288,37 +311,42 @@ async function processAudioData(
 ): Promise<void> {
   // キャッシュされたAPIクライアントを取得
   const apiClient = getApiClient(domainName, stage);
-  
+
   try {
     // Base64音声データをデコード
     const audioBuffer = Buffer.from(base64Audio, 'base64');
-    
+
     // TranscribeStreamingセッションが存在しなければ作成
     if (!activeTranscribeSessions.has(connectionId)) {
+      // セッション作成中の競合防止
+      if (pendingSessions.has(connectionId)) {
+        console.log(`セッション作成中のため待機: ${connectionId}`);
+        return;
+      }
       console.log(`新しいTranscribeセッションを音声データ受信時に開始: ${connectionId}, language: ${language}`);
       await startTranscribeSession(connectionId, domainName, stage, language);
       // セッションの初期化には少し時間がかかるため、短い待機を挿入
       await new Promise(resolve => setTimeout(resolve, 200));
     }
-    
+
     // 既存のTranscribeストリーミングセッションに音声データを送信
     const session = activeTranscribeSessions.get(connectionId);
     if (session && session.audioInput) {
       // 音声データをTranscribeに送信
       session.audioInput.write(audioBuffer);
-      
+
       // 音声アクティビティを通知
       await sendToClient(apiClient, connectionId, {
         voiceActivity: true
       });
-      
+
       console.log(`音声データ送信完了: ${connectionId}, データサイズ: ${audioBuffer.length}`);
     } else {
       console.warn(`有効なTranscribeセッションが見つかりません: ${connectionId}`);
       // セッションがない場合は再作成を試みる
       await startTranscribeSession(connectionId, domainName, stage, language);
     }
-    
+
   } catch (error) {
     console.error('音声処理エラー:', error);
     try {
@@ -351,18 +379,32 @@ function mapLanguageToTranscribeCode(language: string): string {
 async function startTranscribeSession(connectionId: string, domainName: string, stage: string, language: string = 'ja'): Promise<void> {
   // キャッシュされたAPIクライアントを取得
   const apiClient = getApiClient(domainName, stage);
-  
+
+  // セッション作成中フラグを設定（競合防止）
+  pendingSessions.add(connectionId);
+
+  // セッション数の上限チェック
+  if (activeTranscribeSessions.size >= MAX_TRANSCRIBE_SESSIONS) {
+    const oldestKey = activeTranscribeSessions.keys().next().value;
+    if (oldestKey) {
+      const oldSession = activeTranscribeSessions.get(oldestKey);
+      if (oldSession?.abort) oldSession.abort();
+      activeTranscribeSessions.delete(oldestKey);
+      console.warn(`セッション上限到達: 古いセッション ${oldestKey} を強制終了`);
+    }
+  }
+
   // WebSocketメッセージから受け取った言語情報を使用
   const languageCode = mapLanguageToTranscribeCode(language);
   console.log(`接続 ${connectionId} の言語設定: ${language} -> ${languageCode}`);
-  
+
   // AbortControllerを作成
   const abortController = new AbortController();
-  
+
   try {
     // 音声データキューの管理
     const audioQueue: Buffer[] = [];
-    
+
     // 簡素化されたオーディオストリーム
     const audioStream = async function* () {
       while (!abortController.signal.aborted) {
@@ -373,11 +415,11 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
             yield { AudioEvent: { AudioChunk: chunk } };
           }
         }
-        // 短い待機（CPUを解放）
-        await new Promise(resolve => setTimeout(resolve, 10));
+        // 短い待機（CPUを解放 - データがない場合はより長い間隔で待機）
+        await new Promise(resolve => setTimeout(resolve, audioQueue.length > 0 ? 10 : 50));
       }
     };
-    
+
     // Transcribeストリーミング設定
     const command = new StartStreamTranscriptionCommand({
       LanguageCode: languageCode as LanguageCode,
@@ -385,7 +427,7 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
       MediaSampleRateHertz: 16000,
       AudioStream: audioStream()
     });
-    
+
     // 音声データをキューに追加するための関数
     const audioInput = {
       write: (audioData: Buffer) => {
@@ -396,7 +438,7 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
         return false;
       }
     };
-    
+
     // Transcribeセッションをマップに保存
     const transcribeSession = {
       audioInput,
@@ -408,15 +450,15 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
         }
       }
     };
-    
+
     activeTranscribeSessions.set(connectionId, transcribeSession);
-    
+
     // Transcribeセッションを開始
     try {
       const response = await transcribeClient.send(command, {
         abortSignal: abortController.signal
       });
-      
+
       // 応答処理をセットアップ
       if (response.TranscriptResultStream) {
         // AsyncIterableを処理
@@ -427,13 +469,13 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
                 for (const result of event.TranscriptEvent.Transcript.Results) {
                   const transcript = result.Alternatives?.[0]?.Transcript || '';
                   const isPartial = result.IsPartial === true;  // AWS Transcribe APIの標準に準拠
-                  
+
                   if (transcript.trim()) {
                     await sendToClient(apiClient, connectionId, {
                       transcript,
                       isPartial  // true=途中認識、false=最終確定
                     });
-                    
+
                     // 音声アクティビティの検出
                     await sendToClient(apiClient, connectionId, {
                       voiceActivity: true
@@ -444,6 +486,8 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
             }
           } catch (streamError) {
             console.error('Transcribeストリーミングエラー:', streamError);
+            // 死んだセッションをMapから削除して、次の音声データで新規セッションが作られるようにする
+            activeTranscribeSessions.delete(connectionId);
             try {
               await sendToClient(apiClient, connectionId, {
                 error: {
@@ -459,6 +503,7 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
       }
     } catch (error) {
       console.error('Transcribeセッションエラー:', error);
+      activeTranscribeSessions.delete(connectionId);
       try {
         await sendToClient(apiClient, connectionId, {
           error: {
@@ -470,7 +515,7 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
         console.error('エラー通知送信失敗:', e);
       }
     }
-    
+
     console.log(`Transcribeセッション開始: ${connectionId}`);
   } catch (error) {
     console.error('Transcribeセッション開始エラー:', error);
@@ -480,54 +525,60 @@ async function startTranscribeSession(connectionId: string, domainName: string, 
         message: 'Failed to initialize transcription service'
       }
     });
+  } finally {
+    // セッション作成中フラグを解除
+    pendingSessions.delete(connectionId);
   }
 }
 
 /**
+ * Cognito JWT ペイロードの型定義
+ */
+interface CognitoJwtPayload {
+  sub: string;
+  email?: string;
+  'cognito:username'?: string;
+  token_use: 'id' | 'access';
+  iss: string;
+  aud: string;
+  exp: number;
+  iat: number;
+}
+
+// jwks-rsaクライアントをモジュールスコープでキャッシュ（パフォーマンス向上）
+const jwksClientInstance = jwksClient({
+  jwksUri: `https://cognito-idp.${REGION}.amazonaws.com/${USER_POOL_ID}/.well-known/jwks.json`,
+  cache: true,
+  cacheMaxAge: 600000,
+  cacheMaxEntries: 5
+});
+
+/**
  * Cognito JWT トークン検証関数
  */
-async function verifyToken(token: string): Promise<any> {
+async function verifyToken(token: string): Promise<CognitoJwtPayload> {
   console.log('JWT検証開始: verifyToken関数');
-  
+
   try {
-    // JWKSエンドポイントからキーを取得
-    const url = `https://cognito-idp.${REGION}.amazonaws.com/${USER_POOL_ID}/.well-known/jwks.json`;
-    const response = await fetch(url);
-    const jwks = await response.json() as { keys: any[] };
-    const keys = jwks.keys;
-    
     // JWTヘッダーからkidを取得
     const header = jwt.decode(token, { complete: true })?.header;
     if (!header || !header.kid) {
       throw new Error('Invalid token format');
     }
-    
-    // 対応するキーを検索
-    const key = keys.find((k: any) => k.kid === header.kid);
-    if (!key) {
-      throw new Error('Key not found');
-    }
-    
-    // JWTを検証
-    const client = jwksClient({
-      jwksUri: url,
-      cache: true,
-      cacheMaxAge: 600000,
-      cacheMaxEntries: 5
-    });
-    
-    const signingKey = await client.getSigningKey(header.kid!);
+
+    // キャッシュ済みjwksClientからキーを取得
+    const signingKey = await jwksClientInstance.getSigningKey(header.kid);
     const publicKey = signingKey.getPublicKey();
-    
+
     const decoded = jwt.verify(token, publicKey, {
       issuer: `https://cognito-idp.${REGION}.amazonaws.com/${USER_POOL_ID}`,
       audience: USER_POOL_CLIENT_ID,
       algorithms: ['RS256']
     });
-    
+
     console.log('JWT検証成功');
-    return decoded;
-    
+    return decoded as CognitoJwtPayload;
+
   } catch (error: any) {
     console.error('JWT検証エラー:', error);
     throw new Error(`JWT verification failed: ${error.message}`);

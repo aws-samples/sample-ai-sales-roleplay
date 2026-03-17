@@ -131,9 +131,7 @@
       "outputOff": "Audio Output OFF",
       "volume": "Volume: {{volume}}%",
       "speechRate": "Speech Rate: {{rate}}x",
-      "silenceThreshold": "Silence Detection: {{threshold}}s",
-      "npcResponseNote": "※ NPC responses will be played as audio",
-      "silenceNote": "※ Auto-send after this duration of silence"
+      "npcResponseNote": "※ NPC responses will be played as audio"
     },
     "npcRole": "{{role}}",
     "endConversation": "End Conversation",

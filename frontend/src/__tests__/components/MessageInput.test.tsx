@@ -116,18 +116,35 @@ describe("MessageInput", () => {
   });
 
   test("リスニング中は入力フィールドが無効化される", () => {
-    render(<MessageInput {...defaultProps} isListening={true} />);
+    render(<MessageInput {...defaultProps} isListening={true} userInput="テスト音声入力" />);
 
     const textField =
       screen.getByPlaceholderText("メッセージを入力してください...");
     expect(textField).toBeDisabled();
 
+    // リスニング中でもテキストがあれば送信ボタンは有効（ユーザーが手動で送信可能）
     const sendButton = screen.getByRole("button", { name: "メッセージを送信" });
-    expect(sendButton).toBeDisabled();
+    expect(sendButton).toBeEnabled();
 
     // isListening=trueの時、ボタンのラベルは「音声入力を停止」になり、停止ボタンとして有効
     const micButton = screen.getByRole("button", { name: "音声入力を停止" });
     expect(micButton).toBeEnabled();
+  });
+
+  test("リスニング中でもテキストがあれば送信ボタンをクリックできる", () => {
+    render(<MessageInput {...defaultProps} isListening={true} userInput="テスト音声入力" />);
+
+    const sendButton = screen.getByRole("button", { name: "メッセージを送信" });
+    expect(sendButton).toBeEnabled();
+    fireEvent.click(sendButton);
+    expect(defaultProps.sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  test("リスニング中でもテキストが空なら送信ボタンは無効", () => {
+    render(<MessageInput {...defaultProps} isListening={true} userInput="" />);
+
+    const sendButton = screen.getByRole("button", { name: "メッセージを送信" });
+    expect(sendButton).toBeDisabled();
   });
 
   test("キーボードイベント（Enter）が適切に処理される", () => {
