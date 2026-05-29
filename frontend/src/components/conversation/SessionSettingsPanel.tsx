@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import {
   Card,
   CardContent,
@@ -13,6 +13,8 @@ import {
   VolumeOff as VolumeOffIcon,
   Person as PersonIcon,
   PersonOff as PersonOffIcon,
+  Videocam as VideocamIcon,
+  VideocamOff as VideocamOffIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 
@@ -27,6 +29,11 @@ interface SessionSettingsPanelProps {
   avatarVisible?: boolean;
   setAvatarVisible?: (visible: boolean) => void;
   avatarEnabled?: boolean;
+  // ビデオ録画トグル（商談開始前のみ変更可能）
+  videoRecordingEnabled?: boolean;
+  setVideoRecordingEnabled?: (enabled: boolean) => void;
+  // 録画設定の変更可否（商談開始後はロック）
+  recordingSettingLocked?: boolean;
 }
 
 /**
@@ -43,64 +50,63 @@ const SessionSettingsPanel: React.FC<SessionSettingsPanelProps> = ({
   avatarVisible,
   setAvatarVisible,
   avatarEnabled,
+  videoRecordingEnabled,
+  setVideoRecordingEnabled,
+  recordingSettingLocked = false,
 }) => {
-  const { t, i18n } = useTranslation();
-  const [ready, setReady] = useState<boolean>(i18n.isInitialized);
-
-  // i18n初期化の完了を待つ（イベント駆動）
-  useEffect(() => {
-    if (i18n.isInitialized) {
-      // 既に初期化済みの場合は初期値で対応済みなのでリスナーのみ登録
-      return;
-    }
-    const handleInitialized = () => setReady(true);
-    i18n.on('initialized', handleInitialized);
-    return () => { i18n.off('initialized', handleInitialized); };
-  }, [i18n]);
-
-  // フォールバックテキスト（翻訳が読み込まれるまでの一時的なテキスト）
-  // ブラウザの言語設定に基づいてフォールバック言語を選択
-  const getDefaultText = (key: string): string => {
-    const browserLang = navigator.language.startsWith('ja') ? 'ja' : 'en';
-    const defaults: Record<string, Record<string, string>> = {
-      ja: {
-        "conversation.audioSettings.title": "音声設定",
-        "conversation.audioSettings.outputOn": "音声出力 ON",
-        "conversation.audioSettings.outputOff": "音声出力 OFF",
-        "conversation.audioSettings.volume": `音量: ${audioVolume}%`,
-        "conversation.audioSettings.speechRate": `読み上げ速度: ${speechRate.toFixed(1)}x`,
-        "conversation.audioSettings.npcResponseNote": "※ NPCの応答が音声で再生されます",
-        "conversation.settings.title": "設定",
-        "conversation.settings.avatarOn": "3Dアバター表示 ON",
-        "conversation.settings.avatarOff": "3Dアバター表示 OFF",
-      },
-      en: {
-        "conversation.audioSettings.title": "Audio Settings",
-        "conversation.audioSettings.outputOn": "Audio Output ON",
-        "conversation.audioSettings.outputOff": "Audio Output OFF",
-        "conversation.audioSettings.volume": `Volume: ${audioVolume}%`,
-        "conversation.audioSettings.speechRate": `Speech Rate: ${speechRate.toFixed(1)}x`,
-        "conversation.audioSettings.npcResponseNote": "※ NPC responses will be played as audio",
-        "conversation.settings.title": "Settings",
-        "conversation.settings.avatarOn": "3D Avatar ON",
-        "conversation.settings.avatarOff": "3D Avatar OFF",
-      },
-    };
-    return defaults[browserLang]?.[key] || key;
-  };
-
-  // 翻訳関数のラッパー - 初期化前はデフォルトテキストを返す
-  const translate = (
-    key: string,
-    options?: Record<string, unknown>,
-  ): string => {
-    if (!ready) return getDefaultText(key);
-    return t(key, options);
-  };
+  // i18nリソースは静的にバンドルされ initImmediate:false で同期初期化されるため、
+  // 初回レンダリング時点で t() は正しい翻訳を返す。フォールバック機構は不要であり、
+  // 翻訳テキストは ja.json / en.json を単一の真実の源とする（二重管理を排除）。
+  const { t } = useTranslation();
 
   return (
     <Card sx={{ mb: 2 }}>
       <CardContent>
+        {/* ビデオ録画トグル（商談開始前のみ変更可能） */}
+        {setVideoRecordingEnabled && (
+          <Box sx={{ mb: 2 }} data-testid="video-recording-setting">
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={videoRecordingEnabled ?? true}
+                  onChange={(e) => setVideoRecordingEnabled(e.target.checked)}
+                  color="primary"
+                  disabled={recordingSettingLocked}
+                  inputProps={{
+                    // アクセシブル名（ON/OFF・日英対応）。テストもこの名前で要素を特定する
+                    "aria-label": videoRecordingEnabled ?? true
+                      ? t("conversation.settings.recordingOn")
+                      : t("conversation.settings.recordingOff"),
+                  }}
+                />
+              }
+              label={
+                <Box display="flex" alignItems="center">
+                  {videoRecordingEnabled ?? true ? (
+                    <VideocamIcon fontSize="small" sx={{ mr: 1 }} />
+                  ) : (
+                    <VideocamOffIcon fontSize="small" sx={{ mr: 1 }} />
+                  )}
+                  <Typography variant="body2">
+                    {videoRecordingEnabled ?? true
+                      ? t("conversation.settings.recordingOn")
+                      : t("conversation.settings.recordingOff")}
+                  </Typography>
+                </Box>
+              }
+            />
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", ml: 0.5 }}
+            >
+              {recordingSettingLocked
+                ? t("conversation.settings.recordingLockedNote")
+                : t("conversation.settings.recordingNote")}
+            </Typography>
+          </Box>
+        )}
+
         {/* アバター表示トグル（シナリオでアバターが有効な場合のみ表示） */}
         {avatarEnabled && setAvatarVisible && (
           <Box sx={{ mb: 2 }}>
@@ -121,8 +127,8 @@ const SessionSettingsPanel: React.FC<SessionSettingsPanelProps> = ({
                   )}
                   <Typography variant="body2">
                     {avatarVisible
-                      ? translate("conversation.settings.avatarOn")
-                      : translate("conversation.settings.avatarOff")}
+                      ? t("conversation.settings.avatarOn")
+                      : t("conversation.settings.avatarOff")}
                   </Typography>
                 </Box>
               }
@@ -148,8 +154,8 @@ const SessionSettingsPanel: React.FC<SessionSettingsPanelProps> = ({
               )}
               <Typography variant="body2">
                 {audioEnabled
-                  ? translate("conversation.audioSettings.outputOn")
-                  : translate("conversation.audioSettings.outputOff")}
+                  ? t("conversation.audioSettings.outputOn")
+                  : t("conversation.audioSettings.outputOff")}
               </Typography>
             </Box>
           }
@@ -159,7 +165,7 @@ const SessionSettingsPanel: React.FC<SessionSettingsPanelProps> = ({
           <>
             <Box mt={2}>
               <Typography variant="body2" gutterBottom>
-                {translate("conversation.audioSettings.volume", {
+                {t("conversation.audioSettings.volume", {
                   volume: audioVolume,
                 })}
               </Typography>
@@ -176,7 +182,7 @@ const SessionSettingsPanel: React.FC<SessionSettingsPanelProps> = ({
 
             <Box mt={2}>
               <Typography variant="body2" gutterBottom>
-                {translate("conversation.audioSettings.speechRate", {
+                {t("conversation.audioSettings.speechRate", {
                   rate: speechRate.toFixed(1),
                 })}
               </Typography>
@@ -205,7 +211,7 @@ const SessionSettingsPanel: React.FC<SessionSettingsPanelProps> = ({
           color="text.secondary"
           sx={{ display: "block", mt: 1 }}
         >
-          {translate("conversation.audioSettings.npcResponseNote")}
+          {t("conversation.audioSettings.npcResponseNote")}
         </Typography>
       </CardContent>
     </Card>

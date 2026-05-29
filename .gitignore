@@ -36,3 +36,4 @@ ATXDocumentation
 output
 .kiro/steering/atx-documentation.md
 frontend/tmp
+.playwright-mcp/

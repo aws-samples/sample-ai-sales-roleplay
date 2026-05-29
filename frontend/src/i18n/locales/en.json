@@ -227,6 +227,7 @@
     "cameraInitializing": "Initializing camera...",
     "cameraInitializingMessage": "📹 Initializing camera. Please wait...",
     "cameraAccessFailed": "⚠️ Failed to access camera. You can start the conversation without recording.",
+    "recordingDisabledMessage": "📹 Video recording is off. The conversation will start without recording.",
     "realTimeEvaluation": "Real-time Evaluation",
     "angerMeterConversation": "Anger Meter",
     "trustLevelConversation": "Trust Level",
@@ -248,7 +249,11 @@
     "settings": {
       "title": "Settings",
       "avatarOn": "3D Avatar ON",
-      "avatarOff": "3D Avatar OFF"
+      "avatarOff": "3D Avatar OFF",
+      "recordingOn": "Video Recording ON",
+      "recordingOff": "Video Recording OFF",
+      "recordingNote": "* When recording is off, the camera is not used and video analysis is unavailable",
+      "recordingLockedNote": "* Recording settings can only be changed before the conversation starts"
     }
   },
   "metrics": {

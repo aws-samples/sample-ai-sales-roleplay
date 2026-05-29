@@ -1,9 +1,10 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useMemo } from "react";
 import { Box, Typography, Paper, LinearProgress, Button } from "@mui/material";
 import { Send as SendIcon } from "@mui/icons-material";
 import { Message, Metrics, Scenario } from "../../types/index";
 import type { SlideImageInfo } from "../../types/api";
 import { getSessionEndReason } from "../../utils/dialogueEngine";
+import { DEFAULT_VIDEO_RECORDING_ENABLED } from "../../utils/videoRecordingSettings";
 import { useTranslation } from "react-i18next";
 
 interface MessageListProps {
@@ -16,6 +17,8 @@ interface MessageListProps {
   onStartConversation: () => void;
   isCameraInitialized?: boolean;
   cameraError?: boolean;
+  /** ビデオ録画機能の有効/無効 */
+  videoRecordingEnabled?: boolean;
   /** スライド画像一覧（サムネイル表示用） */
   slideImages?: SlideImageInfo[];
   /** スライドサムネイルクリック時のコールバック */
@@ -35,12 +38,32 @@ const MessageList: React.FC<MessageListProps> = ({
   onStartConversation,
   isCameraInitialized = false,
   cameraError = false,
+  videoRecordingEnabled = DEFAULT_VIDEO_RECORDING_ENABLED,
   slideImages = [],
   onSlideClick,
 }) => {
   const { t } = useTranslation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // 商談開始ボタンの有効化判定とラベルを算出
+  // 録画オフの場合は常に開始可能（カメラ初期化を待たない）
+  // 録画オンの場合はカメラ初期化完了またはカメラエラー時のみ開始可能
+  const canStart = !videoRecordingEnabled || isCameraInitialized || cameraError;
+
+  // ボタンラベルの決定（aria-labelと表示テキストで共用）
+  const startButtonLabel = useMemo(() => {
+    if (!videoRecordingEnabled) {
+      return t("conversation.startButtonNoRecording");
+    }
+    if (isCameraInitialized) {
+      return t("conversation.startButton");
+    }
+    if (cameraError) {
+      return t("conversation.startButtonNoRecording");
+    }
+    return t("conversation.cameraInitializing");
+  }, [videoRecordingEnabled, isCameraInitialized, cameraError, t]);
 
   // メッセージ自動スクロール（親要素のスクロールを防止）
   useEffect(() => {
@@ -77,7 +100,20 @@ const MessageList: React.FC<MessageListProps> = ({
             {scenario.description}
           </Typography>
 
-          {!isCameraInitialized && !cameraError && (
+          {/* 録画オフ時のメッセージ */}
+          {!videoRecordingEnabled && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", mb: 2 }}
+              role="status"
+            >
+              {t("conversation.recordingDisabledMessage")}
+            </Typography>
+          )}
+
+          {/* 録画オン時のカメラ初期化中メッセージ */}
+          {videoRecordingEnabled && !isCameraInitialized && !cameraError && (
             <Typography
               variant="caption"
               color="warning.main"
@@ -89,7 +125,8 @@ const MessageList: React.FC<MessageListProps> = ({
             </Typography>
           )}
 
-          {cameraError && (
+          {/* 録画オン時のカメラアクセス失敗メッセージ */}
+          {videoRecordingEnabled && cameraError && (
             <Typography
               variant="caption"
               color="error.main"
@@ -105,24 +142,14 @@ const MessageList: React.FC<MessageListProps> = ({
             size="large"
             onClick={onStartConversation}
             startIcon={<SendIcon />}
-            disabled={!isCameraInitialized && !cameraError}
+            disabled={!canStart}
             data-testid="start-conversation-button"
-            aria-label={
-              isCameraInitialized
-                ? t("conversation.startButton")
-                : cameraError
-                  ? t("conversation.startButtonNoRecording")
-                  : t("conversation.cameraInitializing")
-            }
+            aria-label={startButtonLabel}
             sx={{
-              opacity: (isCameraInitialized || cameraError) ? 1 : 0.6,
+              opacity: canStart ? 1 : 0.6,
             }}
           >
-            {isCameraInitialized
-              ? t("conversation.startButton")
-              : cameraError
-                ? t("conversation.startButtonNoRecording")
-                : t("conversation.cameraInitializing")}
+            {startButtonLabel}
           </Button>
         </Box>
       ) : (
