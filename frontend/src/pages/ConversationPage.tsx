@@ -29,6 +29,10 @@ import {
   mergeGoalStatus,
 } from "../utils/goalUtils";
 import VideoManager from "../components/recording/v2/VideoManager";
+import {
+  loadVideoRecordingEnabled,
+  saveVideoRecordingEnabled,
+} from "../utils/videoRecordingSettings";
 
 // 分割したコンポーネントをインポート
 import ConversationHeader from "../components/conversation/ConversationHeader";
@@ -192,6 +196,23 @@ const ConversationPage: React.FC = () => {
   const [isCameraInitialized, setIsCameraInitialized] = useState<boolean>(false);
   // カメラエラー状態管理
   const [cameraError, setCameraError] = useState<boolean>(false);
+  // ビデオ録画機能のオン/オフ設定（localStorageで永続化、デフォルトはオン）
+  const [videoRecordingEnabled, setVideoRecordingEnabled] = useState<boolean>(
+    loadVideoRecordingEnabled,
+  );
+
+  // ビデオ録画設定の変更をlocalStorageに永続化
+  useEffect(() => {
+    saveVideoRecordingEnabled(videoRecordingEnabled);
+
+    // 録画を無効化した場合、VideoManagerがアンマウントされてカメラ初期化コールバックが
+    // 呼ばれなくなるため、カメラ関連stateを明示的にリセットして状態の意味を一貫させる。
+    // （録画無効時はカメラを使用しないため、初期化済み・エラーのいずれでもない状態に戻す）
+    if (!videoRecordingEnabled) {
+      setIsCameraInitialized(false);
+      setCameraError(false);
+    }
+  }, [videoRecordingEnabled]);
 
   // 新レイアウト用state
   const [rightPanelsVisible, setRightPanelsVisible] = useState<boolean>(true);
@@ -1018,9 +1039,17 @@ const ConversationPage: React.FC = () => {
       };
 
       // 録画アップロード完了を待ってから遷移
-      await waitForRecordingUpload();
+      // ビデオ録画が無効な場合は待機をスキップ
+      if (videoRecordingEnabled) {
+        await waitForRecordingUpload();
+      }
 
       // セッション分析を非同期で開始（Step Functions）
+      // 注意: 録画無効時もセッション分析は起動するが、これは意図的な設計。
+      // バックエンドの動画分析ステップ（sessionAnalysis/video_handler.py）は
+      // S3に動画が存在しない場合を正常系として扱い、videoSkipReason="no_video"で
+      // スキップする。そのため録画オフでもエラーや無駄なNova呼び出し（課金）は発生せず、
+      // 会話ログベースのフィードバック分析は通常どおり実行される。
       try {
         const apiService = ApiService.getInstance();
         await apiService.startSessionAnalysis(
@@ -1047,6 +1076,7 @@ const ConversationPage: React.FC = () => {
       goalScore,
       sessionId,
       i18n.language,
+      videoRecordingEnabled,
     ],
   );
 
@@ -1345,30 +1375,33 @@ const ConversationPage: React.FC = () => {
         )}
 
         {/* カメラプレビュー（左上、メトリクスの下） */}
-        <Box
-          sx={{
-            position: "absolute",
-            top: metricsVisible && sessionStarted ? 110 : 12,
-            left: 12,
-            zIndex: 10,
-            width: 180,
-            borderRadius: 2,
-            overflow: "hidden",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
-            transition: "top 0.2s ease",
-            "@media (prefers-reduced-motion: reduce)": {
-              transition: "none",
-            },
-          }}
-        >
-          <VideoManager
-            ref={undefined}
-            sessionId={sessionId}
-            sessionStarted={sessionStarted}
-            sessionEnded={sessionEnded}
-            onCameraInitialized={handleCameraInitialized}
-          />
-        </Box>
+        {videoRecordingEnabled && (
+          <Box
+            data-testid="video-manager-container"
+            sx={{
+              position: "absolute",
+              top: metricsVisible && sessionStarted ? 110 : 12,
+              left: 12,
+              zIndex: 10,
+              width: 180,
+              borderRadius: 2,
+              overflow: "hidden",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+              transition: "top 0.2s ease",
+              "@media (prefers-reduced-motion: reduce)": {
+                transition: "none",
+              },
+            }}
+          >
+            <VideoManager
+              ref={undefined}
+              sessionId={sessionId}
+              sessionStarted={sessionStarted}
+              sessionEnded={sessionEnded}
+              onCameraInitialized={handleCameraInitialized}
+            />
+          </Box>
+        )}
 
         {/* アバターステージ（中央） — CR-009: AvatarProviderを条件分岐外に配置し再マウント防止 */}
         {avatarVisible && (
@@ -1460,6 +1493,7 @@ const ConversationPage: React.FC = () => {
             onStartConversation={startConversation}
             isCameraInitialized={isCameraInitialized}
             cameraError={cameraError}
+            videoRecordingEnabled={videoRecordingEnabled}
             slideImages={slideImages}
             onSlideClick={(idx) => { setCurrentSlideIndex(idx); setIsSlideZoomOpen(true); }}
           />
@@ -1523,6 +1557,9 @@ const ConversationPage: React.FC = () => {
             avatarVisible={avatarVisible}
             setAvatarVisible={setAvatarVisible}
             avatarEnabled={enableAvatar}
+            videoRecordingEnabled={videoRecordingEnabled}
+            setVideoRecordingEnabled={setVideoRecordingEnabled}
+            recordingSettingLocked={sessionStarted}
           />
         </DialogContent>
       </Dialog>
