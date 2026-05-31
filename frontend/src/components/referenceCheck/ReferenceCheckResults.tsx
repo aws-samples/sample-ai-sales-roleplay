@@ -23,11 +23,13 @@ interface ReferenceCheckResultsProps {
 
 /**
  * 問題があるメッセージかどうかを判定
+ * 「問題あり (issue)」のみを問題として扱う。
+ * 「対象外 (not_applicable)」（挨拶・一般的な進行など）は問題としない。
  * @param msg メッセージオブジェクト
  * @returns 問題がある場合true
  */
-const hasIssue = (msg: { related: boolean }): boolean => {
-  return !msg.related;
+const hasIssue = (msg: { evaluation: string }): boolean => {
+  return msg.evaluation === "issue";
 };
 
 /**

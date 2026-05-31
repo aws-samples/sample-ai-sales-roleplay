@@ -483,13 +483,25 @@ export interface VideoAnalysisResult {
 // ============================================================
 
 /**
+ * リファレンスチェックの評価区分
+ * - "appropriate"    : 発言が参照資料の内容に沿っており、正確な情報提供ができている
+ * - "issue"          : 発言が参照資料の内容と矛盾している、または誤った情報を含んでいる
+ * - "not_applicable" : 挨拶・一般的な進行・意思表示など、参照資料の正誤を問えない発言
+ */
+export type ReferenceCheckEvaluation =
+  | "appropriate"
+  | "issue"
+  | "not_applicable";
+
+/**
  * リファレンスチェックのメッセージ情報
  */
 export interface ReferenceCheckMessage {
   message: string;
   relatedDocument?: string;
   reviewComment?: string;
-  related: boolean;
+  /** 評価区分（3分類） */
+  evaluation: ReferenceCheckEvaluation;
 }
 
 /**
@@ -498,6 +510,12 @@ export interface ReferenceCheckMessage {
 export interface ReferenceCheckSummary {
   totalMessages: number;
   checkedMessages: number;
+  /** 適切な発言数 */
+  appropriateCount?: number;
+  /** 評価対象外の発言数 */
+  notApplicableCount?: number;
+  /** 問題ありの発言数 */
+  issueCount?: number;
 }
 
 /**

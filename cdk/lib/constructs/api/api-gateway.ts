@@ -153,10 +153,37 @@ export class ApiGatewayConstruct extends Construct {
     // Videos API endpoints (動画管理・分析API)
     const videosResource = this.api.root.addResource('videos');
 
-    // GET /videos/upload-url - 動画アップロード用署名付きURL生成エンドポイント
-    const uploadUrlResource = videosResource.addResource('upload-url');
-    uploadUrlResource.addMethod(
-      'GET',
+    // マルチパートアップロード用エンドポイント群
+    // 録画動画はファイルサイズに関わらずマルチパート方式でアップロードするため、
+    // 長時間セッションの大容量動画（200MB超）にも対応する
+    const multipartResource = videosResource.addResource('multipart');
+
+    // POST /videos/multipart/create - マルチパートアップロード開始 + パートURL生成
+    const multipartCreateResource = multipartResource.addResource('create');
+    multipartCreateResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(props.videosFunction),
+      {
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+        authorizer: auth
+      }
+    );
+
+    // POST /videos/multipart/complete - マルチパートアップロード完了
+    const multipartCompleteResource = multipartResource.addResource('complete');
+    multipartCompleteResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(props.videosFunction),
+      {
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+        authorizer: auth
+      }
+    );
+
+    // POST /videos/multipart/abort - マルチパートアップロード中断
+    const multipartAbortResource = multipartResource.addResource('abort');
+    multipartAbortResource.addMethod(
+      'POST',
       new apigateway.LambdaIntegration(props.videosFunction),
       {
         authorizationType: apigateway.AuthorizationType.COGNITO,

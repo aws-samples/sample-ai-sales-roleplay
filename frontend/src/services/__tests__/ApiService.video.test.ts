@@ -8,7 +8,9 @@ jest.mock("aws-amplify/api", () => ({
 jest.mock("../ApiService", () => ({
   ApiService: {
     getInstance: jest.fn(() => ({
-      getVideoUploadUrl: jest.fn(),
+      createMultipartUpload: jest.fn(),
+      completeMultipartUpload: jest.fn(),
+      abortMultipartUpload: jest.fn(),
     })),
   },
 }));
@@ -17,7 +19,9 @@ import { ApiService } from "../ApiService";
 
 describe("ApiService - ビデオ関連機能のテスト", () => {
   let apiService: {
-    getVideoUploadUrl: jest.Mock;
+    createMultipartUpload: jest.Mock;
+    completeMultipartUpload: jest.Mock;
+    abortMultipartUpload: jest.Mock;
   };
 
   beforeEach(() => {
@@ -25,45 +29,92 @@ describe("ApiService - ビデオ関連機能のテスト", () => {
     jest.clearAllMocks();
   });
 
-  describe("getVideoUploadUrl", () => {
-    it("署名付きURLの取得に成功するとき", async () => {
-      // モックレスポンスの設定
+  describe("createMultipartUpload", () => {
+    it("マルチパートアップロード開始に成功するとき", async () => {
+      // モックレスポンスの設定（25パート分のURLを想定）
       const mockResponse = {
-        uploadUrl:
-          "https://example-bucket.s3.amazonaws.com/videos/test-session-id/test-video.webm",
-        videoKey: "videos/test-session-id/test-video.webm",
-        expiresIn: 600,
+        uploadId: "test-upload-id",
+        videoKey: "videos/test-session-id/recording.mp4",
+        partUrls: [
+          { partNumber: 1, url: "https://example-bucket.s3.amazonaws.com/part1" },
+          { partNumber: 2, url: "https://example-bucket.s3.amazonaws.com/part2" },
+        ],
+        expiresIn: 3600,
       };
 
-      // ApiServiceのモック設定
-      apiService.getVideoUploadUrl.mockResolvedValue(mockResponse);
+      apiService.createMultipartUpload.mockResolvedValue(mockResponse);
 
-      // 関数の実行
-      const result = await apiService.getVideoUploadUrl(
+      const result = await apiService.createMultipartUpload(
         "test-session-id",
-        "video/webm",
-        "test-video.webm",
+        "video/mp4",
+        2,
+        "recording.mp4",
       );
 
-      // 関数が正しく呼び出されたことの検証
-      expect(apiService.getVideoUploadUrl).toHaveBeenCalledWith(
+      // 引数の順序が正しいことの検証（sessionId, contentType, partCount, fileName）
+      expect(apiService.createMultipartUpload).toHaveBeenCalledWith(
         "test-session-id",
-        "video/webm",
-        "test-video.webm",
+        "video/mp4",
+        2,
+        "recording.mp4",
       );
-
-      // 結果が正しいことの検証
       expect(result).toEqual(mockResponse);
+      expect(result.partUrls).toHaveLength(2);
     });
 
     it("エラーが発生するとき", async () => {
-      // エラーの設定
-      apiService.getVideoUploadUrl.mockRejectedValue(new Error("APIエラー"));
+      apiService.createMultipartUpload.mockRejectedValue(
+        new Error("マルチパート開始エラー"),
+      );
 
-      // 関数の実行とエラーの検証
       await expect(
-        apiService.getVideoUploadUrl("test-session-id", "video/webm"),
-      ).rejects.toThrow("APIエラー");
+        apiService.createMultipartUpload("test-session-id", "video/mp4", 2),
+      ).rejects.toThrow("マルチパート開始エラー");
+    });
+  });
+
+  describe("completeMultipartUpload", () => {
+    it("マルチパートアップロード完了に成功するとき", async () => {
+      const mockResponse = {
+        videoKey: "videos/test-session-id/recording.mp4",
+        location: "https://example-bucket.s3.amazonaws.com/recording.mp4",
+      };
+
+      apiService.completeMultipartUpload.mockResolvedValue(mockResponse);
+
+      const parts = [
+        { partNumber: 1, eTag: '"etag1"' },
+        { partNumber: 2, eTag: '"etag2"' },
+      ];
+      const result = await apiService.completeMultipartUpload(
+        "videos/test-session-id/recording.mp4",
+        "test-upload-id",
+        parts,
+      );
+
+      expect(apiService.completeMultipartUpload).toHaveBeenCalledWith(
+        "videos/test-session-id/recording.mp4",
+        "test-upload-id",
+        parts,
+      );
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
+  describe("abortMultipartUpload", () => {
+    it("マルチパートアップロード中断に成功するとき", async () => {
+      apiService.abortMultipartUpload.mockResolvedValue({ aborted: true });
+
+      const result = await apiService.abortMultipartUpload(
+        "videos/test-session-id/recording.mp4",
+        "test-upload-id",
+      );
+
+      expect(apiService.abortMultipartUpload).toHaveBeenCalledWith(
+        "videos/test-session-id/recording.mp4",
+        "test-upload-id",
+      );
+      expect(result).toEqual({ aborted: true });
     });
   });
 });

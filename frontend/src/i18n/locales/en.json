@@ -959,7 +959,8 @@
     "reviewComment": "Review Comment",
     "status": {
       "success": "Appropriate",
-      "issue": "Issue"
+      "issue": "Issue",
+      "notApplicable": "Not Applicable"
     },
     "severity": {
       "high": "High",

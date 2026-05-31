@@ -959,7 +959,8 @@
     "reviewComment": "レビューコメント",
     "status": {
       "success": "適切",
-      "issue": "問題あり"
+      "issue": "問題あり",
+      "notApplicable": "対象外"
     },
     "severity": {
       "high": "高",

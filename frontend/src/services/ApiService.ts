@@ -1324,50 +1324,128 @@ export class ApiService {
   }
 
   /**
-   * 動画アップロード用の署名付きURLを取得する
+   * マルチパートアップロードを開始し、各パートの署名付きURLを取得する
+   *
+   * セッション録画の動画ファイルは、長時間セッション（20分超など）でも
+   * S3のサイズ制限に達しないよう、ファイルサイズに関わらずマルチパート方式で
+   * アップロードする。
+   *
    * @param sessionId セッションID
-   * @param contentType 動画のコンテントタイプ
+   * @param contentType 動画のコンテントタイプ（video/mp4）
+   * @param partCount 分割するパート数
    * @param fileName ファイル名（オプション）
-   * @returns 署名付きURLと動画キー
+   * @returns マルチパートアップロードID、動画キー、各パートの署名付きURL
    */
-  public async getVideoUploadUrl(
+  public async createMultipartUpload(
     sessionId: string,
     contentType: string,
+    partCount: number,
     fileName?: string,
   ): Promise<{
-    uploadUrl: string;
-    formData: Record<string, string>;
+    uploadId: string;
     videoKey: string;
+    partUrls: Array<{ partNumber: number; url: string }>;
     expiresIn: number;
   }> {
     try {
-      // クエリパラメータの作成
-      const queryParams: Record<string, string | number> = {
-        sessionId: sessionId,
-        contentType: contentType,
-      };
-
-      if (fileName !== undefined) {
-        queryParams.fileName = fileName;
-      }
-
-      // API呼び出し
-      return await this.apiGet<{
-        uploadUrl: string;
-        formData: Record<string, string>;
-        videoKey: string;
-        expiresIn: number;
-      }>("/videos/upload-url", queryParams);
+      return await this.apiPost<
+        {
+          uploadId: string;
+          videoKey: string;
+          partUrls: Array<{ partNumber: number; url: string }>;
+          expiresIn: number;
+        },
+        {
+          sessionId: string;
+          contentType: string;
+          partCount: number;
+          fileName?: string;
+        }
+      >("/videos/multipart/create", {
+        sessionId,
+        contentType,
+        partCount,
+        ...(fileName !== undefined ? { fileName } : {}),
+      });
     } catch (error) {
-      console.error("動画アップロードURL取得に失敗しました:", error);
+      console.error("マルチパートアップロード開始に失敗しました:", error);
 
       if (error instanceof Error) {
         throw new Error(
-          `動画アップロードURL取得に失敗しました: ${error.message}`,
+          `マルチパートアップロード開始に失敗しました: ${error.message}`,
         );
       } else {
-        throw new Error("動画アップロードURL取得に失敗しました");
+        throw new Error("マルチパートアップロード開始に失敗しました");
       }
+    }
+  }
+
+  /**
+   * マルチパートアップロードを完了する
+   *
+   * 全パートのアップロード完了後、S3に対してパートの結合を指示する。
+   *
+   * @param videoKey 動画キー
+   * @param uploadId マルチパートアップロードID
+   * @param parts 各パートの情報（パート番号とETag）
+   * @returns 動画キーとアップロード完了オブジェクトのURL
+   */
+  public async completeMultipartUpload(
+    videoKey: string,
+    uploadId: string,
+    parts: Array<{ partNumber: number; eTag: string }>,
+  ): Promise<{ videoKey: string; location: string }> {
+    try {
+      return await this.apiPost<
+        { videoKey: string; location: string },
+        {
+          videoKey: string;
+          uploadId: string;
+          parts: Array<{ partNumber: number; eTag: string }>;
+        }
+      >("/videos/multipart/complete", {
+        videoKey,
+        uploadId,
+        parts,
+      });
+    } catch (error) {
+      console.error("マルチパートアップロード完了に失敗しました:", error);
+
+      if (error instanceof Error) {
+        throw new Error(
+          `マルチパートアップロード完了に失敗しました: ${error.message}`,
+        );
+      } else {
+        throw new Error("マルチパートアップロード完了に失敗しました");
+      }
+    }
+  }
+
+  /**
+   * マルチパートアップロードを中断する
+   *
+   * アップロード失敗時に呼び出し、アップロード済みパートを破棄する。
+   *
+   * @param videoKey 動画キー
+   * @param uploadId マルチパートアップロードID
+   * @returns 中断成功フラグ
+   */
+  public async abortMultipartUpload(
+    videoKey: string,
+    uploadId: string,
+  ): Promise<{ aborted: boolean }> {
+    try {
+      return await this.apiPost<
+        { aborted: boolean },
+        { videoKey: string; uploadId: string }
+      >("/videos/multipart/abort", {
+        videoKey,
+        uploadId,
+      });
+    } catch (error) {
+      // 中断処理の失敗は致命的ではないため、警告ログのみ出力して握りつぶす
+      console.warn("マルチパートアップロード中断に失敗しました:", error);
+      return { aborted: false };
     }
   }
 

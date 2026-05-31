@@ -25,9 +25,11 @@ export const useReferenceCheck = (
 ): ReferenceCheckState => {
   /**
    * 問題があるメッセージの数を計算
+   * 「問題あり (issue)」のみをカウントする。
+   * 「対象外 (not_applicable)」（挨拶・一般的な進行など）は問題として扱わない。
    */
   const issuesCount = initialData?.messages
-    ? initialData.messages.filter((msg) => !msg.related).length
+    ? initialData.messages.filter((msg) => msg.evaluation === "issue").length
     : 0;
 
   return {
