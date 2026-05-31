@@ -3,6 +3,11 @@ import { Box, Alert, Snackbar } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import type { VideoRecorderRef } from "../../../types/components";
 
+// マルチパートアップロードの1パートあたりのサイズ（10MB、S3の最小5MB以上）
+// 録画動画はファイルサイズに関わらずマルチパートアップロードで送信するため、
+// 長時間セッションの大容量動画（200MB超）でもS3のサイズ制限に達しない
+const MULTIPART_PART_SIZE_BYTES = 10 * 1024 * 1024;
+
 interface VideoRecorderProps {
   sessionId: string;
   isActive: boolean; // セッションがアクティブかどうか（録画を行うべきかどうか）
@@ -274,79 +279,125 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
     }
   };
 
-  // リトライ機能付きアップロード
-  const uploadWithRetry = async (uploadInfo: { uploadUrl: string; formData: Record<string, string> }, blob: Blob, videoKey: string, maxRetries = 3) => {
+  // 1パートのアップロード（リトライ機能付き、ETagを返す）
+  const uploadPartWithRetry = async (
+    url: string,
+    partBlob: Blob,
+    partNumber: number,
+    maxRetries = 3,
+  ): Promise<string> => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        if (import.meta.env.DEV) console.log(`Upload attempt ${attempt}/${maxRetries}`);
-        if (import.meta.env.DEV) console.log("Form data fields:", Object.keys(uploadInfo.formData));
-
-        const formData = new FormData();
-
-        // S3 presigned POSTでは、フィールドの順序が重要
-        // 'key'フィールドを最初に、'file'フィールドを最後に追加する必要がある
-        // また、'Content-Type'フィールドも正しく追加する必要がある
-        const orderedFields = ['key', 'Content-Type', 'x-amz-algorithm', 'x-amz-credential', 'x-amz-date', 'x-amz-security-token', 'policy', 'x-amz-signature'];
-
-        // 順序通りにフィールドを追加
-        orderedFields.forEach(fieldName => {
-          if (uploadInfo.formData[fieldName]) {
-            formData.append(fieldName, uploadInfo.formData[fieldName]);
-            if (import.meta.env.DEV) console.log(`Field added: ${fieldName}`);
-          }
-        });
-
-        // 残りのフィールドを追加（上記以外のフィールドがある場合）
-        Object.entries(uploadInfo.formData).forEach(([key, value]) => {
-          if (!orderedFields.includes(key)) {
-            formData.append(key, value);
-            if (import.meta.env.DEV) console.log(`Additional field: ${key}`);
-          }
-        });
-
-        // fileフィールドは必ず最後に追加（ファイル名も指定）
-        const file = new File([blob], videoKey.split('/').pop() || 'recording.mp4', { type: 'video/mp4' });
-        formData.append("file", file);
-        if (import.meta.env.DEV) console.log(`File added: size=${file.size}, name=${file.name}, type=${file.type}`);
-
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 300000); // 5分タイムアウト
+        const timeoutId = setTimeout(() => controller.abort(), 300000); // 1パートあたり5分タイムアウト
 
-        const response = await fetch(uploadInfo.uploadUrl, {
-          method: "POST",
-          body: formData,
-          signal: controller.signal
+        const response = await fetch(url, {
+          method: "PUT",
+          body: partBlob,
+          signal: controller.signal,
         });
 
         clearTimeout(timeoutId);
 
-        if (response.ok || response.status === 204) {
-          if (import.meta.env.DEV) console.log("S3 upload success:", response.status);
-          localStorage.setItem("lastRecordingKey", videoKey);
-          if (import.meta.env.DEV) console.log("Recording key saved to localStorage:", videoKey);
-
-          // 録画完了イベントを発火
-          const event = new CustomEvent('recordingComplete', {
-            detail: { videoKey, sessionId }
-          });
-          window.dispatchEvent(event);
-          return; // 成功したら終了
-        } else {
-          // エラーレスポンスの詳細を取得
+        if (!response.ok) {
           const errorText = await response.text();
-          console.error(`S3 error response: ${errorText}`);
           throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
         }
-      } catch (error) {
-        console.error(`Upload attempt ${attempt} failed:`, error);
 
-        if (attempt === maxRetries) {
-          throw error; // 最後の試行で失敗したらエラーを投げる
+        // S3はパートアップロードのレスポンスでETagヘッダーを返す
+        // （CORSのexposedHeadersでETagを公開済み）
+        const eTag = response.headers.get("ETag");
+        if (!eTag) {
+          throw new Error(`ETag header not found for part ${partNumber}`);
         }
 
+        if (import.meta.env.DEV) {
+          console.log(`Part ${partNumber} uploaded: eTag=${eTag}`);
+        }
+        return eTag;
+      } catch (error) {
+        console.error(`Part ${partNumber} upload attempt ${attempt} failed:`, error);
+
+        if (attempt === maxRetries) {
+          throw error;
+        }
         // 指数バックオフで待機
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
       }
+    }
+    // ここには到達しないが型のために明示
+    throw new Error(`Failed to upload part ${partNumber}`);
+  };
+
+  // localStorageへの書き込み（Safariプライベートモード等で例外が発生しても
+  // アップロード成功処理全体を失敗させないよう、try-catchで保護する）
+  const safeSetLocalStorage = (key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch (storageError) {
+      console.warn(`localStorageへの保存に失敗しました（key=${key}）:`, storageError);
+    }
+  };
+
+  // マルチパートアップロード（長時間セッションの大容量動画向け）
+  // 成功時はサーバーが採番した動画キー（videos/{sessionId}/...）を返す。
+  // 呼び出し元はこのキーを下流処理（localStorage・録画完了通知）に使い、
+  // フロント・バックエンド間でキーを一本化する。
+  const uploadWithMultipart = async (
+    blob: Blob,
+    sessionId: string,
+    videoKey: string,
+  ): Promise<string> => {
+    const { ApiService } = await import("../../../services/ApiService");
+    const apiService = ApiService.getInstance();
+
+    // パート数を算出（S3の仕様上、最後のパート以外は5MB以上必要）
+    const partCount = Math.ceil(blob.size / MULTIPART_PART_SIZE_BYTES);
+    const fileName = videoKey.split("/").pop() || "recording.mp4";
+
+    if (import.meta.env.DEV) {
+      console.log(
+        `Multipart upload start: size=${Math.round(blob.size / 1024 / 1024 * 100) / 100}MB, parts=${partCount}`,
+      );
+    }
+
+    // マルチパートアップロードを開始し、各パートの署名付きURLを取得
+    const { uploadId, videoKey: serverVideoKey, partUrls } =
+      await apiService.createMultipartUpload(sessionId, "video/mp4", partCount, fileName);
+
+    try {
+      // 各パートを順次アップロードしてETagを収集
+      const uploadedParts: Array<{ partNumber: number; eTag: string }> = [];
+      for (const { partNumber, url } of partUrls) {
+        const start = (partNumber - 1) * MULTIPART_PART_SIZE_BYTES;
+        const end = Math.min(start + MULTIPART_PART_SIZE_BYTES, blob.size);
+        const partBlob = blob.slice(start, end);
+
+        const eTag = await uploadPartWithRetry(url, partBlob, partNumber);
+        uploadedParts.push({ partNumber, eTag });
+      }
+
+      // 全パート完了後、S3にパート結合を指示
+      await apiService.completeMultipartUpload(serverVideoKey, uploadId, uploadedParts);
+
+      if (import.meta.env.DEV) console.log("Multipart upload success:", serverVideoKey);
+
+      // サーバー採番のキーで保存・通知し、フロント/バックエンドのキーを一致させる
+      safeSetLocalStorage("lastRecordingKey", serverVideoKey);
+
+      // 録画完了イベントを発火
+      const event = new CustomEvent("recordingComplete", {
+        detail: { videoKey: serverVideoKey, sessionId },
+      });
+      window.dispatchEvent(event);
+
+      // 呼び出し元がサーバー採番のキーを使えるよう返却する
+      return serverVideoKey;
+    } catch (error) {
+      // 失敗時はマルチパートアップロードを中断してパートの残骸を破棄
+      console.error("Multipart upload failed, aborting:", error);
+      await apiService.abortMultipartUpload(serverVideoKey, uploadId);
+      throw error;
     }
   };
 
@@ -358,27 +409,17 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
         throw new Error(t("recording.sessionIdNotSet"));
       }
 
-      const videoKey = `session_${sessionId}_${new Date().getTime()}.mp4`;
-      if (import.meta.env.DEV) console.log("S3 upload start:", videoKey, "size:", Math.round(blob.size / 1024 / 1024 * 100) / 100, "MB");
+      // ローカルの仮キー。アップロード成功時はサーバー採番のキーで上書きする
+      const localVideoKey = `session_${sessionId}_${new Date().getTime()}.mp4`;
+      if (import.meta.env.DEV) console.log("S3 upload start:", localVideoKey, "size:", Math.round(blob.size / 1024 / 1024 * 100) / 100, "MB");
 
-      // APIサービスを使用して署名付きURLを取得してS3にアップロード
+      // マルチパートアップロードでS3に保存する
+      // ファイルサイズに関わらずマルチパート方式に統一しており、
+      // 長時間セッションの大容量動画（200MB超）でもS3のサイズ制限に達しない
+      // アップロード成功時はサーバー採番のキー（videos/{sessionId}/...）を採用する
+      let resultVideoKey = localVideoKey;
       try {
-        // ApiServiceのインポート
-        const { ApiService } = await import("../../../services/ApiService");
-        const apiService = ApiService.getInstance();
-
-        // 署名付きURLを取得
-        const contentType = "video/mp4";
-        const uploadInfo = await apiService.getVideoUploadUrl(
-          sessionId,
-          contentType,
-          videoKey,
-        );
-        if (import.meta.env.DEV) console.log("Signed URL obtained:", uploadInfo.uploadUrl);
-
-        // BlobをS3にPOSTフォームでアップロード（リトライ機能付き）
-        await uploadWithRetry(uploadInfo, blob, videoKey);
-
+        resultVideoKey = await uploadWithMultipart(blob, sessionId, localVideoKey);
       } catch (uploadError) {
         console.error("S3 upload process error:", uploadError);
         // エラーが発生した場合でも、親コンポーネントにエラー情報を渡す
@@ -388,11 +429,12 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
         // エラーが発生してもvideoKeyは渡して処理を続行
       }
 
-      if (import.meta.env.DEV) console.log("Recording data saved:", videoKey);
+      if (import.meta.env.DEV) console.log("Recording data saved:", resultVideoKey);
 
       // コールバックを呼び出し（エラーが発生してもvideoKeyは渡す）
+      // 成功時はサーバー採番のキー、失敗時はローカル仮キーを渡す
       if (onRecordingComplete) {
-        onRecordingComplete(videoKey);
+        onRecordingComplete(resultVideoKey);
       }
     } catch (err) {
       console.error("Recording data processing failed:", err);

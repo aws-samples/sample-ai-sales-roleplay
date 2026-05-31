@@ -179,11 +179,13 @@ def evaluate_references(
             check_results.append(result)
         except Exception as e:
             logger.error(f"メッセージ評価エラー: {str(e)}")
+            # 評価不能（エラー）は「問題あり」ではなく「対象外」として扱う
+            # （誤検知を避けるため、評価できなかった発言を問題扱いしない）
             check_results.append({
                 "message": user_content,
                 "relatedDocument": "",
                 "reviewComment": f"評価中にエラーが発生: {str(e)}",
-                "related": False
+                "evaluation": "not_applicable"
             })
     
     return {
@@ -191,7 +193,12 @@ def evaluate_references(
         "summary": {
             "totalMessages": len(user_messages),
             "checkedMessages": len(check_results),
-            "relatedCount": sum(1 for r in check_results if r.get("related", False))
+            # 資料に基づいた適切な発言数
+            "appropriateCount": sum(1 for r in check_results if r.get("evaluation") == "appropriate"),
+            # 評価対象外の発言数（挨拶・一般的な進行など、資料参照が不要な発言）
+            "notApplicableCount": sum(1 for r in check_results if r.get("evaluation") == "not_applicable"),
+            # 資料と矛盾する/誤った情報を含む発言数（問題ありの件数）
+            "issueCount": sum(1 for r in check_results if r.get("evaluation") == "issue")
         }
     }
 
@@ -294,11 +301,13 @@ def check_single_message(
             "knowledge_base_id": KNOWLEDGE_BASE_ID,
             "user_message": user_message[:100]
         })
+        # 関連資料が見つからない発言は「問題あり」ではなく「対象外」として扱う
+        # （挨拶や一般的な進行など、そもそも資料参照が不要な発言を問題扱いしないため）
         return {
             "message": user_message,
             "relatedDocument": "",
-            "reviewComment": "関連する参照資料が見つかりませんでした" if language == "ja" else "No related reference documents found",
-            "related": False
+            "reviewComment": "この発言に関連する参照資料はありませんでした（評価対象外）" if language == "ja" else "No reference document is related to this statement (not applicable)",
+            "evaluation": "not_applicable"
         }
     
     # 関連ドキュメントの内容を結合
@@ -327,7 +336,7 @@ def check_single_message(
         "message": user_message,
         "relatedDocument": related_document[:500],  # 長すぎる場合は切り詰め
         "reviewComment": evaluation.get("comment", ""),
-        "related": evaluation.get("related", False)
+        "evaluation": evaluation.get("evaluation", "not_applicable")
     }
 
 
@@ -337,11 +346,33 @@ def evaluate_relevance(
     related_document: str,
     language: str
 ) -> Dict[str, Any]:
-    """Strands Agentsで関連性を評価"""
+    """
+    Strands Agentsで発言を3分類で評価する
+
+    評価区分:
+      - "appropriate"     : 発言が参照資料の内容に沿っており、正確な情報提供ができている
+      - "issue"           : 発言が参照資料の内容と矛盾している、または誤った情報を含んでいる
+      - "not_applicable"  : 挨拶・一般的な進行・意思表示など、参照資料の正誤を問えない発言
+
+    重要: 参照資料に記載がないだけの一般的な発言は "issue" ではなく "not_applicable" とする。
+    "issue" は資料と明確に矛盾する、または事実誤認がある場合に限定する。
+    """
     
     if language == "en":
-        system_prompt = "You are an expert at evaluating whether statements are based on reference documents. Always respond in valid JSON format."
-        prompt = f"""Evaluate whether the user's statement is based on the reference document.
+        system_prompt = (
+            "You are an expert at evaluating whether a sales representative's statement "
+            "is consistent with reference documents. Always respond in valid JSON format. "
+            "Only flag a statement as an issue when it clearly contradicts the reference "
+            "document or contains factual errors. Greetings, general remarks, or statements "
+            "of intent that the document neither supports nor contradicts must be classified "
+            "as 'not_applicable', NOT as an issue."
+        )
+        prompt = f"""Classify the user's statement into exactly one of three categories based on the reference document.
+
+Categories:
+- "appropriate": The statement is consistent with and supported by the reference document (accurate information).
+- "issue": The statement clearly contradicts the reference document or contains factual errors.
+- "not_applicable": The statement is a greeting, general remark, or statement of intent that the document neither supports nor contradicts. The absence of related information in the document alone means "not_applicable", NOT "issue".
 
 User's statement: "{user_message}"
 
@@ -352,10 +383,21 @@ Conversation context:
 {context}
 
 Respond in JSON format:
-{{"related": true/false, "comment": "Brief evaluation comment"}}"""
+{{"evaluation": "appropriate" | "issue" | "not_applicable", "comment": "Brief evaluation comment explaining the classification"}}"""
     else:
-        system_prompt = "あなたは発言が参照資料に基づいているかを評価する専門家です。必ず有効なJSON形式で回答してください。"
-        prompt = f"""ユーザーの発言が参照資料に基づいているか評価してください。
+        system_prompt = (
+            "あなたは営業担当者の発言が参照資料の内容と整合しているかを評価する専門家です。"
+            "必ず有効なJSON形式で回答してください。"
+            "発言が参照資料と明確に矛盾している、または事実誤認を含む場合のみ「問題あり(issue)」と判定してください。"
+            "挨拶・一般的な進行・意思表示など、資料が肯定も否定もしない発言は「問題あり」ではなく"
+            "「対象外(not_applicable)」に分類してください。"
+        )
+        prompt = f"""ユーザーの発言を、参照資料の内容に基づき次の3区分のいずれか1つに分類してください。
+
+区分:
+- "appropriate"（適切）: 発言が参照資料の内容に沿っており、正確な情報提供ができている。
+- "issue"（問題あり）: 発言が参照資料の内容と明確に矛盾している、または誤った情報を含んでいる。
+- "not_applicable"（対象外）: 挨拶・一般的な進行・意思表示など、参照資料の正誤を問えない発言。資料に関連記載が「ないだけ」の場合は "issue" ではなく "not_applicable" とすること。
 
 ユーザーの発言: "{user_message}"
 
@@ -366,7 +408,7 @@ Respond in JSON format:
 {context}
 
 JSON形式で回答してください:
-{{"related": true/false, "comment": "簡潔な評価コメント"}}"""
+{{"evaluation": "appropriate" | "issue" | "not_applicable", "comment": "分類理由を含む簡潔な評価コメント"}}"""
     
     try:
         logger.info("関連性評価開始", extra={
@@ -398,8 +440,18 @@ JSON形式で回答してください:
         json_end = response_text.rfind("}") + 1
         if json_start >= 0 and json_end > json_start:
             parsed_result = json.loads(response_text[json_start:json_end])
-            logger.info("関連性評価完了", extra={"related": parsed_result.get("related")})
-            return parsed_result
+
+            # evaluationの値を検証（想定外の値は対象外に丸める）
+            evaluation_value = parsed_result.get("evaluation")
+            if evaluation_value not in ("appropriate", "issue", "not_applicable"):
+                logger.warning("想定外のevaluation値", extra={"evaluation": evaluation_value})
+                evaluation_value = "not_applicable"
+
+            logger.info("関連性評価完了", extra={"evaluation": evaluation_value})
+            return {
+                "evaluation": evaluation_value,
+                "comment": parsed_result.get("comment", "")
+            }
         
         logger.warning("JSON解析失敗: JSONが見つかりません", extra={"response": response_text[:200]})
         
@@ -415,7 +467,8 @@ JSON形式で回答してください:
             "model_id": BEDROCK_MODEL_ID
         })
     
+    # 評価できなかった場合は「問題あり」ではなく「対象外」として扱う（誤検知防止）
     return {
-        "related": False,
+        "evaluation": "not_applicable",
         "comment": "評価中にエラーが発生しました" if language == "ja" else "Error during evaluation"
     }

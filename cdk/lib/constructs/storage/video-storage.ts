@@ -37,6 +37,11 @@ export class VideoStorageConstruct extends Construct {
           // 未使用の動画ファイルは14日後に削除（録画データは容量が大きいため短めの期間設定）
           expiration: cdk.Duration.days(14),
           prefix: 'videos/',
+        },
+        {
+          // 中断・失敗したマルチパートアップロードの残骸を1日後に自動削除し、
+          // 不要なストレージ課金を防ぐ
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(1),
         }
       ],
       // サーバーサイド暗号化を有効化

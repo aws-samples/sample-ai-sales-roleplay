@@ -63,8 +63,12 @@ export class VideosLambdaConstruct extends Construct {
       environment: {
         SESSION_FEEDBACK_TABLE: props.feedbackTableName,
         VIDEO_BUCKET: props.videoBucket.bucketName,
-        MAX_VIDEO_SIZE_MB: '200',  // 200MB
-        DEFAULT_PRESIGNED_URL_EXPIRY: '600', // 10分
+        MULTIPART_PRESIGNED_URL_EXPIRY: '3600', // 1時間（長時間セッションのマルチパートアップロード用）
+        // マルチパートの最大パート数。録画は1.5Mbps映像+音声≈1.6Mbpsで、
+        // 10MB/パート換算だと60分≈68パート・2時間≈150パート程度。
+        // 余裕を見て500（=10MB×500=5GB相当）に制限し、過大なpartCount要求による
+        // 署名付きURL大量生成（Lambdaのブロッキング/DoS）を防ぐ。
+        MAX_MULTIPART_PARTS: '500',
         VIDEO_ANALYSIS_MODEL_ID: props.videoAnalysisModelId || 'global.amazon.nova-2-lite-v1:0',
         POWERTOOLS_LOG_LEVEL: "DEBUG",
         AWS_MAX_ATTEMPTS: "10",
@@ -72,6 +76,9 @@ export class VideosLambdaConstruct extends Construct {
     });
 
     // S3バケットへのアクセス許可
+    // grantReadWriteには PutObject / GetObject / DeleteObject / AbortMultipartUpload /
+    // ListBucketMultipartUploads / ListMultipartUploadParts が含まれ、
+    // マルチパートアップロードに必要な権限を満たす
     props.videoBucket.grantReadWrite(this.function);
 
     // DynamoDBテーブルへのアクセス許可

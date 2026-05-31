@@ -26,6 +26,24 @@ const REALTIME_SCORING_RUNTIME_ARN = import.meta.env.VITE_AGENTCORE_REALTIME_SCO
 // AgentCore Data Plane エンドポイント
 const AGENTCORE_ENDPOINT = `https://bedrock-agentcore.${AWS_REGION}.amazonaws.com`;
 
+// アクセストークンの先回り更新しきい値（秒）
+// AgentCoreは「あと1分以内に失効するトークン」を拒否するため、
+// それより十分手前（2分）を切ったら更新し、長いペイロード送信中の失効も吸収する
+const TOKEN_REFRESH_THRESHOLD_SEC = 120;
+
+/**
+ * AgentCore Runtimeが401（認証エラー）を返した場合に投げる専用エラー
+ *
+ * トークン失効・失効間近（"Ineffectual token, will expire within the next minute"）が
+ * 主因のため、呼び出し元はこのエラーを検知してトークンを強制更新し、リトライ判定に使う。
+ */
+class AgentCoreUnauthorizedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AgentCoreUnauthorizedError";
+  }
+}
+
 /**
  * AgentCore Runtime サービスクラス
  * 
@@ -49,14 +67,36 @@ export class AgentCoreService {
 
   /**
    * Cognito Access Tokenを取得
-   * 
+   *
    * 注意: AgentCore RuntimeのJWT認証ではAccess Tokenを使用する
    * （ID Tokenではない）
+   *
+   * AgentCoreは「あと1分以内に失効するトークン」を予防的に拒否する
+   * （401 "Ineffectual token, will expire within the next minute"）。
+   * Amplifyの fetchAuthSession はトークンが完全失効するまでキャッシュを返すため、
+   * 残り時間がしきい値（TOKEN_REFRESH_THRESHOLD_SEC）を下回る場合は
+   * forceRefresh で先回り更新し、この隙間による401を防ぐ。
+   *
+   * @param forceRefresh trueの場合、残り時間に関わらずトークンを強制更新する
+   *                     （401リトライ時に使用）
    */
-  private async getAccessToken(): Promise<string> {
+  private async getAccessToken(forceRefresh = false): Promise<string> {
     try {
       await getCurrentUser();
-      const authSession = await fetchAuthSession();
+      let authSession = await fetchAuthSession(
+        forceRefresh ? { forceRefresh: true } : undefined,
+      );
+
+      // 強制更新でない場合は、失効が近ければ先回りで更新する
+      if (!forceRefresh) {
+        const expSec = authSession.tokens?.accessToken?.payload?.exp;
+        if (typeof expSec === "number") {
+          const remainingSec = expSec - Math.floor(Date.now() / 1000);
+          if (remainingSec < TOKEN_REFRESH_THRESHOLD_SEC) {
+            authSession = await fetchAuthSession({ forceRefresh: true });
+          }
+        }
+      }
 
       if (!authSession.tokens?.accessToken) {
         throw new Error("Access Tokenが取得できません");
@@ -81,14 +121,57 @@ export class AgentCoreService {
    * 
    * JWT認証を使用する場合、AWS SDKではなくHTTPS直接リクエストを使用
    * タイムアウト: 120秒（API Gatewayの29秒制限を回避）
+   *
+   * 401（トークン失効・失効間近）の場合は、トークンを強制更新して1回だけリトライする。
+   * AgentCoreは残り1分以内のトークンを拒否するため、先回り更新（getAccessToken）を
+   * すり抜けたケースの保険となる。
    */
   private async invokeAgentCoreRuntime<T>(
     runtimeArn: string,
     sessionId: string,
     payload: Record<string, unknown>
   ): Promise<T> {
+    // 1回目は通常取得（必要なら内部で先回り更新）
     const accessToken = await this.getAccessToken();
 
+    try {
+      return await this.sendAgentCoreRequest<T>(
+        runtimeArn,
+        sessionId,
+        payload,
+        accessToken,
+      );
+    } catch (error) {
+      // 401（認証エラー）の場合のみ、トークンを強制更新して1回リトライ
+      if (error instanceof AgentCoreUnauthorizedError) {
+        console.warn(
+          "AgentCore Runtime 401（トークン失効間近の可能性）。トークンを強制更新して再試行します。",
+        );
+        const refreshedToken = await this.getAccessToken(true);
+        return await this.sendAgentCoreRequest<T>(
+          runtimeArn,
+          sessionId,
+          payload,
+          refreshedToken,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * AgentCore Runtimeへ実際のHTTPSリクエストを送信する
+   *
+   * invokeAgentCoreRuntimeのリトライ機構から、トークンを差し替えて再利用できるよう
+   * 単一リクエストの送信処理を切り出したもの。
+   * 401を受け取った場合は AgentCoreUnauthorizedError を投げ、呼び出し元でリトライ判定する。
+   */
+  private async sendAgentCoreRequest<T>(
+    runtimeArn: string,
+    sessionId: string,
+    payload: Record<string, unknown>,
+    accessToken: string,
+  ): Promise<T> {
     // ARNをURLエンコード
     const encodedArn = encodeURIComponent(runtimeArn);
     // エンドポイント形式: /runtimes/{encodedArn}/invocations
@@ -115,6 +198,10 @@ export class AgentCoreService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`AgentCore Runtime エラー: ${response.status}`, errorText);
+        // 401はトークン失効系のため、呼び出し元でのリトライ対象として専用エラーを投げる
+        if (response.status === 401) {
+          throw new AgentCoreUnauthorizedError(errorText);
+        }
         throw new Error(`AgentCore Runtime呼び出しエラー: ${response.status} - ${errorText}`);
       }
 
