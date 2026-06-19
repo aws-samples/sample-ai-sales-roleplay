@@ -406,6 +406,7 @@ export class AgentCoreService {
     npcEmotion?: string;
     npcEmotionIntensity?: number;
     gesture?: string;
+    suggestions?: string[];
   }> {
     if (!this.isAvailable()) {
       throw new Error('AgentCore Runtimeが利用できません');
@@ -478,6 +479,7 @@ export class AgentCoreService {
         npcEmotion?: string;
         npcEmotionIntensity?: number;
         gesture?: string;
+        suggestions?: string[];
         sessionId?: string;
         memoryEnabled?: boolean;
         error?: string;
@@ -526,6 +528,7 @@ export class AgentCoreService {
           npcEmotion: result.npcEmotion || 'neutral',
           npcEmotionIntensity: result.npcEmotionIntensity ?? 0.5,
           gesture: result.gesture || 'none',
+          suggestions: Array.isArray(result.suggestions) ? result.suggestions : [],
         };
       }
 

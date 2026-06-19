@@ -2051,3 +2051,282 @@
 - `frontend/src/i18n/locales/en.json` - 変更: スライド関連i18nキー追加
 
 ---
+
+
+---
+
+## New Workflow Session: AWS Summit デモ展示向け機能強化
+**Timestamp**: 2026-05-31T10:00:00Z
+
+---
+
+## INCEPTION - Workspace Detection (Summit Demo)
+**Timestamp**: 2026-05-31T10:00:01Z
+**User Input**: "ai-dlcで実施します。本アセットをAWS Summit Japanのデモ展示をする予定です。デモとして観客の注目を集め、高評価をもらえるための仕組みは何が必要かを議論したいです。"
+**AI Response**: ワークスペース検出を実行。既存のBrownfieldプロジェクト（全機能実装済み）を確認。デモ展示向けの機能強化要件として議論を開始。
+**Context**: 新規Inceptionフェーズ開始、AWS Summit Japanデモ展示向け機能強化リクエスト
+
+---
+
+## INCEPTION - Requirements Analysis (Summit Demo) - 前提条件のヒアリング
+**Timestamp**: 2026-05-31T10:10:00Z
+**User Input (複数ターンの集約)**:
+- デモのゴール: A（アセット/ソリューションの認知拡大）
+- 体験形式: C（参加型＋見せる型の両方）
+- 音声認識: 諦めてチャット入力にする
+- 準備期間: 2週間
+- 物理構成: 大型モニターはブースにあり。PCは2台体制。1台だけモニターに出力。セキュリティの問題でゲストの端末からはアクセスさせられない。
+- 入力デバイス: A（キーボード打鍵 → サジェスト返答ボタン併用）
+- 画面連動: リアルタイム連動。ただし大型モニターに映すのは体験者本人のPC画面（解釈①＝同一PC、HDMI出力）
+- 称号判定: 機械的判定で進める方向で合意
+
+**AI Response**: 前提条件を整理。既存WebSocket基盤（TranscribeService）はリアルタイム音声認識専用でセッション同期には転用不可と判明。解釈①（同一PC・HDMI出力）採用によりサーバー側のセッション同期実装は不要、BroadcastChannel/デュアルディスプレイで実現可能と判断。機能スコープ（Must/Should/Nice-to-have）を整理。
+**Context**: Requirements Analysis - 前提条件確定、要件確認質問書の作成へ
+
+---
+
+## INCEPTION - Requirements Analysis (Summit Demo) - ゲストモード制約変更
+**Timestamp**: 2026-05-31T10:20:00Z
+**User Input**: "ゲストモード（Cognito認証スキップ、ニックネームのみ）はセキュリティの制約で禁止です。デモ用のユーザーをCognitoで作成します。"
+**AI Response**: 前提を変更。Cognito認証スキップ（ゲストモード）は禁止。代わりにデモ用ユーザーをCognitoで事前作成する方式に変更。これに伴いMust機能#1「ゲストモード」を「デモ用Cognitoユーザー＋スムーズなログイン/切り替え運用」に置き換え。質問ファイルのQ5/Q6を更新し、運用フロー（共有アカウント数・ランキング表示名の入力導線）に関する質問を追加。
+**Context**: Requirements Analysis - セキュリティ制約により認証方式の前提を修正
+
+---
+
+## INCEPTION - Requirements Analysis (Summit Demo) - ウォームアップ削除
+**Timestamp**: 2026-05-31T10:25:00Z
+**User Input**: "AgentCoreウォームアップ（コールドスタート回避）これは大して問題にならないので不要です"
+**AI Response**: Must機能#4「AgentCoreウォームアップ」をスコープから除外。コールドスタートは実運用で問題にならないとの判断。質問ファイルのスコープ一覧を更新。
+**Context**: Requirements Analysis - スコープ調整
+
+---
+
+## INCEPTION - Requirements Analysis (Summit Demo) - 運用簡素化
+**Timestamp**: 2026-05-31T10:35:00Z
+**User Input**: "ログインは事前に行っておきます。共通ユーザー1つで運用します。ワンクリックリセットも不要です。シナリオを再開すればいいだけなので。"
+**AI Response**: 運用方式を確定・簡素化。(1)共通Cognitoユーザー1つを事前ログインして使い回す（ログイン操作・切り替え実装は不要、運用で対応）。(2)ワンクリックリセット機能を不要としてスコープから除外（シナリオ再開で代替）。Must機能を再整理。ただし共通ユーザー1つの場合、ランキング/称号演出で「体験者ごとの表示名」が出せなくなり認知拡大ゴールの訴求が弱まる懸念があるため、Cognito identityとは切り離した「体験者ごとの表示名（フロントエンドのみの概念）」を残すか確認する質問を追加。
+**Context**: Requirements Analysis - 運用方式の確定とスコープ簡素化
+
+---
+
+## INCEPTION - Requirements Analysis (Summit Demo) - ランキング廃止
+**Timestamp**: 2026-05-31T10:45:00Z
+**User Input**: "ランキング制度はやめましょう"
+**AI Response**: ランキング機能をデモスコープから除外。連鎖する論点を整理: (1)Nice-to-have「ライブランキング常時表示」削除。(2)Q9「体験者ごとの表示名」は主用途がランキングと称号演出だったが、ランキング廃止により用途が称号演出のみに縮小。(3)Q5「セッションデータ取り扱い」からランキング用保存の選択肢を見直し。称号演出はその場限りの演出として残し、持ち帰りはQR（Should機能）で対応する方針。質問ファイルを更新。
+**Context**: Requirements Analysis - スコープ調整（ランキング廃止）
+
+---
+
+## INCEPTION - Requirements Analysis (Summit Demo) - 質問ファイル全面整理
+**Timestamp**: 2026-05-31T10:55:00Z
+**User Input**: "これまでの会話をもとに質問周を更新"
+**AI Response**: これまでの会話で確定した前提（認知拡大ゴール、参加型＋見せる型、チャット+サジェストボタン、同一PC HDMI出力、共通Cognitoユーザー1つ事前ログイン、リセット不要、ランキング廃止、機械的称号判定、2週間）を前提テーブルに集約。残る未確定論点のみを質問として通し番号で再構成し、summit-demo-verification-questions.md を全面的にクリーンアップ。
+**Context**: Requirements Analysis - 質問ファイルの整理・再構成
+
+---
+
+## INCEPTION - Requirements Analysis (Summit Demo) - 感情表現強化を本番にも適用する提案
+**Timestamp**: 2026-05-31T11:05:00Z
+**User Input**: "デモ用じゃなくて本番用でもこれあった方がいいと思う。"
+**AI Response**: 感情誇張機能を本番にも適用したいとの要望。ただし「デモ向けの誇張」と「本番の最適表現」は必ずしも一致しない論点を提示。2案を提示: (案1)本番のアバター表現デフォルト自体を強化、(案2)表現強度をパラメータ化しレベル制にして本番は中程度・デモは最大に。AIは案2（強度調整可能）を推奨（営業練習のリアリティとデモの視認性の両立のため）。質問ファイルに本論点を追加。
+**Context**: Requirements Analysis - 感情表現強化の適用範囲に関する論点
+
+---
+
+## INCEPTION - Requirements Analysis (Summit Demo) - Should機能3つ削除
+**Timestamp**: 2026-05-31T11:15:00Z
+**User Input**: "観客向け大型ビュー（同一PC、アバター大写し＋メーター）は不要です。ディスプレイはミラーリングで接続します。 / 6. 終了演出＋称号判定（機械的）不要。 / 7. QR持ち帰り（GitHub/資料誘導）ブースのパネルにQRコードを掲載していますので不要です。"
+**AI Response**: Should機能3つを削除。(1)観客向け大型ビュー→ディスプレイはミラーリング接続のため実装不要。(2)終了演出＋称号判定→不要。(3)QR持ち帰り→ブースパネルにQR掲載済みのため不要。連鎖して以下の質問が不要化: Q2(大型ビュー方式)、Q4(称号判定ロジック)、Q7(称号画面の名前表示)。残る実装スコープは「ブース専用ショートシナリオ」「サジェスト返答ボタン」「アバター感情表現の強化(本番にも適用)」の3点。質問ファイルを再整理。
+**Context**: Requirements Analysis - スコープ大幅縮小
+
+---
+
+## INCEPTION - Requirements Analysis (Summit Demo) - 感情表現強化を除外
+**Timestamp**: 2026-05-31T11:25:00Z
+**User Input**: "感情表現の強化は今回のスコープからは外します"
+**AI Response**: アバター感情表現の強化をスコープから除外。残る実装スコープは「ブース専用ショートシナリオ」「サジェスト返答ボタン」の2点。Q4(感情表現強化の適用範囲)を削除。ショートシナリオはQ5次第で既存機能のデータ作成のみ（コード変更ゼロ）になり得るため、実質的な新規実装はサジェスト返答ボタンが中心になることを確認。質問ファイルを更新。
+**Context**: Requirements Analysis - スコープ縮小（感情表現強化を除外）
+
+---
+
+## INCEPTION - Requirements Analysis (Summit Demo) - 回答受領・矛盾チェック
+**Timestamp**: 2026-05-31T11:35:00Z
+**User Input**: summit-demo-verification-questions.md に回答を記入。回答サマリー: Q1=A（スコープ2点で進める）, Q2=B（サジェスト選択肢はAI動的生成）, Q3=B（サジェストボタンは本番でも選択可能な汎用機能）, Q4=B（※感情表現強化は別途スコープ外指示あり、無効扱い）, Q5=A（既存シナリオ「【デモ】AWSクラウド移行提案 - 初回商談」を改造）, Q6=Other（「デモ向け」特別実装はしない。デモ用だけの特別実装はしない）, Q7=B（Security拡張スキップ）, Q8=C（PBT拡張スキップ）。
+**AI Response**: 回答を読み取り。Q6=Other（デモ専用実装をしない方針）とQ3=B（本番汎用機能化）が整合。ただし3点の確認が必要と判断: (1)Q2=B（AI動的生成）の確定意図、(2)Q6によりショートシナリオも「デモ専用」でなく通常シナリオの改良として位置づける理解の確認、(3)感情表現強化のスコープ除外の最終確認。clarification質問を追加。
+**Context**: Requirements Analysis - 回答受領、矛盾・曖昧性チェック
+
+---
+
+## INCEPTION - Requirements Analysis (Summit Demo) - Clarification回答受領
+**Timestamp**: 2026-05-31T11:45:00Z
+**User Input**: "2. Yes. 通常のシナリオの一つです。3. スコープから外します。"
+**AI Response**: Clarification回答を受領。Clarification 2=A（ショートシナリオは通常シナリオの1つ、既存「【デモ】AWSクラウド移行提案 - 初回商談」をデータ調整のみで対応、コード変更なし）、Clarification 3=A（感情表現強化はスコープ除外で確定）。Clarification 1は未回答だがQ2=B/Q3=B/Q6=Otherと完全整合するためA（AI動的生成で確定）と解釈。結論: 今回のAI-DLCで実装する新規機能は「サジェスト返答ボタン（AI動的生成、本番でも使える汎用機能、シナリオ設定でON/OFF）」1点に確定。ショートシナリオはデータ調整のみで実装スコープ外。矛盾解消完了、要件定義書作成へ。
+**Context**: Requirements Analysis - 矛盾解消完了
+
+---
+
+## INCEPTION - Requirements Analysis (Summit Demo) - Clarification 1 確定
+**Timestamp**: 2026-05-31T11:50:00Z
+**User Input**: "Clarification 1 はAでいいです"
+**AI Response**: Clarification 1=A（サジェスト返答ボタンはAI動的生成で確定）。全Clarification解消。要件定義書作成のため、既存のチャット送信フロー・AgentCore連携・シナリオ設定型をサブエージェントで調査開始。
+**Context**: Requirements Analysis - 全論点解消、実現可能性調査へ
+
+---
+
+## INCEPTION - Requirements Analysis (Summit Demo) - 実現可能性調査・載せ先確定
+**Timestamp**: 2026-05-31T12:00:00Z
+**User Input**: "リアルタイムスコアリングに相乗り（推奨）"
+**AI Response**: context-gathererサブエージェントで既存コードを調査し実現可能性を確認。サジェスト返答ボタンのAI生成は、リアルタイムスコアリングエージェント（cdk/agents/realtime-scoring）のScoringResult構造化出力に suggestions フィールドを追加する方式で確定（追加API呼び出し・レイテンシ増なし）。フロントは ConversationPage の sendMessage(inputText?) を活用し MessageInput 直上に SuggestionBar を配置。シナリオ設定は suggestionEnabled フラグを TS型2箇所・create/update Lambda・初期JSON に追加。i18nは conversation.suggestion.* を ja/en 両方に追加。全論点解消、要件定義書を作成。
+**Context**: Requirements Analysis - 実現可能性確認完了、要件定義書作成へ
+
+---
+
+## INCEPTION - Requirements Analysis (Summit Demo) - 要件定義書作成完了
+**Timestamp**: 2026-05-31T12:10:00Z
+**AI Response**: 要件定義書を作成。機能要件5件（FR-001〜005）、非機能要件6件（NFR-001〜006）、影響範囲、ブース運用メモ、スコープ外項目、Extension設定を記載。aidlc-state.md を更新（Requirements Analysis完了、承認待ち）。
+**生成成果物**: aidlc-docs/inception/requirements/summit-demo-requirements.md
+**承認プロンプト**: 要件定義書のレビューと承認を要求
+**Context**: Requirements Analysis stage - 要件定義書作成完了、ユーザー承認待ち
+
+
+---
+
+## INCEPTION - Requirements Analysis Approval (Summit Demo)
+**Timestamp**: 2026-05-31T12:20:00Z
+**User Input**: "approve"
+**AI Response**: 要件定義書を承認。User Storiesステージはスキップ判定（単一の汎用機能追加、既存ユーザータイプ、要件明確）。Workflow Planningに進む。
+**Status**: Approved
+**Context**: Requirements Analysis完了・承認、Workflow Planningへ遷移
+
+---
+
+## INCEPTION - User Stories Assessment (Summit Demo)
+**Timestamp**: 2026-05-31T12:20:30Z
+**User Input**: N/A (自動評価)
+**AI Response**: User Storiesステージをスキップと判定。
+**Context**: User Stories stage - Intelligent assessment
+### Assessment Result:
+- **Decision**: SKIP
+- **Reasoning**:
+  - サジェスト返答ボタンという単一の汎用機能追加
+  - 既存ユーザータイプ（営業練習ユーザー）の範囲内、新規ペルソナなし
+  - 要件定義書で機能要件・受け入れ観点が明確
+  - 既存コンポーネント（ConversationPage, realtime-scoring）の拡張が中心
+---
+
+## INCEPTION - Workflow Planning (Summit Demo)
+**Timestamp**: 2026-05-31T12:25:00Z
+**User Input**: N/A (要件承認後に自動実行)
+**AI Response**: 実行計画書を作成。Code Generation + Build and Test の2ステージ実行、7ステージスキップを推奨。リスクレベルLow。
+### 実行計画サマリー:
+- **実行ステージ**: Code Generation, Build and Test
+- **スキップステージ**: User Stories, Application Design, Units Generation, Functional Design, NFR Requirements, NFR Design, Infrastructure Design
+- **リスクレベル**: Low
+- **推定期間**: 2〜4時間
+### スキップ理由:
+- Application Design: 新規サービス層不要、新規コンポーネントはSuggestionBar1つで既存組み込みパターン確立済み
+- Units Generation: 単一ユニット
+- Functional Design: 複雑なロジック・新規データモデルなし
+- NFR Requirements/Design: 既存NFR設定で十分、要件定義書に記載済み
+- Infrastructure Design: インフラ変更なし（既存AgentCore/Lambda/DynamoDB使用）
+### 生成成果物:
+- `aidlc-docs/inception/plans/summit-demo-execution-plan.md`
+**承認プロンプト**: 実行計画のレビューと承認を要求
+**Context**: Workflow Planning stage - 実行計画作成完了、ユーザー承認待ち
+
+---
+
+## INCEPTION - Workflow Planning Approval (Summit Demo)
+**Timestamp**: 2026-05-31T12:30:00Z
+**User Input**: "approve"
+**AI Response**: 実行計画を承認。Code Generation Part 1（Planning）に進む。
+**Status**: Approved
+**Context**: Workflow Planning完了・承認、Code Generationへ遷移
+
+---
+
+## CONSTRUCTION - Code Generation Part 1: Planning (Summit Demo)
+**Timestamp**: 2026-05-31T12:35:00Z
+**User Input**: N/A (ワークフロー計画承認後に自動実行)
+**AI Response**: サジェスト返答ボタンのコード生成プランを作成。9ステップ（バックエンド: models.py/prompts.py/agent.py、シナリオLambda、初期データ; フロントエンド: 型定義、SuggestionBar新規、サービス層+ConversationPage統合、i18n、型チェック・リント）。要件FR-001〜005へのトレーサビリティを明記。
+**生成成果物**:
+- `aidlc-docs/construction/plans/summit-demo-suggestion-code-generation-plan.md`
+**承認プロンプト**: コード生成プランのレビューと承認を要求
+**Context**: Code Generation Part 1完了、承認待ち
+
+---
+
+## CONSTRUCTION - Code Generation Plan Approval (Summit Demo)
+**Timestamp**: 2026-05-31T12:45:00Z
+**User Input**: "approve"
+**AI Response**: コード生成プランを承認。Part 2（Generation）を開始。Step 1から実装。
+**Status**: Approved
+**Context**: Code Generation Part 1完了・承認、Part 2実装開始
+
+---
+
+## CONSTRUCTION - Code Generation Part 2: Implementation Complete (Summit Demo)
+**Timestamp**: 2026-05-31T13:30:00Z
+**User Input**: N/A (プラン承認後に実装)
+**AI Response**: サジェスト返答ボタンのコード生成全9ステップを実装完了。
+
+### 実装内容:
+- **Step 1**: `cdk/agents/realtime-scoring/models.py` - ScoringResultに `suggestions: List[str]` 追加
+- **Step 2**: `cdk/agents/realtime-scoring/prompts.py` - 日英プロンプトに返答候補生成ルール追加 / `agent.py` - レスポンスに suggestions 含める
+- **Step 3**: `frontend/src/types/api.ts`・`index.ts` - `suggestionEnabled?: boolean` 追加
+- **Step 4**: `cdk/lambda/scenarios/index.py` - create(boolean_fields)・update(field_mappings)に suggestionEnabled 追加
+- **Step 5**: `cdk/data/scenarios.json` - デモシナリオ(aws-summit-demo)に `suggestionEnabled: true` 付与
+- **Step 6**: `frontend/src/components/conversation/SuggestionBar.tsx` 新規作成（Chipボタン、data-testid、aria-label、role=group）
+- **Step 7**: AgentCoreService/ApiService に suggestions 伝搬、ConversationPage に state+ref・評価結果取得・SuggestionBar配置・送信時クリアを統合
+- **Step 8**: ja.json/en.json に `conversation.suggestion.*` 追加
+- **Step 9**: 型チェック（新規エラーなし）、リント0件、Python構文OK
+
+### 変更ファイル:
+- cdk/agents/realtime-scoring/models.py
+- cdk/agents/realtime-scoring/prompts.py
+- cdk/agents/realtime-scoring/agent.py
+- cdk/lambda/scenarios/index.py
+- cdk/data/scenarios.json
+- frontend/src/types/api.ts
+- frontend/src/types/index.ts
+- frontend/src/components/conversation/SuggestionBar.tsx（新規）
+- frontend/src/services/AgentCoreService.ts
+- frontend/src/services/ApiService.ts
+- frontend/src/pages/ConversationPage.tsx
+- frontend/src/i18n/locales/ja.json
+- frontend/src/i18n/locales/en.json
+
+### 検証結果:
+- フロントエンドリント: エラー0件
+- 型診断: 変更ファイルに新規エラーなし（既存エラー2件 industry/ComplianceViolation は変更対象外・本変更前から存在）
+- Python構文: OK
+
+**Context**: Code Generation Part 2完了、ユーザー承認待ち
+
+## CONSTRUCTION - Code Generation Approval (Summit Demo)
+**Timestamp**: 2026-05-31T13:40:00Z
+**User Input**: "approve"
+**AI Response**: コード生成を承認。Build and Testステージに進む。
+**Status**: Approved
+**Context**: Code Generation完了・承認、Build and Testへ遷移
+
+---
+
+## CONSTRUCTION - Build and Test Stage (Summit Demo)
+**Timestamp**: 2026-05-31T13:55:00Z
+**Build Status**: Success（型チェック・リント・Python構文OK）
+**Test Status**: Pass
+### 検証結果:
+- フロントエンドユニットテスト（`npm test`）: 28スイート / 214テスト全てPass
+- フロントエンドリント（`npm run lint`）: エラー0件
+- 型診断（getDiagnostics）: 変更ファイルに新規エラーなし（既存エラー2件 industry/ComplianceViolation は対象外）
+- i18n整合性検証（`npm run validate-i18n`）: ja/en構文・キー整合OK
+- Python構文チェック: models.py/prompts.py/agent.py/scenarios/index.py すべてOK
+### Files Generated:
+- aidlc-docs/construction/build-and-test/summit-demo-suggestion-build-and-test-summary.md
+### Notes:
+- 実環境動作確認はCDKデプロイ（npm run deploy:dev）後に手動実施
+- E2Eテストはフロントエンド変更ありのためユーザー判断で実施
+**Context**: Build and Test stage完了、ユーザー承認待ち（全ステージ完了）
+
+---

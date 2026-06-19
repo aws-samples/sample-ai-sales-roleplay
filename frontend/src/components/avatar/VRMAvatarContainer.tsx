@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useCallback, useState, useMemo, useRef } from 'react';
 import { Box, Typography, CircularProgress, Alert } from '@mui/material';
-import { VolumeUp as VolumeUpIcon, Error as ErrorIcon } from '@mui/icons-material';
+import { Error as ErrorIcon } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { VRMAvatarContainerProps } from '../../types/avatar';
 import { VisemeData } from '../../types/avatar';
@@ -290,32 +290,7 @@ const VRMAvatarContainer: React.FC<VRMAvatarContainerProps> = ({
         />
       </Box>
 
-      {/* 発話インジケーター */}
-      {isSpeaking && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '8px',
-            right: '8px',
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-            color: 'white',
-            padding: '4px 8px',
-            borderRadius: '16px',
-            fontSize: '0.75rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 0.5,
-            zIndex: 10,
-          }}
-          role="status"
-          aria-live="polite"
-        >
-          <VolumeUpIcon sx={{ fontSize: '1rem' }} />
-          <Typography variant="caption" sx={{ color: 'inherit' }}>
-            {t('avatar.speaking', '発話中')}
-          </Typography>
-        </Box>
-      )}
+
 
       {/* 感情状態インジケーター（デバッグ用、本番では非表示可） */}
       {process.env.NODE_ENV === 'development' && (

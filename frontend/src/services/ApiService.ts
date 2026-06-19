@@ -401,6 +401,7 @@ export class ApiService {
     npcEmotion?: string;
     npcEmotionIntensity?: number;
     gesture?: string;
+    suggestions?: string[];
   }> {
     try {
       // AgentCore Runtimeを使用（会話履歴はAgentCore Memoryで管理）

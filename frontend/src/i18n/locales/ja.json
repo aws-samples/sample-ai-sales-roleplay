@@ -211,6 +211,10 @@
       "stopVoice": "音声入力を停止",
       "continueVoice": "音声入力を継続（既存のテキストは保持されます）"
     },
+    "suggestion": {
+      "label": "返答候補",
+      "select": "この返答を送信: {{text}}"
+    },
     "turn": "ターン",
     "emoji": {
       "emotionState": "感情状態",

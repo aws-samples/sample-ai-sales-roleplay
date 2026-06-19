@@ -1009,13 +1009,13 @@ def create_scenario():
             scenario_data["pdfFiles"] = pdf_files
         
         # オプションフィールドの追加
-        optional_fields = ["goals", "initialMetrics", "objectives", "maxTurns", "avatarId", "presentationFile"]
+        optional_fields = ["goals", "initialMetrics", "objectives", "maxTurns", "avatarId", "presentationFile", "initialSuggestions"]
         for field in optional_fields:
             if field in body and body[field]:
                 scenario_data[field] = body[field]
         
         # boolean型フィールドの追加（False値も保存する必要があるため別処理）
-        boolean_fields = ["enableAvatar"]
+        boolean_fields = ["enableAvatar", "suggestionEnabled"]
         for field in boolean_fields:
             if field in body and isinstance(body[field], bool):
                 scenario_data[field] = body[field]
@@ -1161,6 +1161,8 @@ def update_scenario(scenario_id: str):
                 "maxTurns": "maxTurns",  # 最大ターン数
                 "avatarId": "avatarId",  # アバターID
                 "enableAvatar": "enableAvatar",  # アバター表示On/Off
+                "suggestionEnabled": "suggestionEnabled",  # サジェスト返答ボタンの有効/無効
+                "initialSuggestions": "initialSuggestions",  # 初回サジェスト返答候補
                 "presentationFile": "presentationFile"  # 提案資料情報
             }
             

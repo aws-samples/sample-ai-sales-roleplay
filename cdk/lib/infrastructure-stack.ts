@@ -308,6 +308,18 @@ export class InfrastructureStack extends cdk.Stack {
       exportName: `${prefix}CloudFrontURL`
     });
 
+    new cdk.CfnOutput(this, 'NpcConversationAgentArn', {
+      value: this.npcConversationAgent.runtimeArn,
+      description: 'AgentCore Runtime ARN for NPC Conversation',
+      exportName: `${prefix}NpcConversationAgentArn`
+    });
+
+    new cdk.CfnOutput(this, 'RealtimeScoringAgentArn', {
+      value: this.realtimeScoringAgent.runtimeArn,
+      description: 'AgentCore Runtime ARN for Realtime Scoring',
+      exportName: `${prefix}RealtimeScoringAgentArn`
+    });
+
     this.userPool = auth.userPool;
     this.userPoolClient = auth.client;
   }

@@ -19,14 +19,14 @@ const TARGET_FPS = 30;
 const FRAME_INTERVAL = 1000 / TARGET_FPS;
 
 /**
- * カメラ設定 - 顔全体が見える位置
+ * カメラ設定 - 上半身全体（頭〜腰）が映るバストショット
  */
 const CAMERA_CONFIG = {
-  fov: 20,
+  fov: 30,
   near: 0.1,
   far: 100,
-  position: { x: 0, y: 1.35, z: 1.0 },
-  lookAt: { x: 0, y: 1.35, z: 0 },
+  position: { x: 0, y: 1.2, z: 1.2 },
+  lookAt: { x: 0, y: 1.25, z: 0 },
 };
 
 /**

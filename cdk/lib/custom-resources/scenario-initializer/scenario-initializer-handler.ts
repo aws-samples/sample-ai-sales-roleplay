@@ -168,6 +168,8 @@ export async function handler(event: CloudFormationEvent): Promise<void> {
 
                 initialMessage: scenario.initialMessage,
                 maxTurns: scenario.maxTurns || 0, // デフォルト値は0
+                suggestionEnabled: scenario.suggestionEnabled ?? false, // サジェスト返答ボタンの有効/無効（未設定時はfalse）
+                initialSuggestions: scenario.initialSuggestions || [], // 初回サジェスト返答候補（未設定時は空配列）
                 npc: {
                   id: npc.id || '',
                   name: npc.name || '',

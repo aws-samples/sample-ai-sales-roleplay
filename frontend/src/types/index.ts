@@ -29,6 +29,8 @@ export interface Scenario {
   goals: GoalInfo[]; // シナリオのゴール一覧
   maxTurns?: number; // 最大会話ターン数（指定しない場合はデフォルト値を使用）
   enableAvatar?: boolean; // アバター表示On/Off（未設定時はfalse）
+  suggestionEnabled?: boolean; // サジェスト返答ボタンの有効/無効（未設定時はfalse）
+  initialSuggestions?: string[]; // 商談開始時に表示する初回サジェスト返答候補
 }
 
 // 拡張メトリクス（詳細スコア付き）

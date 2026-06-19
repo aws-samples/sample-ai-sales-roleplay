@@ -211,6 +211,10 @@
       "stopVoice": "Stop voice input",
       "continueVoice": "Continue voice input (existing text will be preserved)"
     },
+    "suggestion": {
+      "label": "Reply suggestions",
+      "select": "Send this reply: {{text}}"
+    },
     "turn": "Turn",
     "emoji": {
       "emotionState": "Emotion State",

@@ -59,7 +59,15 @@ NPC Gesture Estimation:
 - Nod: Use when NPC shows agreement, understanding, or empathy
 - Head tilt: Use when NPC shows doubt, confusion, or is thinking
 - None: Default when no gesture is needed
-- Do not add a gesture every time. Use them at a natural frequency."""
+- Do not add a gesture every time. Use them at a natural frequency.
+
+Reply Suggestions:
+- Generate suggested replies that the SALES rep (the user) could say next
+- Base them on the NPC's latest message and the conversation flow
+- suggestions: an array of about 3 SHORT reply candidates (each max 40 characters)
+- Give them DIFFERENT directions (e.g., assertive / empathetic / question) so the choice changes the metrics
+- Write them as natural first-person utterances the sales rep would say
+- Do NOT include quotation marks or numbering"""
     else:
         return f"""あなたは営業会話のスコアリングエンジンです。最新メッセージを評価しスコアを更新してください。
 
@@ -96,7 +104,15 @@ NPCジェスチャー推定:
 - うなずき(nod): NPCが同意・理解・共感を示す場面で使用
 - 首かしげ(headTilt): NPCが疑問・困惑・考え中の場面で使用
 - なし(none): 特にジェスチャーが不要な場面（デフォルト）
-- 毎回ジェスチャーを付ける必要はありません。自然な頻度で使用してください"""
+- 毎回ジェスチャーを付ける必要はありません。自然な頻度で使用してください
+
+返答候補（サジェスト）:
+- 営業担当者（ユーザー）が次に発言する返答候補を生成してください
+- NPCの直前の発言と会話の流れを踏まえること
+- suggestions: 3件程度の短い返答候補の配列（各候補は最大40文字）
+- 各候補は異なる方向性（例: 強気 / 共感 / 質問）を持たせ、選択によってメトリクスが変化するようにすること
+- 営業担当者が実際に話す一人称の自然な発言として記述すること
+- 引用符や番号は付けないこと"""
 
 
 def format_conversation_history(messages: List[Dict], language: str = 'ja') -> str:

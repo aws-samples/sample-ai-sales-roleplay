@@ -40,6 +40,7 @@ import { AvatarProvider } from "../components/avatar";
 import type { GestureType } from "../types/avatar";
 import MessageList from "../components/conversation/MessageList";
 import MessageInput from "../components/conversation/MessageInput";
+import SuggestionBar from "../components/conversation/SuggestionBar";
 // クリーンアップ用のuseEffectを追加
 import { useEffect, useState, useCallback, useRef } from "react";
 import ComplianceAlert from "../components/compliance/ComplianceAlert";
@@ -112,6 +113,12 @@ const ConversationPage: React.FC = () => {
   const [npcDirectEmotion, setNpcDirectEmotion] = useState<EmotionState | undefined>(undefined);
   // NPCジェスチャー状態（リアルタイム評価から取得、アバターに渡す）
   const [npcGesture, setNpcGesture] = useState<GestureType>('none');
+  // サジェスト返答候補（リアルタイム評価から取得、サジェストボタンに渡す）
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  // シナリオのサジェスト返答ボタン有効/無効
+  const [suggestionEnabled, setSuggestionEnabled] = useState<boolean>(false);
+  // シナリオの初回サジェスト返答候補（商談開始時に表示）
+  const [initialSuggestions, setInitialSuggestions] = useState<string[]>([]);
   // シナリオに紐づくアバターID
   const [scenarioAvatarId, setScenarioAvatarId] = useState<string | undefined>(undefined);
   // シナリオに紐づくアバターS3キー
@@ -159,6 +166,8 @@ const ConversationPage: React.FC = () => {
   const goalStatusesRef = useRef<GoalStatus[]>([]);
   const goalsRef = useRef<Goal[]>([]);
   const slideImagesRef = useRef<SlideImageInfo[]>([]);
+  // suggestionEnabledをrefで管理（sendMessageの依存配列から除外するため）
+  const suggestionEnabledRef = useRef<boolean>(false);
 
   // userInputの変更をrefに同期
   useEffect(() => {
@@ -187,6 +196,11 @@ const ConversationPage: React.FC = () => {
   useEffect(() => {
     slideImagesRef.current = slideImages;
   }, [slideImages]);
+
+  // suggestionEnabledの変更をrefに同期
+  useEffect(() => {
+    suggestionEnabledRef.current = suggestionEnabled;
+  }, [suggestionEnabled]);
   // コンプライアンス違反の通知管理
   const [activeViolation, setActiveViolation] =
     useState<ComplianceViolation | null>(null);
@@ -354,6 +368,11 @@ const ConversationPage: React.FC = () => {
             setEnableAvatar(scenarioInfo.enableAvatar ?? false);
             // ランタイムトグルの初期値もシナリオ設定に合わせる
             setAvatarVisible(scenarioInfo.enableAvatar ?? false);
+
+            // シナリオのサジェスト返答ボタン有効/無効設定を読み込み（未設定時はfalse）
+            setSuggestionEnabled(scenarioInfo.suggestionEnabled ?? false);
+            // シナリオの初回サジェスト返答候補を読み込み（未設定時は空配列）
+            setInitialSuggestions(scenarioInfo.initialSuggestions ?? []);
 
             // シナリオNPCの音声モデルIDを設定（アバターAPI取得前に即座に設定）
             // アバター詳細APIの完了を待つとvoiceId設定が遅延し、
@@ -536,6 +555,11 @@ const ConversationPage: React.FC = () => {
       messagesRef.current = initialMessages;
       setMessages(initialMessages);
       setCurrentEmotion("neutral");
+
+      // 初回サジェスト返答候補を表示（シナリオで有効かつ初回候補が設定されている場合）
+      if (suggestionEnabled && initialSuggestions.length > 0) {
+        setSuggestions(initialSuggestions);
+      }
     }, 100); // 100ms遅延させる
 
     // 初期メッセージの音声合成
@@ -641,6 +665,9 @@ const ConversationPage: React.FC = () => {
 
     // 音声認識の状態もリセット
     setConfirmedTranscripts([]);
+
+    // 送信時にサジェスト返答候補をクリア（次の評価結果で更新される）
+    setSuggestions([]);
 
     // メッセージ送信時に一時的に感情状態を更新
     // ユーザーが入力している間は中立的な状態にする
@@ -865,6 +892,11 @@ const ConversationPage: React.FC = () => {
                     // ジェスチャー実行後にリセット
                     gestureTimerRef.current = setTimeout(() => setNpcGesture('none'), 1500);
                   }
+                }
+
+                // サジェスト返答候補を更新（シナリオで有効な場合のみ表示）
+                if (suggestionEnabledRef.current && Array.isArray(evaluationResult.suggestions)) {
+                  setSuggestions(evaluationResult.suggestions);
                 }
 
                 // 新しいメトリクスを設定
@@ -1311,13 +1343,11 @@ const ConversationPage: React.FC = () => {
     <Box
       className={`conversation-container ${emotionClassName}`}
       sx={{
-        flex: 1,
-        minHeight: 0,
+        height: "calc(100vh - 96px)",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
         position: "relative",
-        my: -2,
       }}
     >
       {/* ヘッダー */}
@@ -1349,177 +1379,256 @@ const ConversationPage: React.FC = () => {
           flex: 1,
           position: "relative",
           display: "flex",
-          flexDirection: "column",
+          // セッション開始後は3カラム横並び、開始前は従来の縦積み
+          flexDirection: sessionStarted ? "row" : "column",
           minHeight: 0,
           overflow: "hidden",
+          // 左右の余白を確保して見切れを防止
+          px: sessionStarted ? 1 : 0,
         }}
       >
-        {/* メトリクスオーバーレイ（左上） */}
-        {sessionStarted && (
-          <MetricsOverlay
-            currentMetrics={currentMetrics}
-            prevMetrics={prevMetrics}
-            metricsUpdating={metricsUpdating}
-            visible={metricsVisible}
-          />
-        )}
-
-        {/* 右側パネル（ゴール・シナリオ・ペルソナ） */}
-        {sessionStarted && (
-          <RightPanelContainer
-            visible={rightPanelsVisible}
-            goals={goals}
-            goalStatuses={goalStatuses}
-            scenario={scenario}
-          />
-        )}
-
-        {/* カメラプレビュー（左上、メトリクスの下） */}
-        {videoRecordingEnabled && (
+        {/* ===== 左カラム: アバター + メトリクス + スライド ===== */}
+        {sessionStarted && avatarVisible && (
           <Box
-            data-testid="video-manager-container"
             sx={{
-              position: "absolute",
-              top: metricsVisible && sessionStarted ? 110 : 12,
-              left: 12,
-              zIndex: 10,
-              width: 180,
-              borderRadius: 2,
+              width: "22%",
+              minWidth: 260,
+              maxWidth: 360,
+              display: "flex",
+              flexDirection: "column",
+              borderRight: "1px solid",
+              borderColor: "divider",
               overflow: "hidden",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
-              transition: "top 0.2s ease",
-              "@media (prefers-reduced-motion: reduce)": {
-                transition: "none",
-              },
+              position: "relative",
             }}
           >
-            <VideoManager
-              ref={undefined}
-              sessionId={sessionId}
-              sessionStarted={sessionStarted}
-              sessionEnded={sessionEnded}
-              onCameraInitialized={handleCameraInitialized}
-            />
+            {/* アバターステージ（カラム全体を使用） */}
+            <AvatarProvider>
+              <Box sx={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+              }}>
+                <AvatarStage
+                  avatarId={scenarioAvatarId}
+                  avatarS3Key={scenarioAvatarS3Key}
+                  angerLevel={currentMetrics.angerLevel}
+                  trustLevel={currentMetrics.trustLevel}
+                  progressLevel={currentMetrics.progressLevel}
+                  isSpeaking={isSpeaking}
+                  directEmotion={npcDirectEmotion}
+                  gesture={npcGesture}
+                  onEmotionChange={handleEmotionChange}
+                  npcName={scenario.npc.name}
+                />
+              </Box>
+            </AvatarProvider>
+
+            {/* スペーサー（提案資料を下部に押す） */}
+            <Box sx={{ flex: 1 }} />
+
+            {/* スライドトレイ（提案資料、アバターの上に重ねる） */}
+            {slideImages.length > 0 && (
+              <Box sx={{
+                position: "relative",
+                zIndex: 10,
+                maxHeight: 100,
+                overflow: "auto",
+                background: "rgba(255, 255, 255, 0.85)",
+                backdropFilter: "blur(4px)",
+              }}>
+                <SlideTray
+                  slides={slideImages}
+                  currentIndex={currentSlideIndex}
+                  presentedPages={presentedSlidePages}
+                  onSlideSelect={setCurrentSlideIndex}
+                  onPresent={handleSlidePresent}
+                  onUnpresent={handleSlideUnpresent}
+                  onClearAll={handleSlideClearAll}
+                  onZoom={() => setIsSlideZoomOpen(true)}
+                />
+              </Box>
+            )}
+
+            {/* カメラプレビュー（左カラム下部） */}
+            {videoRecordingEnabled && (
+              <Box
+                data-testid="video-manager-container"
+                sx={{
+                  borderTop: "1px solid",
+                  borderColor: "divider",
+                  p: 1,
+                }}
+              >
+                <VideoManager
+                  ref={undefined}
+                  sessionId={sessionId}
+                  sessionStarted={sessionStarted}
+                  sessionEnded={sessionEnded}
+                  onCameraInitialized={handleCameraInitialized}
+                />
+              </Box>
+            )}
           </Box>
         )}
 
-        {/* アバターステージ（中央） — CR-009: AvatarProviderを条件分岐外に配置し再マウント防止 */}
-        {avatarVisible && (
-          <AvatarProvider>
-            <Box sx={{
-              flex: sessionStarted ? "1 1 0" : "0 0 0",
-              minHeight: 0,
-              maxHeight: sessionStarted ? "40vh" : 0,
-              visibility: sessionStarted ? 'visible' : 'hidden',
-              overflow: 'hidden',
-            }}>
-              <AvatarStage
-                avatarId={scenarioAvatarId}
-                avatarS3Key={scenarioAvatarS3Key}
-                angerLevel={currentMetrics.angerLevel}
-                trustLevel={currentMetrics.trustLevel}
-                progressLevel={currentMetrics.progressLevel}
-                isSpeaking={isSpeaking}
-                directEmotion={npcDirectEmotion}
-                gesture={npcGesture}
-                onEmotionChange={handleEmotionChange}
-                npcName={scenario.npc.name}
-              />
-            </Box>
-          </AvatarProvider>
-        )}
-
-
-        {/* スライドトレイ（提案資料がある場合のみ表示） */}
-        {sessionStarted && slideImages.length > 0 && (
-          <Box sx={{ mr: rightPanelsVisible ? RIGHT_PANEL_OFFSET : 0 }}>
-            <SlideTray
-              slides={slideImages}
-              currentIndex={currentSlideIndex}
-              presentedPages={presentedSlidePages}
-              onSlideSelect={setCurrentSlideIndex}
-              onPresent={handleSlidePresent}
-              onUnpresent={handleSlideUnpresent}
-              onClearAll={handleSlideClearAll}
-              onZoom={() => setIsSlideZoomOpen(true)}
-            />
-          </Box>
-        )}
-
-        {/* チャットログ（下部） */}
+        {/* ===== 中央カラム: チャットログ + 入力 ===== */}
         <Box
           sx={{
-            // セッション開始前はflex:1で全体を使用、開始後は残りスペースを埋める
-            ...(sessionStarted
-              ? {
-                flex: "1 1 auto",
-                minHeight: 100,
-                // アバター非表示時はmaxHeight制限を解除してチャットログを拡張
-                ...(avatarVisible ? { maxHeight: "30vh" } : {}),
-                // 右パネルと重ならないようにマージンを追加
-                mr: rightPanelsVisible ? RIGHT_PANEL_OFFSET : 0,
-                // アバター非表示時はメトリクス・カメラとの重なりを防ぐため左パディング追加
-                ...(!avatarVisible ? { pl: LEFT_METRICS_OFFSET } : {}),
-                display: "flex",
-                flexDirection: "column",
-              }
-              : {
-                flex: 1,
-                minHeight: 0,
-                display: "flex",
-                flexDirection: "column",
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            // セッション開始前はメトリクスをabsolute配置で表示
+            position: "relative",
+          }}
+        >
+          {/* アバターなし時：メトリクスは右パネルにのみ表示（アバターあり版と統一） */}
+
+          {/* セッション開始前のカメラプレビュー */}
+          {videoRecordingEnabled && !sessionStarted && (
+            <Box
+              data-testid="video-manager-container"
+              sx={{
+                position: "absolute",
+                top: 12,
+                left: 12,
+                zIndex: 10,
+                width: 180,
+                borderRadius: 2,
+                overflow: "hidden",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+              }}
+            >
+              <VideoManager
+                ref={undefined}
+                sessionId={sessionId}
+                sessionStarted={sessionStarted}
+                sessionEnded={sessionEnded}
+                onCameraInitialized={handleCameraInitialized}
+              />
+            </Box>
+          )}
+
+          {/* チャットログ */}
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              ...((!sessionStarted) && {
                 cursor: "default",
                 backgroundColor: "#fafafa",
               }),
-            overflow: "hidden",
-            "@media (prefers-reduced-motion: reduce)": {
-              transition: "none",
-            },
-          }}
-          role="region"
-          aria-label={
-            chatLogExpanded
-              ? t("conversation.chatLog.collapse")
-              : t("conversation.chatLog.expand")
-          }
-        >
-          <MessageList
-            messages={messages}
-            isProcessing={isProcessing}
-            sessionStarted={sessionStarted}
-            sessionEnded={sessionEnded}
-            currentMetrics={currentMetrics}
-            scenario={scenario}
-            onStartConversation={startConversation}
-            isCameraInitialized={isCameraInitialized}
-            cameraError={cameraError}
-            videoRecordingEnabled={videoRecordingEnabled}
-            slideImages={slideImages}
-            onSlideClick={(idx) => { setCurrentSlideIndex(idx); setIsSlideZoomOpen(true); }}
-          />
+            }}
+            role="region"
+            aria-label={
+              chatLogExpanded
+                ? t("conversation.chatLog.collapse")
+                : t("conversation.chatLog.expand")
+            }
+          >
+            <MessageList
+              messages={messages}
+              isProcessing={isProcessing}
+              sessionStarted={sessionStarted}
+              sessionEnded={sessionEnded}
+              currentMetrics={currentMetrics}
+              scenario={scenario}
+              onStartConversation={startConversation}
+              isCameraInitialized={isCameraInitialized}
+              cameraError={cameraError}
+              videoRecordingEnabled={videoRecordingEnabled}
+              slideImages={slideImages}
+              onSlideClick={(idx) => { setCurrentSlideIndex(idx); setIsSlideZoomOpen(true); }}
+            />
+          </Box>
+
+          {/* コーチングヒントバー */}
+          <Box sx={{ flexShrink: 0 }}>
+            <CoachingHintBar hint={currentMetrics.analysis} />
+          </Box>
+
+          {/* サジェスト返答ボタン（コーチングヒントと入力欄の間に表示） */}
+          {sessionStarted && !sessionEnded && suggestionEnabled && (
+            <Box sx={{ flexShrink: 0 }}>
+              <SuggestionBar
+                suggestions={suggestions}
+                onSelect={(text) => sendMessage(text)}
+                disabled={isProcessing}
+              />
+            </Box>
+          )}
+
+          {/* メッセージ入力エリア */}
+          <Box sx={{ flexShrink: 0 }}>
+            <MessageInput
+              userInput={userInput}
+              setUserInput={setUserInput}
+              sendMessage={sendMessage}
+              isProcessing={isProcessing}
+              isListening={isListening}
+              isConnecting={connectionState === ConnectionState.CONNECTING}
+              speechRecognitionError={speechRecognitionError}
+              startSpeechRecognition={startSpeechRecognition}
+              switchToTextInput={switchToTextInput}
+              handleKeyDown={handleKeyDown}
+              sessionStarted={sessionStarted}
+              sessionEnded={sessionEnded}
+              continuousListening={continuousListening}
+            />
+          </Box>
         </Box>
 
+        {/* ===== 右カラム: メトリクス + ゴール + シナリオ情報 ===== */}
+        {sessionStarted && rightPanelsVisible && (
+          <Box
+            sx={{
+              width: "25%",
+              minWidth: 240,
+              maxWidth: 320,
+              borderLeft: "1px solid",
+              borderColor: "divider",
+              overflow: "auto",
+            }}
+          >
+            {/* メトリクスパネル（右カラム上部） */}
+            {metricsVisible && (
+              <Box sx={{
+                borderBottom: "1px solid",
+                borderColor: "divider",
+                "& > [role='region']": {
+                  position: "static",
+                  borderRadius: 0,
+                  boxShadow: "none",
+                  background: "transparent",
+                  m: 0,
+                  maxWidth: "none",
+                },
+              }}>
+                <MetricsOverlay
+                  currentMetrics={currentMetrics}
+                  prevMetrics={prevMetrics}
+                  metricsUpdating={metricsUpdating}
+                  visible={metricsVisible}
+                />
+              </Box>
+            )}
+            <RightPanelContainer
+              visible={true}
+              goals={goals}
+              goalStatuses={goalStatuses}
+              scenario={scenario}
+            />
+          </Box>
+        )}
+
       </Box>
-
-      {/* コーチングヒントバー（入力エリア上部） */}
-      <CoachingHintBar hint={currentMetrics.analysis} />
-
-      {/* メッセージ入力エリア */}
-      <MessageInput
-        userInput={userInput}
-        setUserInput={setUserInput}
-        sendMessage={sendMessage}
-        isProcessing={isProcessing}
-        isListening={isListening}
-        isConnecting={connectionState === ConnectionState.CONNECTING}
-        speechRecognitionError={speechRecognitionError}
-        startSpeechRecognition={startSpeechRecognition}
-        switchToTextInput={switchToTextInput}
-        handleKeyDown={handleKeyDown}
-        sessionStarted={sessionStarted}
-        sessionEnded={sessionEnded}
-        continuousListening={continuousListening}
-      />
 
       {/* スライド拡大モーダル */}
       {slideImages.length > 0 && (

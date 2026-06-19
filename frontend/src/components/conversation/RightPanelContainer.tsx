@@ -28,16 +28,12 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
   return (
     <Box
       sx={{
-        position: "absolute",
-        top: 12,
-        right: 12,
-        zIndex: 20,
         display: "flex",
         flexDirection: "column",
         gap: 1,
-        maxWidth: 260,
-        maxHeight: "calc(100% - 24px)",
+        height: "100%",
         overflowY: "auto",
+        p: 1.5,
         // スクロールバーをコンパクトに
         "&::-webkit-scrollbar": { width: 4 },
         "&::-webkit-scrollbar-thumb": {

@@ -377,6 +377,10 @@ export interface ScenarioInfo {
   presentationFile?: PresentationFileInfo;
   avatarId?: string;
   enableAvatar?: boolean;
+  /** サジェスト返答ボタンの有効/無効（未設定時はfalse） */
+  suggestionEnabled?: boolean;
+  /** 商談開始時に表示する初回サジェスト返答候補（ユーザー初回入力前用） */
+  initialSuggestions?: string[];
 }
 
 // ============================================================

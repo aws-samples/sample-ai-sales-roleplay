@@ -46,9 +46,9 @@ const MetricsOverlay: React.FC<MetricsOverlayProps> = ({
   return (
     <Box
       sx={{
-        position: "absolute",
-        top: 12,
-        left: 12,
+        position: "relative",
+        top: "auto",
+        left: "auto",
         background: "rgba(255, 255, 255, 0.92)",
         backdropFilter: "blur(8px)",
         borderRadius: 3,
@@ -59,6 +59,8 @@ const MetricsOverlay: React.FC<MetricsOverlayProps> = ({
         flexDirection: "column",
         gap: 0.75,
         minWidth: 160,
+        maxWidth: 220,
+        m: 1.5,
         transition: "opacity 0.2s",
         "@media (prefers-reduced-motion: reduce)": {
           transition: "none",

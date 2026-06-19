@@ -241,6 +241,7 @@ def handle_invocation(payload: Dict[str, Any]) -> Dict[str, Any]:
             'scores': scores,
             'analysis': analysis,
             'goalUpdates': result_dict.get('goalUpdates', []),
+            'suggestions': result_dict.get('suggestions', []),
             'sessionId': session_id,
             'memoryEnabled': bool(AGENTCORE_MEMORY_ID),
         }

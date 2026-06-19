@@ -42,42 +42,26 @@ const AvatarStage: React.FC<AvatarStageProps> = ({
   return (
     <Box
       sx={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
+        width: "100%",
+        height: "100%",
         position: "relative",
-        p: 2.5,
-        minHeight: 0,
+        overflow: "hidden",
       }}
       role="region"
       aria-label={t("avatarStage.label")}
     >
-      {/* NPC名ラベル */}
-      <Typography
-        sx={{
-          fontSize: "0.8125rem",
-          fontWeight: 600,
-          color: "text.secondary",
-          mb: 1.5,
-          px: 1.75,
-          py: 0.5,
-          background: "rgba(255, 255, 255, 0.8)",
-          borderRadius: "9999px",
-          zIndex: 5,
-        }}
-      >
-        {npcName}
-      </Typography>
+      {/* NPC名ラベル（非表示） */}
 
       {/* VRMアバター */}
       <Box
         sx={{
           width: "100%",
-          flex: 1,
-          minHeight: 0,
-          maxWidth: 600,
+          height: "100%",
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
         }}
       >
         <VRMAvatarContainer
