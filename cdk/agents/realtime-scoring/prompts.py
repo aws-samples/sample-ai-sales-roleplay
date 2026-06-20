@@ -10,7 +10,8 @@ def build_scoring_prompt(
     previous_messages: List[Dict],
     current_scores: Dict[str, Any],
     goals: List[Dict],
-    language: str = 'ja'
+    language: str = 'ja',
+    scenario_description: str = ''
 ) -> str:
     """スコアリング用プロンプトを構築"""
     anger = current_scores.get('angerLevel', 1)
@@ -24,10 +25,11 @@ def build_scoring_prompt(
     goals_txt = format_goals(goals, language)
     
     if language == 'en':
+        scenario_ctx = f"\nScenario Context: {scenario_description}\n" if scenario_description else ""
         return f"""You are a sales conversation scoring engine. Evaluate the latest message and update scores.
 
 Current Scores: Anger={anger}/10, Trust={trust}/10, Progress={progress}/10
-
+{scenario_ctx}
 Conversation:
 {history}
 
@@ -64,15 +66,18 @@ NPC Gesture Estimation:
 Reply Suggestions:
 - Generate suggested replies that the SALES rep (the user) could say next
 - Base them on the NPC's latest message and the conversation flow
+- IMPORTANT: Consider the scenario context and goal hints when generating suggestions
+- Prioritize suggestions that help achieve unachieved goals
 - suggestions: an array of about 3 SHORT reply candidates (each max 40 characters)
 - Give them DIFFERENT directions (e.g., assertive / empathetic / question) so the choice changes the metrics
 - Write them as natural first-person utterances the sales rep would say
 - Do NOT include quotation marks or numbering"""
     else:
+        scenario_ctx = f"\nシナリオの背景: {scenario_description}\n" if scenario_description else ""
         return f"""あなたは営業会話のスコアリングエンジンです。最新メッセージを評価しスコアを更新してください。
 
 現在のスコア: 怒り={anger}/10, 信頼={trust}/10, 進捗={progress}/10
-
+{scenario_ctx}
 会話履歴:
 {history}
 
@@ -109,6 +114,8 @@ NPCジェスチャー推定:
 返答候補（サジェスト）:
 - 営業担当者（ユーザー）が次に発言する返答候補を生成してください
 - NPCの直前の発言と会話の流れを踏まえること
+- 重要: シナリオの背景とゴールのヒントを考慮して提案を生成すること
+- 未達成のゴールの達成を助ける提案を優先すること
 - suggestions: 3件程度の短い返答候補の配列（各候補は最大40文字）
 - 各候補は異なる方向性（例: 強気 / 共感 / 質問）を持たせ、選択によってメトリクスが変化するようにすること
 - 営業担当者が実際に話す一人称の自然な発言として記述すること
@@ -140,6 +147,8 @@ def format_goals(goals: List[Dict], language: str = 'ja') -> str:
     
     achieved_label = '達成' if language == 'ja' else 'Achieved'
     not_achieved_label = '未達成' if language == 'ja' else 'Not achieved'
+    hints_label = 'ヒント' if language == 'ja' else 'Hints'
+    criteria_label = '達成基準' if language == 'ja' else 'Criteria'
     
     lines = []
     for goal in goals:
@@ -148,6 +157,16 @@ def format_goals(goals: List[Dict], language: str = 'ja') -> str:
         achieved = goal.get('achieved', False)
         status = achieved_label if achieved else not_achieved_label
         lines.append(f"- [ID: {goal_id}] {description}: {status}")
+        
+        # 達成基準を含める（未達成ゴールのみ、サジェスト品質向上のため）
+        criteria = goal.get('criteria', [])
+        if criteria and not achieved:
+            lines.append(f"  {criteria_label}: {'; '.join(criteria)}")
+        
+        # ヒントを含める（未達成ゴールのみ、サジェスト品質向上のため）
+        hints = goal.get('hints', [])
+        if hints and not achieved:
+            lines.append(f"  {hints_label}: {'; '.join(hints)}")
     
     return "\n".join(lines)
 

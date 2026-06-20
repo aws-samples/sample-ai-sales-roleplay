@@ -839,6 +839,8 @@ const ConversationPage: React.FC = () => {
                   trustLevel: currentMetricsRef.current.trustLevel,
                   progressLevel: currentMetricsRef.current.progressLevel,
                 },
+                // シナリオの説明文を渡す（サジェスト品質向上のため）
+                String(scenario.description || ""),
               );
 
               // コンプライアンスチェック結果の確認

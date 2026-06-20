@@ -196,7 +196,8 @@ def handle_invocation(payload: Dict[str, Any]) -> Dict[str, Any]:
             previous_messages,
             payload.get('currentScores', get_default_scores()),
             goals,
-            payload.get('language', 'ja')
+            payload.get('language', 'ja'),
+            payload.get('scenarioDescription', '')
         )
         
         logger.info(f"Building scoring prompt for session: {session_id}")

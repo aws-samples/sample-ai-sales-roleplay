@@ -389,6 +389,7 @@ export class ApiService {
       trustLevel: number;
       progressLevel: number;
     },
+    scenarioDescription?: string,
   ): Promise<{
     scores?: {
       angerLevel: number;
@@ -419,6 +420,7 @@ export class ApiService {
         scenarioId,
         language,
         currentScores,
+        scenarioDescription,
       );
     } catch (error) {
       console.error("リアルタイム評価API呼び出しエラー:", error);

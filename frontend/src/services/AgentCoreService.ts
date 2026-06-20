@@ -393,7 +393,8 @@ export class AgentCoreService {
       angerLevel: number;
       trustLevel: number;
       progressLevel: number;
-    }
+    },
+    scenarioDescription?: string
   ): Promise<{
     scores?: {
       angerLevel: number;
@@ -445,11 +446,13 @@ export class AgentCoreService {
           description: goal.description || "",
           priority: typeof goal.priority === "number" ? goal.priority : 3,
           criteria: Array.isArray(goal.criteria) ? goal.criteria : [],
+          hints: Array.isArray(goal.hints) ? goal.hints : [],
           isRequired: Boolean(goal.isRequired)
         }))
       } : {}),
       ...(scenarioId ? { scenarioId } : {}),
       ...(language ? { language } : {}),
+      ...(scenarioDescription ? { scenarioDescription } : {}),
     };
 
     try {
