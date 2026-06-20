@@ -83,14 +83,15 @@ def register_session_routes(app: APIGatewayRestResolver):
                         'ScanIndexForward': False  # 降順（最新のセッションから）
                     }
             else:
-                # 通常のユーザーIDによるクエリ
+                # UserCompletedSessionsIndex GSIを使用して完了セッションを時刻降順で取得
                 dynamo_query_params = {
+                    'IndexName': 'UserCompletedSessionsIndex',
                     'KeyConditionExpression': 'userId = :uid',
                     'ExpressionAttributeValues': {
                         ':uid': user_id
                     },
                     'Limit': limit,
-                    'ScanIndexForward': False  # 降順（最新のセッションから）
+                    'ScanIndexForward': False  # 降順（最新の完了セッションから）
                 }
             
             # ページネーショントークンの追加

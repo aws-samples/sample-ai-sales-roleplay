@@ -68,6 +68,20 @@ export class DatabaseTables extends Construct {
       projectionType: dynamodb.ProjectionType.ALL
     });
 
+    // 完了セッションを時刻降順で取得するためのGSI
+    this.sessionsTable.addGlobalSecondaryIndex({
+      indexName: 'UserCompletedSessionsIndex',
+      partitionKey: {
+        name: 'userId',
+        type: dynamodb.AttributeType.STRING
+      },
+      sortKey: {
+        name: 'completedAt',
+        type: dynamodb.AttributeType.STRING
+      },
+      projectionType: dynamodb.ProjectionType.ALL
+    });
+
     // メッセージテーブル
     this.messagesTable = new dynamodb.Table(this, 'MessagesTable', {
       tableName: `${prefix}AISalesRolePlay-Messages`,
@@ -99,7 +113,7 @@ export class DatabaseTables extends Construct {
       timeToLiveAttribute: 'expireAt', // TTL属性
       removalPolicy: cdk.RemovalPolicy.DESTROY, // 開発環境用設定（本番環境では注意）
     });
-    
+
     // ランキング用のGSIを追加
     this.sessionFeedbackTable.addGlobalSecondaryIndex({
       indexName: 'scenarioId-overallScore-index',

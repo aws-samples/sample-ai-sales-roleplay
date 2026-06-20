@@ -138,6 +138,7 @@ export class SessionLambdaConstruct extends Construct {
           `arn:aws:dynamodb:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:table/${props.scenariosTableName}/index/CategoryIndex`,
           `arn:aws:dynamodb:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:table/${props.sessionsTableName}/index/CreatedAtIndex`,
           `arn:aws:dynamodb:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:table/${props.sessionsTableName}/index/ScenarioSessionsIndex`,
+          `arn:aws:dynamodb:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:table/${props.sessionsTableName}/index/UserCompletedSessionsIndex`,
         ],
       })
     );

@@ -173,9 +173,17 @@ export class SessionAnalysisLambdaConstruct extends Construct {
     // 全ての関数にDynamoDB権限を付与
     allFunctions.forEach(func => {
       props.sessionFeedbackTable.grantReadWriteData(func);
-      props.sessionsTable.grantReadData(func);
       props.messagesTable.grantReadData(func);
       props.scenariosTable.grantReadData(func);
+    });
+
+    // SessionsテーブルはsaveFunctionのみ書き込み権限が必要（完了時にstatus更新）
+    allFunctions.forEach(func => {
+      if (func === this.saveFunction) {
+        props.sessionsTable.grantReadWriteData(func);
+      } else {
+        props.sessionsTable.grantReadData(func);
+      }
     });
 
     // AgentCore Memory権限（start_handlerで会話履歴を取得、feedback_handlerでスライド提示履歴を取得）

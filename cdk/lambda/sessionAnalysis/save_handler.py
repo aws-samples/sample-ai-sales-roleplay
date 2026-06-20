@@ -19,6 +19,7 @@ logger = Logger(service="session-analysis-save")
 
 # 環境変数
 SESSION_FEEDBACK_TABLE = os.environ.get("SESSION_FEEDBACK_TABLE")
+SESSIONS_TABLE = os.environ.get("SESSIONS_TABLE")
 
 # DynamoDBクライアント
 dynamodb = boto3.resource("dynamodb")
@@ -87,6 +88,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             reference_check=reference_check,
             language=language
         )
+        
+        # Sessionsテーブルのステータスを「completed」に更新
+        update_session_status(session_id, user_id)
         
         # 分析ステータスを「完了」に更新
         update_analysis_status(session_id, "completed")
@@ -183,6 +187,48 @@ def save_to_dynamodb(
         "has_video_analysis": video_analysis is not None,
         "has_reference_check": reference_check is not None
     })
+
+
+def update_session_status(session_id: str, user_id: str):
+    """Sessionsテーブルのステータスをcompletedに更新し、completedAtを設定"""
+    try:
+        if not SESSIONS_TABLE:
+            logger.warning("SESSIONS_TABLE環境変数が設定されていません")
+            return
+            
+        sessions_table = dynamodb.Table(SESSIONS_TABLE)
+        completed_at = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        
+        sessions_table.update_item(
+            Key={
+                'userId': user_id,
+                'sessionId': session_id
+            },
+            UpdateExpression='SET #status = :status, completedAt = :completedAt, updatedAt = :updatedAt',
+            ExpressionAttributeNames={
+                '#status': 'status'
+            },
+            ExpressionAttributeValues={
+                ':status': 'completed',
+                ':completedAt': completed_at,
+                ':updatedAt': completed_at
+            }
+        )
+        
+        logger.info("セッションステータス更新完了", extra={
+            "session_id": session_id,
+            "user_id": user_id,
+            "status": "completed",
+            "completed_at": completed_at
+        })
+        
+    except Exception as e:
+        # ステータス更新エラーは分析結果の保存には影響させない
+        logger.error("セッションステータス更新エラー", extra={
+            "session_id": session_id,
+            "user_id": user_id,
+            "error": str(e)
+        })
 
 
 def update_analysis_status(session_id: str, status: str, error_message: str = None):
