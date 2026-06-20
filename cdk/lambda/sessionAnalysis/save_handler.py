@@ -80,6 +80,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         save_to_dynamodb(
             session_id=session_id,
             scenario_id=scenario_id,
+            user_id=user_id,
             feedback_data=feedback_data,
             final_metrics=final_metrics,
             goal_results=goal_results,
@@ -124,6 +125,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 def save_to_dynamodb(
     session_id: str,
     scenario_id: str,
+    user_id: str,
     feedback_data: Dict[str, Any],
     final_metrics: Dict[str, Any],
     goal_results: Dict[str, Any],
@@ -148,6 +150,7 @@ def save_to_dynamodb(
         "createdAt": current_time,
         "dataType": "final-feedback",
         "scenarioId": scenario_id,
+        "userId": user_id,
         "language": language,
         "expireAt": expire_at
     }
