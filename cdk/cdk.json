@@ -1,5 +1,5 @@
 {
-  "app": "npx ts-node --prefer-ts-exts bin/cdk.ts",
+  "app": "cp data/guardrails.json agents/realtime-scoring/guardrails.json && npx ts-node --prefer-ts-exts bin/cdk.ts",
   "watch": {
     "include": [
       "**"

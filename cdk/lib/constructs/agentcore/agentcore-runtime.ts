@@ -86,10 +86,12 @@ export class AgentCoreRuntime extends Construct {
     runtime.addToRolePolicy(new iam.PolicyStatement({
       sid: 'BedrockModelInvocation',
       effect: iam.Effect.ALLOW,
-      actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
+      actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream', 'bedrock:ApplyGuardrail'],
       resources: [
         'arn:aws:bedrock:*::foundation-model/*',
         `arn:aws:bedrock:*:${account}:inference-profile/*`,
+        `arn:aws:bedrock:*:${account}:guardrail/*`,
+        `arn:aws:bedrock:*:${account}:guardrail-profile/*`,
         `arn:aws:bedrock:${region}:${account}:*`,
       ],
     }));

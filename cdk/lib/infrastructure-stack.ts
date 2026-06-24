@@ -163,7 +163,9 @@ export class InfrastructureStack extends cdk.Stack {
       memoryId: this.sessionMemory.memoryId,
       additionalEnvironmentVariables: {
         SESSION_FEEDBACK_TABLE: databaseTables.sessionFeedbackTable.tableName,
+        SCENARIOS_TABLE_NAME: databaseTables.scenariosTable.tableName,
         BEDROCK_MODEL_SCORING: props!.bedrockModels.scoring,
+        ENVIRONMENT_PREFIX: resourcePrefix,
       },
       additionalPolicies: [
         new cdk.aws_iam.PolicyStatement({
@@ -171,6 +173,27 @@ export class InfrastructureStack extends cdk.Stack {
           effect: cdk.aws_iam.Effect.ALLOW,
           actions: ['dynamodb:PutItem', 'dynamodb:GetItem', 'dynamodb:Query'],
           resources: [databaseTables.sessionFeedbackTable.tableArn],
+        }),
+        new cdk.aws_iam.PolicyStatement({
+          sid: 'DynamoDBScenariosReadAccess',
+          effect: cdk.aws_iam.Effect.ALLOW,
+          actions: ['dynamodb:GetItem'],
+          resources: [databaseTables.scenariosTable.tableArn],
+        }),
+        new cdk.aws_iam.PolicyStatement({
+          sid: 'SSMGuardrailParameterAccess',
+          effect: cdk.aws_iam.Effect.ALLOW,
+          actions: ['ssm:GetParameter'],
+          resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter/aisalesroleplay/guardrails/*`],
+        }),
+        new cdk.aws_iam.PolicyStatement({
+          sid: 'BedrockGuardrailAccess',
+          effect: cdk.aws_iam.Effect.ALLOW,
+          actions: ['bedrock:ApplyGuardrail'],
+          resources: [
+            `arn:aws:bedrock:${this.region}:${this.account}:guardrail/*`,
+            `arn:aws:bedrock:*:${this.account}:guardrail-profile/*`,
+          ],
         }),
       ],
     });

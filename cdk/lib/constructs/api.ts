@@ -11,7 +11,6 @@ import { VideoStorageConstruct } from './storage/video-storage';
 import { AvatarStorageConstruct } from './storage/avatar-storage';
 import { VideosLambdaConstruct } from './api/videos-lambda';
 import { AvatarLambdaConstruct } from './api/avatar-lambda';
-import { ScoringLambdaConstruct } from './api/scoring-lambda';
 import { SessionLambdaConstruct } from './api/session-lambda';
 import { ScenarioLambdaConstruct } from './api/scenario-lambda';
 import { SlideConvertLambdaConstruct } from './api/slide-convert-lambda';
@@ -84,9 +83,6 @@ export class Api extends Construct {
 
   /** ランキング管理Lambda */
   public readonly rankingsLambdaConstruct: RankingsLambdaConstruct;
-
-  /** スコア管理Lambda */
-  public readonly scoringLambdaConstruct: ScoringLambdaConstruct;
 
   /** 音声分析Lambda */
   public readonly audioAnalysisLambda: AudioAnalysisLambdaConstruct;
@@ -193,15 +189,6 @@ export class Api extends Construct {
     // S3バケットへの書き込み権限を付与
     this.audioStorage.bucket.grantReadWrite(this.textToSpeechFunction);
 
-    // スコアリングLambda関数
-    this.scoringLambdaConstruct = new ScoringLambdaConstruct(this, 'ScoringLambda', {
-      scoringModelId: bedrockModels.scoring,
-      guardrailModelId: bedrockModels.guardrail,
-      environmentPrefix: props.resourceNamePrefix,
-      scenariosTable: this.databaseTables.scenariosTable,
-      sessionFeedbackTable: this.databaseTables.sessionFeedbackTable,
-    });
-
     // ランキングLambda関数を作成 (新しいRankingsLambdaConstructを使用)
     this.rankingsLambdaConstruct = new RankingsLambdaConstruct(this, 'RankingsLambda', {
       sessionFeedbackTable: this.databaseTables.sessionFeedbackTable,
@@ -298,7 +285,6 @@ export class Api extends Construct {
       userPool: props.userPool!,
       userPoolClient: props.userPoolClient!,
       textToSpeechFunction: this.textToSpeechFunction,
-      scoringFunction: this.scoringLambdaConstruct.function,
       sessionFunction: this.sessionLambda.function,
       scenarioFunction: this.scenarioLambda.function,
       rankingFunction: this.rankingsLambdaConstruct.function,

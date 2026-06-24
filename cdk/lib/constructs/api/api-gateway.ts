@@ -17,8 +17,6 @@ export interface ApiGatewayConstructProps {
   rankingFunction: lambda.Function;
   /** テキスト→音声変換Lambda関数 */
   textToSpeechFunction: lambda.Function;
-  /** スコアリングフィードバックLambda関数 */
-  scoringFunction: lambda.Function;
   /** ガードレール管理Lambda関数 */
   guardrailsFunction: lambda.Function;
   /** セッション管理Lambda関数 */
@@ -118,20 +116,6 @@ export class ApiGatewayConstruct extends Construct {
     convertResource.addMethod(
       'POST',
       new apigateway.LambdaIntegration(props.textToSpeechFunction),
-      {
-        authorizer: auth,
-        authorizationType: apigateway.AuthorizationType.COGNITO,
-      }
-    );
-
-    // Scoring API endpoints (スコアリングAPI)
-    const scoringResource = this.api.root.addResource('scoring');
-    const realtimeResource = scoringResource.addResource('realtime');
-
-    // POST /scoring/realtime - リアルタイムスコアリングエンドポイント
-    realtimeResource.addMethod(
-      'POST',
-      new apigateway.LambdaIntegration(props.scoringFunction),
       {
         authorizer: auth,
         authorizationType: apigateway.AuthorizationType.COGNITO,
