@@ -57,7 +57,11 @@
 - CDK Nag（セキュリティチェック）
 
 ### アーキテクチャ
-![](./docs/image/Architecture.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/image/Architecture.png">
+  <source media="(prefers-color-scheme: light)" srcset="./docs/image/Architecture.png">
+  <img src="./docs/image/Architecture.png" alt="Architecture" style="background-color: #1a1a2e;">
+</picture>
 
 ## セットアップ
 
