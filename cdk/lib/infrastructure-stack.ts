@@ -291,7 +291,6 @@ export class InfrastructureStack extends cdk.Stack {
       selfSignUpEnabled,
       webAclId: props?.webAclId,
       resourceNamePrefix: resourcePrefix,
-      transcribeWebSocketEndpoint: api.transcribeWebSocket.webSocketApiEndpoint,
       avatarBucket: api.avatarStorage.bucket,
       agentCoreEnabled: true,
       npcConversationAgentArn: this.npcConversationAgent.runtimeArn,
@@ -317,12 +316,6 @@ export class InfrastructureStack extends cdk.Stack {
       value: api.api.api.url,
       description: 'API Gateway Endpoint URL',
       exportName: `${prefix}ApiEndpoint`
-    });
-
-    new cdk.CfnOutput(this, 'TranscribeWebSocketEndpoint', {
-      value: api.transcribeWebSocket.webSocketApiEndpoint,
-      description: 'WebSocket API Endpoint for Transcribe integration',
-      exportName: `${prefix}TranscribeWebSocketEndpoint`
     });
 
     new cdk.CfnOutput(this, 'CloudFrontURL', {

@@ -153,6 +153,22 @@ export class Auth extends Construct {
       })
     );
 
+    // Grant permissions for Transcribe Streaming (speech-to-text)
+    // ブラウザから直接 Transcribe Streaming WebSocket に接続するために必要
+    idPool.authenticatedRole.attachInlinePolicy(
+      new Policy(this, 'GrantAccessTranscribe', {
+        statements: [
+          new PolicyStatement({
+            actions: [
+              'transcribe:StartStreamTranscription',
+              'transcribe:StartStreamTranscriptionWebSocket'
+            ],
+            resources: ['*'],
+          }),
+        ],
+      })
+    );
+
     this.client = client;
     this.userPool = userPool;
     this.idPool = idPool;

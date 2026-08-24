@@ -17,7 +17,7 @@ import { SlideConvertLambdaConstruct } from './api/slide-convert-lambda';
 import { RankingsLambdaConstruct } from './api/rankings-lambda';
 import { GuardrailsLambdaConstruct } from './api/guardrails-lambda';
 import { AudioAnalysisLambdaConstruct } from './api/audio-analysis-lambda';
-import { TranscribeWebSocketConstruct } from './api/transcribe-websocket';
+
 
 // DatabaseTablesをインポート
 import { DatabaseTables } from './storage/database-tables';
@@ -44,9 +44,6 @@ export interface BackendApiProps {
 
 export class Api extends Construct {
   readonly api: ApiGatewayConstruct;
-
-  /** WebSocket API for Transcribe */
-  public readonly transcribeWebSocket: TranscribeWebSocketConstruct;
 
   /** 音声ストレージ */
   public readonly audioStorage: AudioStorageConstruct;
@@ -269,16 +266,6 @@ export class Api extends Construct {
       'SESSION_ANALYSIS_STATE_MACHINE_ARN',
       this.sessionAnalysisStepFunctions.stateMachine.stateMachineArn
     );
-
-    // WebSocket API for Transcribe
-    this.transcribeWebSocket = new TranscribeWebSocketConstruct(this, 'TranscribeWebSocket', {
-      stageName: 'prod',
-      envId: props.envId,
-      userPool: props.userPool!,
-      userPoolClient: props.userPoolClient!,
-      sessionsTable: props.databaseTables.sessionsTable,
-      scenariosTable: props.databaseTables.scenariosTable
-    });
 
     // API Gateway
     this.api = new ApiGatewayConstruct(this, 'ApiGateway', {

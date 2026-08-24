@@ -247,12 +247,6 @@ const ConversationPage: React.FC = () => {
       setConnectionState(state);
     });
 
-    // 環境変数からWebSocketエンドポイントを取得
-    const websocketEndpoint = import.meta.env.VITE_TRANSCRIBE_WEBSOCKET_URL;
-    if (websocketEndpoint) {
-      transcribeServiceRef.current.setWebSocketEndpoint(websocketEndpoint);
-    }
-
     return () => {
       // コンポーネントのアンマウント時にリソース解放
       if (transcribeServiceRef.current) {

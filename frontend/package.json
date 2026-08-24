@@ -22,6 +22,7 @@
   "dependencies": {
     "@aws-amplify/pubsub": "^6.1.69",
     "@aws-amplify/ui-react": "^6.15.2",
+    "@aws-sdk/client-transcribe-streaming": "^3.700.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@fontsource/roboto": "^5.2.10",

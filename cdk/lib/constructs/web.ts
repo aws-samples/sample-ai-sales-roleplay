@@ -14,7 +14,6 @@ export interface WebProps {
   selfSignUpEnabled: boolean;
   webAclId?: string;
   resourceNamePrefix?: string; // リソース名のプレフィックス
-  transcribeWebSocketEndpoint: string; // Transcribe WebSocketエンドポイント
   avatarBucket?: s3.IBucket; // アバターVRMファイル用S3バケット
   // AgentCore Runtime設定
   agentCoreEnabled?: boolean;
@@ -143,7 +142,6 @@ export class Web extends Construct {
         VITE_COGNITO_USER_POOL_CLIENT_ID: props.userPoolClientId,
         VITE_COGNITO_IDENTITY_POOL_ID: props.idPoolId,
         VITE_APP_SELF_SIGN_UP_ENABLED: props.selfSignUpEnabled.toString(),
-        VITE_TRANSCRIBE_WEBSOCKET_URL: props.transcribeWebSocketEndpoint,
         // アバターCDN URL（CloudFront経由でアバターVRMファイルを配信）
         VITE_AVATAR_CDN_URL: `https://${cloudFrontWebDistribution.domainName}/avatars`,
         // AgentCore Runtime設定

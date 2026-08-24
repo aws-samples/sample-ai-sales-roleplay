@@ -1,10 +1,23 @@
 /**
- * Amazon Transcribeストリーミング統合サービス
- * 
- * WebSocketを通じて音声をストリーミングし、Amazon Transcribeによるリアルタイム音声認識を
- * 実行するためのサービスクラスです。常時マイク入力を可能にし、無音検出による自動発話終了を
- * サポートします。認証されたWebSocket接続を使用します。
+ * Amazon Transcribeストリーミング統合サービス（ブラウザ直接接続版）
+ *
+ * ブラウザから直接 Amazon Transcribe Streaming WebSocket に接続し、
+ * リアルタイム音声認識を実行するサービスクラスです。
+ *
+ * 従来の Lambda 経由方式では、音声チャンクごとに別々の Lambda 実行環境に
+ * ルーティングされ、Transcribe セッションが維持できない問題がありました。
+ * この実装では Cognito Identity Pool の一時クレデンシャルを使って
+ * ブラウザから直接 Transcribe に接続することで、この問題を根本解決します。
+ *
+ * @see https://github.com/aws-samples/sample-ai-sales-roleplay/issues/93
  */
+
+import {
+  TranscribeStreamingClient,
+  StartStreamTranscriptionCommand,
+  LanguageCode,
+} from '@aws-sdk/client-transcribe-streaming';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 /**
  * WebSocket接続状態の定義
@@ -15,15 +28,25 @@ export enum ConnectionState {
   CONNECTED = 'connected',          // 接続完了
   CONNECTION_ERROR = 'connection_error'  // 接続エラー
 }
+
+/**
+ * 言語コードマッピング
+ */
+const LANGUAGE_MAP: Record<string, LanguageCode> = {
+  'ja': 'ja-JP' as LanguageCode,
+  'en': 'en-US' as LanguageCode,
+};
+
 export class TranscribeService {
   private static instance: TranscribeService;
-  private socket: WebSocket | null = null;
+  private transcribeClient: TranscribeStreamingClient | null = null;
   private audioContext: AudioContext | null = null;
   private audioProcessor: ScriptProcessorNode | null = null;
   private mediaStream: MediaStream | null = null;
   private isRecording: boolean = false;
   private silenceDetectionTimer: ReturnType<typeof setTimeout> | null = null;
   private lastVoiceActivityTime: number = 0;
+  private abortController: AbortController | null = null;
 
   // 接続状態管理
   private connectionState: ConnectionState = ConnectionState.DISCONNECTED;
@@ -31,15 +54,13 @@ export class TranscribeService {
   // 設定パラメータ
   private silenceThresholdMs: number = 5000;  // 無音判定閾値（ミリ秒）- マイク放置時の安全弁
   private voiceThreshold: number = 1.5;  // 音声判定閾値（環境ノイズ除外用）
-  private websocketUrl: string = '';
   private language: string = 'ja';  // 言語情報を保持
   private currentSessionId: string = '';  // 現在のセッションID
+  private region: string = '';
 
-  // 自動再接続とバッファリング
-  private audioBuffer: Array<{ audio: string, language: string }> = [];
-  private isReconnecting: boolean = false;
-  private maxBufferSize: number = 50; // 最大バッファサイズ（約5秒分）
-  private reconnectPromise: Promise<void> | null = null;
+  // 音声データキュー（Transcribe Streaming に流すバッファ）
+  private audioQueue: Uint8Array[] = [];
+  private isStreaming: boolean = false;
 
   // コールバック関数
   private onTranscriptCallback: ((text: string, isFinal: boolean) => void) | null = null;
@@ -52,15 +73,6 @@ export class TranscribeService {
    */
   private constructor() {
     // シングルトン初期化
-  }
-
-  /**
-   * WebSocketエンドポイントを設定
-   * 
-   * @param url WebSocketエンドポイントURL
-   */
-  public setWebSocketEndpoint(url: string): void {
-    this.websocketUrl = url;
   }
 
   /**
@@ -92,7 +104,7 @@ export class TranscribeService {
 
   /**
    * 接続状態を変更する（内部使用）
-   * 
+   *
    * @private
    * @param {ConnectionState} newState 新しい接続状態
    */
@@ -100,7 +112,7 @@ export class TranscribeService {
     if (this.connectionState !== newState) {
       const oldState = this.connectionState;
       this.connectionState = newState;
-      console.warn(`接続状態変更: ${oldState} → ${newState}`);
+      console.log(`Transcribe接続状態変更: ${oldState} → ${newState}`);
 
       // 接続状態変更コールバックを実行
       if (this.onConnectionStateChangeCallback) {
@@ -111,7 +123,7 @@ export class TranscribeService {
 
   /**
    * 現在の接続状態を取得
-   * 
+   *
    * @returns {ConnectionState} 現在の接続状態
    */
   public getConnectionState(): ConnectionState {
@@ -120,7 +132,7 @@ export class TranscribeService {
 
   /**
    * 接続状態変更時のコールバックを設定
-   * 
+   *
    * @param {function} callback 接続状態変更時に呼ばれるコールバック関数
    */
   public setOnConnectionStateChange(callback: (state: ConnectionState) => void | null): void {
@@ -140,7 +152,30 @@ export class TranscribeService {
   }
 
   /**
-   * WebSocket接続を初期化
+   * Cognito Identity Pool から一時クレデンシャルを取得し、
+   * Transcribe Streaming クライアントを初期化する
+   */
+  private async initializeTranscribeClient(): Promise<void> {
+    const session = await fetchAuthSession();
+
+    if (!session.credentials) {
+      throw new Error('Cognito一時クレデンシャルが取得できませんでした');
+    }
+
+    this.region = import.meta.env.VITE_AWS_REGION || 'ap-northeast-1';
+
+    this.transcribeClient = new TranscribeStreamingClient({
+      region: this.region,
+      credentials: {
+        accessKeyId: session.credentials.accessKeyId,
+        secretAccessKey: session.credentials.secretAccessKey,
+        sessionToken: session.credentials.sessionToken,
+      },
+    });
+  }
+
+  /**
+   * 接続を初期化（Transcribe クライアントの準備）
    *
    * @param sessionId セッションID
    * @param language 言語設定 (例: 'ja', 'en')
@@ -149,131 +184,122 @@ export class TranscribeService {
     // セッションIDと言語情報を保存
     this.currentSessionId = sessionId;
     this.language = language || 'ja';
-    if (!this.websocketUrl) {
-      this.setConnectionState(ConnectionState.CONNECTION_ERROR);
-      throw new Error('WebSocketエンドポイントが設定されていません');
-    }
-
-    // 既存の接続を閉じる
-    this.closeConnection();
 
     // 接続開始状態に変更
     this.setConnectionState(ConnectionState.CONNECTING);
 
     try {
-      // AuthServiceから認証トークンを取得
-      const { AuthService } = await import('./AuthService');
-      const authService = AuthService.getInstance();
-      const token = await authService.getAuthToken();
-
-      if (!token) {
-        throw new Error('認証トークンが取得できませんでした');
-      }
-
-      // 認証トークン付きの接続URL
-      const authenticatedUrl = `${this.websocketUrl}?session=${encodeURIComponent(sessionId)}&token=${encodeURIComponent(token)}`;
-
-      return new Promise((resolve, reject) => {
-        try {
-          this.socket = new WebSocket(authenticatedUrl);
-
-          this.socket.onopen = () => {
-            this.setConnectionState(ConnectionState.CONNECTED);
-            resolve();
-          };
-
-          this.socket.onmessage = (event) => {
-            try {
-              const data = JSON.parse(event.data);
-              if (data.transcript && this.onTranscriptCallback) {
-                // isPartial: true=途中認識、false=最終確定（AWS Transcribe APIの標準に準拠）
-                this.onTranscriptCallback(data.transcript, data.isPartial || false);
-              }
-
-              // Lambda側のvoiceActivityは無視（フロントエンド側の音声レベル判定を優先）
-              // 実際の音声レベル検出はaudioProcessor内で行う
-            } catch (error) {
-              console.error('WebSocketメッセージ解析エラー:', error);
-            }
-          };
-
-          this.socket.onerror = (error) => {
-            console.error('WebSocketエラー:', error);
-            this.setConnectionState(ConnectionState.CONNECTION_ERROR);
-            reject(error);
-          };
-
-          this.socket.onclose = (event) => {
-            console.warn(`WebSocket切断: コード=${event.code}, wasClean=${event.wasClean}`);
-
-            // 音声認識中だった場合は、次の音声検出時に自動再接続を準備
-            if (this.isRecording) {
-              console.warn('音声認識中の切断を検出、次の音声で再接続します');
-            }
-            this.setConnectionState(ConnectionState.DISCONNECTED);
-          };
-        } catch (error) {
-          console.error('WebSocket初期化エラー:', error);
-          reject(error);
-        }
-      });
+      await this.initializeTranscribeClient();
+      this.setConnectionState(ConnectionState.CONNECTED);
+      console.log('Transcribe直接接続の準備完了');
     } catch (error) {
-      console.error('WebSocket接続エラー:', error);
+      console.error('Transcribeクライアント初期化エラー:', error);
       this.setConnectionState(ConnectionState.CONNECTION_ERROR);
       if (this.onErrorCallback) {
-        this.onErrorCallback(error instanceof Error ? error : new Error('WebSocket接続エラー'));
+        this.onErrorCallback(error instanceof Error ? error : new Error('Transcribe初期化エラー'));
       }
       throw error;
     }
   }
 
   /**
-   * 自動再接続（既に再接続中の場合は既存のPromiseを返す）
-   * 
+   * Transcribe Streaming セッションを開始
+   *
    * @private
-   * @returns {Promise<void>} 再接続完了のPromise
    */
-  private async autoReconnect(): Promise<void> {
-    // 既に再接続中なら、その完了を待つ
-    if (this.reconnectPromise) {
-      return this.reconnectPromise;
+  private async startTranscribeStream(): Promise<void> {
+    if (!this.transcribeClient) {
+      throw new Error('Transcribeクライアントが初期化されていません');
     }
 
-    if (!this.currentSessionId) {
-      console.error('セッションIDが設定されていないため、再接続できません');
+    if (this.isStreaming) {
       return;
     }
 
-    this.isReconnecting = true;
+    this.isStreaming = true;
+    this.abortController = new AbortController();
 
-    this.reconnectPromise = (async () => {
-      try {
-        await this.initializeConnection(this.currentSessionId, this.language);
-        console.warn('自動再接続完了');
+    const languageCode = LANGUAGE_MAP[this.language] || ('ja-JP' as LanguageCode);
 
-        // バッファに溜まった音声データを送信
-        if (this.audioBuffer.length > 0) {
-          for (const bufferedData of this.audioBuffer) {
-            if (this.socket?.readyState === WebSocket.OPEN) {
-              this.socket.send(JSON.stringify({
-                action: 'sendAudio',
-                audio: bufferedData.audio,
-                language: bufferedData.language
-              }));
+    // 音声ストリームの AsyncGenerator
+    const audioStream = this.createAudioStream();
+
+    const command = new StartStreamTranscriptionCommand({
+      LanguageCode: languageCode,
+      MediaEncoding: 'pcm',
+      MediaSampleRateHertz: 16000,
+      AudioStream: audioStream,
+    });
+
+    try {
+      const response = await this.transcribeClient.send(command, {
+        abortSignal: this.abortController.signal,
+      });
+
+      // 結果ストリームを非同期で処理
+      if (response.TranscriptResultStream) {
+        this.processTranscriptStream(response.TranscriptResultStream);
+      }
+    } catch (error: unknown) {
+      // AbortError は正常終了（stopListening時）
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Transcribeセッション正常終了');
+        return;
+      }
+      console.error('Transcribe Streamingエラー:', error);
+      this.isStreaming = false;
+
+      if (this.onErrorCallback) {
+        this.onErrorCallback(error instanceof Error ? error : new Error('Transcribe Streamingエラー'));
+      }
+    }
+  }
+
+  /**
+   * 音声データの AsyncGenerator を作成
+   * audioQueue にデータが積まれるたびに yield する
+   */
+  private async *createAudioStream(): AsyncGenerator<{ AudioEvent: { AudioChunk: Uint8Array } }> {
+    while (!this.abortController?.signal.aborted) {
+      if (this.audioQueue.length > 0) {
+        const chunk = this.audioQueue.shift();
+        if (chunk) {
+          yield { AudioEvent: { AudioChunk: chunk } };
+        }
+      } else {
+        // データがない場合は短い待機（CPU を解放）
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+    }
+  }
+
+  /**
+   * Transcribe の結果ストリームを処理
+   */
+  private async processTranscriptStream(
+    stream: AsyncIterable<{ TranscriptEvent?: { Transcript?: { Results?: Array<{ Alternatives?: Array<{ Transcript?: string }>; IsPartial?: boolean }> } } }>
+  ): Promise<void> {
+    try {
+      for await (const event of stream) {
+        if (event.TranscriptEvent?.Transcript?.Results) {
+          for (const result of event.TranscriptEvent.Transcript.Results) {
+            const transcript = result.Alternatives?.[0]?.Transcript || '';
+            const isPartial = result.IsPartial === true;
+
+            if (transcript.trim() && this.onTranscriptCallback) {
+              this.onTranscriptCallback(transcript, isPartial);
             }
           }
-          this.audioBuffer = [];
         }
-      } catch (error) {
-        console.error('❌ 自動再接続失敗:', error);
-        throw error;
-      } finally {
-        this.isReconnecting = false;
-        this.reconnectPromise = null;
       }
-    })();
-
-    return this.reconnectPromise;
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+      console.error('Transcriptストリーム処理エラー:', error);
+    } finally {
+      this.isStreaming = false;
+    }
   }
 
   /**
@@ -292,13 +318,16 @@ export class TranscribeService {
       this.stopListening();
     }
 
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      throw new Error('WebSocket接続が確立されていません');
+    if (!this.transcribeClient) {
+      throw new Error('Transcribeクライアントが初期化されていません。initializeConnection()を先に呼んでください');
     }
 
     this.onTranscriptCallback = onTranscript;
     this.onSilenceDetectedCallback = onSilence || null;
     this.onErrorCallback = onError || null;
+
+    // 音声キューをリセット
+    this.audioQueue = [];
 
     try {
       // マイクへのアクセスを要求
@@ -339,50 +368,16 @@ export class TranscribeService {
 
           if (isVoiceDetected) {
             this.lastVoiceActivityTime = Date.now();
-
-            // 音声検出時に接続が切れていたら自動再接続
-            if (!this.isConnected() && !this.isReconnecting && this.currentSessionId) {
-              this.autoReconnect().catch(err => {
-                console.error('自動再接続エラー:', err);
-                if (this.onErrorCallback) {
-                  this.onErrorCallback(err instanceof Error ? err : new Error('自動再接続失敗'));
-                }
-              });
-            }
           }
 
           // Float32ArrayをInt16Arrayに変換（PCM 16bit）
           const pcmData = new Int16Array(inputData.length);
           for (let i = 0; i < inputData.length; i++) {
-            // -1.0から1.0の範囲を-32768から32767の範囲に変換
             pcmData[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32767));
           }
 
-          // Int16ArrayをUint8Arrayに変換してBase64エンコード
-          const uint8Array = new Uint8Array(pcmData.buffer);
-          const base64Audio = this.arrayBufferToBase64(uint8Array.buffer);
-
-          // 接続状態に応じて送信またはバッファリング
-          if (this.socket?.readyState === WebSocket.OPEN && !this.isReconnecting) {
-            // 接続済み：直接送信
-            this.socket.send(JSON.stringify({
-              action: 'sendAudio',
-              audio: base64Audio,
-              language: this.language  // 言語情報を追加
-            }));
-          } else if (isVoiceDetected) {
-            // 音声検出中で未接続：バッファに保存
-            this.audioBuffer.push({
-              audio: base64Audio,
-              language: this.language
-            });
-
-            // バッファサイズ制限
-            if (this.audioBuffer.length > this.maxBufferSize) {
-              this.audioBuffer.shift(); // 古いデータを削除
-              console.warn('⚠️ バッファが満杯、古いデータを削除');
-            }
-          }
+          // Transcribe Streaming のキューに追加
+          this.audioQueue.push(new Uint8Array(pcmData.buffer));
         } catch (error) {
           console.error('音声データ処理エラー:', error);
         }
@@ -396,6 +391,14 @@ export class TranscribeService {
       this.startSilenceDetection();
 
       this.isRecording = true;
+
+      // Transcribe Streaming セッションを開始（非同期、バックグラウンド）
+      this.startTranscribeStream().catch(error => {
+        console.error('Transcribe Streaming 開始エラー:', error);
+        if (this.onErrorCallback) {
+          this.onErrorCallback(error instanceof Error ? error : new Error('Transcribe開始エラー'));
+        }
+      });
     } catch (error) {
       console.error('音声認識開始エラー:', error);
       if (this.onErrorCallback) {
@@ -444,6 +447,14 @@ export class TranscribeService {
       this.silenceDetectionTimer = null;
     }
 
+    // Transcribe Streaming セッションを終了
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+    this.isStreaming = false;
+    this.audioQueue = [];
+
     // Web Audio API リソースを停止
     if (this.audioProcessor) {
       try {
@@ -468,37 +479,12 @@ export class TranscribeService {
   }
 
   /**
-   * WebSocket接続を閉じる
-   */
-  private closeConnection(): void {
-    if (this.socket) {
-      try {
-        if (this.socket.readyState === WebSocket.OPEN ||
-          this.socket.readyState === WebSocket.CONNECTING) {
-          this.socket.close();
-        }
-      } catch (e) {
-        console.warn('WebSocket切断エラー:', e);
-      }
-      this.socket = null;
-    }
-    // 手動で切断した場合は切断状態に設定
-    if (this.connectionState !== ConnectionState.CONNECTION_ERROR) {
-      this.setConnectionState(ConnectionState.DISCONNECTED);
-    }
-  }
-
-  /**
    * リソースを解放
    */
   public dispose(): void {
     this.stopListening();
-    this.closeConnection();
-
-    // バッファをクリア
-    this.audioBuffer = [];
-    this.isReconnecting = false;
-    this.reconnectPromise = null;
+    this.transcribeClient = null;
+    this.setConnectionState(ConnectionState.DISCONNECTED);
 
     if (this.audioContext) {
       try {
@@ -520,29 +506,13 @@ export class TranscribeService {
   }
 
   /**
-   * WebSocketが接続されているかを確認
+   * Transcribeクライアントが準備できているかを確認
    *
    * @returns {boolean} 接続されている場合true
    */
   public isConnected(): boolean {
-    return this.socket !== null && this.socket.readyState === WebSocket.OPEN;
-  }
-
-  /**
-   * ArrayBufferをBase64に変換
-   *
-   * @param buffer 変換するArrayBuffer
-   * @returns {string} Base64エンコードされた文字列
-   */
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    const chunkSize = 8192;
-    const chunks: string[] = [];
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      const chunk = bytes.subarray(i, i + chunkSize);
-      chunks.push(String.fromCharCode.apply(null, Array.from(chunk)));
-    }
-    return window.btoa(chunks.join(''));
+    return this.transcribeClient !== null &&
+      this.connectionState === ConnectionState.CONNECTED;
   }
 }
 
