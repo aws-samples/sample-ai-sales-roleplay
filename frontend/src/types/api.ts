@@ -346,6 +346,8 @@ export interface ScenarioInfo {
   description: string;
   difficulty: DifficultyLevel;
   category: string;
+  /** @deprecated 後方互換用。旧APIレスポンスが返す業種名。新規コードはcategoryを使用すること */
+  industry?: string;
   initialMessage?: string;
   language?: string;
   estimatedDuration?: number;

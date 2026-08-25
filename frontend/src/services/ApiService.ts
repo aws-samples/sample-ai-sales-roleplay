@@ -1300,7 +1300,7 @@ export class ApiService {
           ...response,
           complianceViolations: Array.isArray(response.complianceViolations)
             ? response.complianceViolations.map((v) =>
-              typeof (v as Record<string, unknown>).rule_id === "string"
+              typeof (v as unknown as Record<string, unknown>).rule_id === "string"
                 ? transformComplianceViolation(v as never)
                 : v,
             )
