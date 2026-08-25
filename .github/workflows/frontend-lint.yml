@@ -3,12 +3,12 @@ name: Frontend ESLint Check
 on:
   pull_request:
     paths:
-      - 'frontend/**'
+      - "frontend/**"
   push:
     branches:
       - main
     paths:
-      - 'frontend/**'
+      - "frontend/**"
 
 jobs:
   eslint:
@@ -17,26 +17,26 @@ jobs:
     defaults:
       run:
         working-directory: ./frontend
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "24"
+          cache: "npm"
           cache-dependency-path: ./frontend/package-lock.json
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run ESLint
         # ESLINT_FAIL_ON_WARNING=true を設定することでwarningもエラーとして処理されます
         run: |
           echo "Running ESLint with warnings treated as errors..."
           ESLINT_FAIL_ON_WARNING=true npm run lint
-        
+
       - name: Check TypeScript compilation
         run: tsc --noEmit
