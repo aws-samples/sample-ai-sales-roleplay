@@ -25,7 +25,7 @@
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "25.5.0",
-    "aws-cdk": "2.1114.1",
+    "aws-cdk": "2.1139.0",
     "aws-cdk-lib": "^2.262.0",
     "cdk-nag": "^2.37.55",
     "jest": "^30.3.0",
