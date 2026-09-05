@@ -41,8 +41,12 @@ export class TranscribeService {
   private static instance: TranscribeService;
   private transcribeClient: TranscribeStreamingClient | null = null;
   private audioContext: AudioContext | null = null;
-  private audioProcessor: ScriptProcessorNode | null = null;
+  private audioWorkletNode: AudioWorkletNode | null = null;
+  private mediaStreamSource: MediaStreamAudioSourceNode | null = null;
   private mediaStream: MediaStream | null = null;
+  // AudioWorklet モジュール（transcribe-audio-processor.js）を AudioContext ごとに
+  // 一度だけ addModule するためのフラグ管理用
+  private workletModuleLoaded: boolean = false;
   private isRecording: boolean = false;
   private silenceDetectionTimer: ReturnType<typeof setTimeout> | null = null;
   private lastVoiceActivityTime: number = 0;
@@ -61,6 +65,14 @@ export class TranscribeService {
   // 音声データキュー（Transcribe Streaming に流すバッファ）
   private audioQueue: Uint8Array[] = [];
   private isStreaming: boolean = false;
+  // 最後に Transcribe へ音声チャンクを送信した時刻（キープアライブ判定用）
+  private lastAudioSentTime: number = 0;
+  // キープアライブ用の無音PCMチャンク送信間隔（ミリ秒）
+  // Transcribe は「15秒間新しい音声が来ない」とタイムアウトするため、
+  // それより十分短い間隔で無音チャンクを送り続けてセッションを維持する。
+  private readonly keepAliveIntervalMs: number = 5000;
+  // キープアライブ用の無音PCMチャンク（16kHz / 16bit / モノラルの 100ms 相当 = 1600 サンプル）
+  private readonly silentPcmChunk: Uint8Array = new Uint8Array(1600 * 2);
 
   // コールバック関数
   private onTranscriptCallback: ((text: string, isFinal: boolean) => void) | null = null;
@@ -257,18 +269,31 @@ export class TranscribeService {
 
   /**
    * 音声データの AsyncGenerator を作成
-   * audioQueue にデータが積まれるたびに yield する
+   * audioQueue にデータが積まれるたびに yield する。
+   *
+   * 実音声が一定時間送られていない場合は無音PCMチャンクを送信して
+   * Transcribe セッションのタイムアウト（15秒無音で BadRequestException）を防ぐ。
    */
   private async *createAudioStream(): AsyncGenerator<{ AudioEvent: { AudioChunk: Uint8Array } }> {
+    this.lastAudioSentTime = Date.now();
+
     while (!this.abortController?.signal.aborted) {
       if (this.audioQueue.length > 0) {
         const chunk = this.audioQueue.shift();
         if (chunk) {
+          this.lastAudioSentTime = Date.now();
           yield { AudioEvent: { AudioChunk: chunk } };
         }
       } else {
-        // データがない場合は短い待機（CPU を解放）
-        await new Promise(resolve => setTimeout(resolve, 20));
+        // 実音声が keepAliveIntervalMs 以上送られていなければ無音チャンクを送り、
+        // Transcribe のアイドルタイムアウトを回避する。
+        if (Date.now() - this.lastAudioSentTime >= this.keepAliveIntervalMs) {
+          this.lastAudioSentTime = Date.now();
+          yield { AudioEvent: { AudioChunk: this.silentPcmChunk } };
+        } else {
+          // データがない場合は短い待機（CPU を解放）
+          await new Promise(resolve => setTimeout(resolve, 20));
+        }
       }
     }
   }
@@ -341,50 +366,56 @@ export class TranscribeService {
         }
       });
 
+      // 既存の AudioContext が残っていれば閉じてリークを防ぐ
+      if (this.audioContext) {
+        try {
+          await this.audioContext.close();
+        } catch (e) {
+          console.warn('既存AudioContext停止エラー:', e);
+        }
+        this.audioContext = null;
+        this.workletModuleLoaded = false;
+      }
+
       // Web Audio APIを使用してPCM形式で処理
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
         sampleRate: 16000
       });
 
+      // 非推奨の ScriptProcessorNode に代わり AudioWorkletNode を使用する。
+      // 音声レベル計算と Float32->Int16 PCM 変換はワークレット側で行い、
+      // 結果を message で受け取る。
+      if (!this.workletModuleLoaded) {
+        await this.audioContext.audioWorklet.addModule('/transcribe-audio-processor.js');
+        this.workletModuleLoaded = true;
+      }
+
       this.mediaStream = stream;
-      const source = this.audioContext.createMediaStreamSource(stream);
-      this.audioProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
+      this.mediaStreamSource = this.audioContext.createMediaStreamSource(stream);
+      this.audioWorkletNode = new AudioWorkletNode(this.audioContext, 'transcribe-audio-processor', {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        channelCount: 1,
+      });
 
-      this.audioProcessor.onaudioprocess = (event) => {
+      this.audioWorkletNode.port.onmessage = (event: MessageEvent<{ audioLevel: number; pcm: ArrayBuffer }>) => {
         try {
-          const inputBuffer = event.inputBuffer;
-          const inputData = inputBuffer.getChannelData(0);
-
-          // 音声レベルを計算（RMS値）
-          let sum = 0;
-          for (let i = 0; i < inputData.length; i++) {
-            sum += inputData[i] * inputData[i];
-          }
-          const rms = Math.sqrt(sum / inputData.length);
-          const audioLevel = rms * 100; // 0-100のスケールに変換
+          const { audioLevel, pcm } = event.data;
 
           // 音声レベルが閾値を超えている場合のみ音声アクティビティを更新
-          const isVoiceDetected = audioLevel > this.voiceThreshold;
-
-          if (isVoiceDetected) {
+          if (audioLevel > this.voiceThreshold) {
             this.lastVoiceActivityTime = Date.now();
           }
 
-          // Float32ArrayをInt16Arrayに変換（PCM 16bit）
-          const pcmData = new Int16Array(inputData.length);
-          for (let i = 0; i < inputData.length; i++) {
-            pcmData[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32767));
-          }
-
           // Transcribe Streaming のキューに追加
-          this.audioQueue.push(new Uint8Array(pcmData.buffer));
+          this.audioQueue.push(new Uint8Array(pcm));
         } catch (error) {
           console.error('音声データ処理エラー:', error);
         }
       };
 
-      source.connect(this.audioProcessor);
-      this.audioProcessor.connect(this.audioContext.destination);
+      this.mediaStreamSource.connect(this.audioWorkletNode);
+      this.audioWorkletNode.connect(this.audioContext.destination);
 
       // 無音検出タイマーを設定
       this.lastVoiceActivityTime = Date.now();
@@ -456,12 +487,22 @@ export class TranscribeService {
     this.audioQueue = [];
 
     // Web Audio API リソースを停止
-    if (this.audioProcessor) {
+    if (this.audioWorkletNode) {
       try {
-        this.audioProcessor.disconnect();
-        this.audioProcessor = null;
+        this.audioWorkletNode.port.onmessage = null;
+        this.audioWorkletNode.disconnect();
+        this.audioWorkletNode = null;
       } catch (e) {
-        console.warn('AudioProcessor停止エラー:', e);
+        console.warn('AudioWorkletNode停止エラー:', e);
+      }
+    }
+
+    if (this.mediaStreamSource) {
+      try {
+        this.mediaStreamSource.disconnect();
+        this.mediaStreamSource = null;
+      } catch (e) {
+        console.warn('MediaStreamSource停止エラー:', e);
       }
     }
 
@@ -493,6 +534,9 @@ export class TranscribeService {
         console.warn('AudioContext停止エラー:', e);
       }
       this.audioContext = null;
+      // AudioContext を破棄したので、次回は新しい Context に対して
+      // 再度 worklet モジュールを addModule する必要がある。
+      this.workletModuleLoaded = false;
     }
   }
 
