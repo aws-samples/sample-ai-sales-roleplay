@@ -1472,26 +1472,14 @@ const ConversationPage: React.FC = () => {
               </Box>
             )}
 
-            {/* カメラプレビュー（左カラム下部） */}
-            {videoRecordingEnabled && (
-              <Box
-                data-testid="video-manager-container"
-                sx={{
-                  borderTop: "1px solid",
-                  borderColor: "divider",
-                  p: 1,
-                }}
-              >
-                <VideoManager
-                  ref={undefined}
-                  sessionId={sessionId}
-                  sessionStarted={sessionStarted}
-                  sessionEnded={sessionEnded}
-                  onCameraInitialized={handleCameraInitialized}
-                onRecordingStateChange={handleRecordingStateChange}
-                />
-              </Box>
-            )}
+            {/*
+              カメラプレビューは中央カラムの先頭に単一インスタンスとして常時マウントする。
+              以前はここ（左カラム下部・開始後用）と中央カラム（開始前用）に別々の
+              VideoManager を条件付きで置いていたため、sessionStarted が false→true に
+              変わる瞬間に片方がアンマウント・もう片方がマウントされ、カメラが停止・再取得
+              されて「セッション開始時にカメラがオフになる」現象が起きていた。
+              単一インスタンス化により再マウントを防ぐ（中央カラム側の配置を参照）。
+            */}
           </Box>
         )}
 
@@ -1509,16 +1497,27 @@ const ConversationPage: React.FC = () => {
         >
           {/* アバターなし時：メトリクスは右パネルにのみ表示（アバターあり版と統一） */}
 
-          {/* セッション開始前のカメラプレビュー */}
-          {videoRecordingEnabled && !sessionStarted && (
+          {/*
+            カメラプレビュー（単一インスタンス）。
+            開始前・開始後とも常に存在する中央カラムの先頭にインライン配置する。
+            以前は開始前用（中央カラム）と開始後用（左カラム下部）に別々の VideoManager を
+            条件付きでマウントしていたため、sessionStarted が false→true になる瞬間に
+            片方がアンマウント・もう片方がマウントされ、カメラが停止・再取得されて
+            「セッション開始時にカメラがオフになる」現象が起きていた。
+            また開始後用は avatarVisible にも依存していたため、アバター無効シナリオでは
+            開始後にプレビューが表示されず録画も始まらなかった。
+            単一インスタンス化により再マウントを防ぎ、インライン配置により
+            ヘッダーやメトリクスパネルへの重なりも避ける。
+          */}
+          {videoRecordingEnabled && (
             <Box
               data-testid="video-manager-container"
               sx={{
-                position: "absolute",
-                top: 12,
-                left: 12,
-                zIndex: 10,
-                width: 180,
+                flexShrink: 0,
+                alignSelf: "flex-start",
+                // 開始前は映りを確認しやすいよう少し大きく、開始後は会話領域を広く保つため小さく
+                width: sessionStarted ? 140 : 200,
+                m: 1,
                 borderRadius: 2,
                 overflow: "hidden",
                 boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
