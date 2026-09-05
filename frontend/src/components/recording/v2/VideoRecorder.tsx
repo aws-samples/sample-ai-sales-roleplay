@@ -1,12 +1,26 @@
-import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react";
+import React, { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
 import { Box, Alert, Snackbar } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import type { VideoRecorderRef } from "../../../types/components";
+import { isDevEnvironment } from "../../../utils/env";
 
 // マルチパートアップロードの1パートあたりのサイズ（10MB、S3の最小5MB以上）
 // 録画動画はファイルサイズに関わらずマルチパートアップロードで送信するため、
 // 長時間セッションの大容量動画（200MB超）でもS3のサイズ制限に達しない
 const MULTIPART_PART_SIZE_BYTES = 10 * 1024 * 1024;
+
+// isActive が true になってから録画開始を待つ猶予時間（ミリ秒）。
+// カメラ初期化のタイムアウト（10秒）より長くし、初期化完了を待って
+// 録画が始まるケースを誤検知しないようにする。
+const RECORDING_START_GRACE_MS = 15000;
+
+/**
+ * 録画の実行状態。親コンポーネントは録画が実際に開始されたかどうかを知る必要がある。
+ * - idle: まだ録画が開始されていない
+ * - recording: 録画が開始された（アップロード完了を待つ価値がある）
+ * - failed: 録画の開始・アップロードに失敗した（待機しても意味がない）
+ */
+export type RecordingState = "idle" | "recording" | "failed";
 
 interface VideoRecorderProps {
   sessionId: string;
@@ -14,6 +28,7 @@ interface VideoRecorderProps {
   onRecordingComplete?: (videoKey: string) => void;
   onError?: (error: string) => void;
   onCameraInitialized?: (initialized: boolean) => void; // カメラ初期化状態の通知
+  onRecordingStateChange?: (state: RecordingState) => void; // 録画状態の通知
 }
 
 /**
@@ -28,6 +43,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
   onRecordingComplete,
   onError,
   onCameraInitialized,
+  onRecordingStateChange,
 }, ref) => {
   const { t } = useTranslation();
 
@@ -37,6 +53,16 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const durationTimerRef = useRef<number | null>(null);
+  // プレビューURLの最新値。onstop などの非同期コールバックが state の
+  // 古いクロージャを参照して URL を revoke し損ねるのを防ぐ。
+  const previewUrlRef = useRef<string>("");
+  // このセッションで一度でも録画が開始されたか（停止時の無音失敗を検出するため）
+  const hasStartedRecordingRef = useRef<boolean>(false);
+  // このセッションで録画すべき状態（isActive=true）になったか。
+  // 停止要求時には既に isActive=false になっているため、判定にはこのフラグを使う。
+  const wasActiveRef = useRef<boolean>(false);
+  // カメラ初期化が失敗したか（録画開始の猶予タイマーの二重通知を避けるため）
+  const cameraFailedRef = useRef<boolean>(false);
 
   // state
   const [isAccessGranted, setIsAccessGranted] = useState<boolean>(false);
@@ -46,14 +72,38 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
 
+  // プレビューURLは ref と state の両方で保持する（下記 previewUrlRef のコメント参照）
+  useEffect(() => {
+    previewUrlRef.current = previewUrl;
+  }, [previewUrl]);
+
+  // 録画の開始・アップロード失敗を利用者と親コンポーネントの両方に伝える。
+  // 「録画されているつもりだったが記録が残っていなかった」状態を防ぐため、
+  // 本番ビルドでも必ず console に残し、Snackbar と onError で明示する。
+  const reportRecordingFailure = useCallback(
+    (messageKey: string, detail?: unknown) => {
+      const message = t(messageKey);
+      console.error(`Recording failure: ${message}`, detail ?? "");
+      setError(message);
+      setSnackbarOpen(true);
+      if (onError) onError(message);
+      if (onRecordingStateChange) onRecordingStateChange("failed");
+      // 呼び出し元（ConversationPage）がアップロード待ちを打ち切れるよう通知する
+      window.dispatchEvent(
+        new CustomEvent("recordingFailed", { detail: { sessionId, message } }),
+      );
+    },
+    [onError, onRecordingStateChange, sessionId, t],
+  );
+
   // カメラアクセスの初期化 - コンポーネントがマウントされた時に一度だけ実行
   useEffect(() => {
-    if (import.meta.env.DEV) console.log("Component mounted");
+    if (isDevEnvironment()) console.log("Component mounted");
 
     // カメラアクセス初期化関数
     const initializeCamera = async () => {
       try {
-        if (import.meta.env.DEV) console.log("Requesting camera access");
+        if (isDevEnvironment()) console.log("Requesting camera access");
         setError("");
 
         // タイムアウト処理を追加（10秒）
@@ -76,15 +126,21 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
         // ストリームをrefに保存
         streamRef.current = stream;
 
+        // <video> 要素がまだマウントされていない場合でもカメラ初期化は完了扱いにする。
+        // srcObject の割り当ては videoRef が利用可能になった時点で別の useEffect が行う。
+        // （以前は videoRef.current が null だと isAccessGranted が永久に false のままで、
+        //  録画が一切開始されなかった）
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          setIsAccessGranted(true);
-          if (import.meta.env.DEV) console.log("Camera initialized");
-          // 親コンポーネントにカメラ初期化完了を通知
-          if (onCameraInitialized) onCameraInitialized(true);
         }
+        cameraFailedRef.current = false;
+        setIsAccessGranted(true);
+        if (isDevEnvironment()) console.log("Camera initialized");
+        // 親コンポーネントにカメラ初期化完了を通知
+        if (onCameraInitialized) onCameraInitialized(true);
       } catch (error) {
         console.error("Camera access error:", error);
+        cameraFailedRef.current = true;
         setError(t("recording.cameraAccessError"));
         setSnackbarOpen(true);
         if (onError) onError(t("recording.cameraAccessError"));
@@ -98,16 +154,42 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
 
     // クリーンアップ関数
     return () => {
-      if (import.meta.env.DEV) console.log("Component unmounting - releasing resources");
+      if (isDevEnvironment()) console.log("Component unmounting - releasing resources");
       stopRecording();
       releaseCamera();
     };
+    // カメラ初期化はマウント時に一度だけ行う意図的な処理のため exhaustive-deps を無効化する。
+    // （録画開始を制御する下の useEffect では無効化していない。依存漏れを ESLint に
+    //  検出させるためであり、isAccessGranted の漏れが本 Issue の原因だった）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 空の依存配列でコンポーネントのマウント時に一度だけ実行
 
+  // カメラストリームを <video> 要素へ割り当てる。
+  // カメラ初期化の完了と <video> のマウント順序に依存しないよう、初期化本体から分離している。
+  useEffect(() => {
+    // プレビュー再生中（previewUrl あり）は src 属性を使うため srcObject は設定しない
+    if (previewUrl) return;
+    if (videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [previewUrl, isAccessGranted]);
+
+  // 最新の startRecording / stopRecording を保持する ref。
+  // これらの関数は毎レンダー再生成されるため依存配列に直接入れると effect が無駄に再実行される。
+  // ref 経由で呼ぶことで、依存配列を「録画すべきかどうかを決める値」だけに保ちつつ
+  // exhaustive-deps を満たせる（= 依存漏れを ESLint が検出できる状態を維持できる）。
+  const startRecordingRef = useRef<() => void>(() => {});
+  const stopRecordingRef = useRef<() => void>(() => {});
+
+  // セッションが切り替わったら録画状態のフラグをリセットする
+  useEffect(() => {
+    hasStartedRecordingRef.current = false;
+    wasActiveRef.current = false;
+  }, [sessionId]);
+
   // isActive プロパティが変更された時の処理
   useEffect(() => {
-    if (import.meta.env.DEV) console.log(
+    if (isDevEnvironment()) console.log(
       "isActive changed:",
       isActive,
       "recording:",
@@ -118,24 +200,43 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
       isAccessGranted,
     );
 
+    if (isActive && sessionId) {
+      wasActiveRef.current = true;
+    }
+
     if (isActive && !isRecording && sessionId) {
       // セッションがアクティブで、sessionIdが有効な場合のみ録画開始
       // カメラ初期化が完了していれば即座に録画開始
       if (isAccessGranted) {
-        if (import.meta.env.DEV) console.log("Camera initialized, starting recording");
-        startRecording();
+        if (isDevEnvironment()) console.log("Camera initialized, starting recording");
+        startRecordingRef.current();
       } else {
-        if (import.meta.env.DEV) console.log("Waiting for camera initialization, recording deferred");
+        // カメラ初期化の完了を待つ。isAccessGranted が依存配列に含まれているため、
+        // 初期化完了時にこの effect が再実行されて録画が開始される。
+        if (isDevEnvironment()) console.log("Waiting for camera initialization, recording deferred");
       }
     } else if (!isActive && isRecording) {
       // セッションが非アクティブになったら録画停止
-      stopRecording();
+      stopRecordingRef.current();
     } else if (isActive && !sessionId) {
       // sessionIdが無効な場合は警告を出力
       console.warn("Recording start requested but sessionId is empty");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, isRecording, sessionId]);
+  }, [isActive, isRecording, sessionId, isAccessGranted]);
+
+  // 録画開始の監視。isActive になってから猶予時間内に録画が開始されない場合は、
+  // 無音のまま録画されないことを防ぐため利用者と親コンポーネントに明示する。
+  useEffect(() => {
+    if (!isActive || !sessionId || isRecording || isAccessGranted) return;
+
+    const timeoutId = window.setTimeout(() => {
+      // カメラアクセス自体が失敗している場合は既に通知済みなので二重に出さない
+      if (cameraFailedRef.current) return;
+      reportRecordingFailure("recording.notStartedError");
+    }, RECORDING_START_GRACE_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isActive, sessionId, isRecording, isAccessGranted, reportRecordingFailure]);
 
   // カメラストリームを解放
   const releaseCamera = () => {
@@ -151,9 +252,10 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
 
     setIsAccessGranted(false);
 
-    // プレビューURL解放
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
+    // プレビューURL解放（ref を使い、古いクロージャの値を参照しないようにする）
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = "";
       setPreviewUrl("");
     }
   };
@@ -162,12 +264,10 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
   const startRecording = () => {
     if (isRecording || !isAccessGranted) return;
 
-    if (import.meta.env.DEV) console.log("Recording started");
+    if (isDevEnvironment()) console.log("Recording started");
 
     if (!streamRef.current) {
-      console.error("Camera stream not available");
-      setError(t("recording.cameraNotInitialized"));
-      setSnackbarOpen(true);
+      reportRecordingFailure("recording.cameraNotInitialized");
       return;
     }
 
@@ -199,21 +299,21 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
 
       // 録画停止時の処理
       mediaRecorderRef.current.onstop = () => {
-        if (import.meta.env.DEV) console.log("Recording stopped");
+        if (isDevEnvironment()) console.log("Recording stopped");
 
         try {
           // MP4形式でBlobを作成
           const blob = new Blob(chunksRef.current, { type: "video/mp4" });
-          if (import.meta.env.DEV) console.log(
+          if (isDevEnvironment()) console.log(
             "Recording blob size:",
             blob.size,
             "bytes",
             "MIME type: video/mp4",
           );
 
-          // 以前のURLを解放
-          if (previewUrl) {
-            URL.revokeObjectURL(previewUrl);
+          // 以前のURLを解放（ref を使い、古いクロージャの値を参照しないようにする）
+          if (previewUrlRef.current) {
+            URL.revokeObjectURL(previewUrlRef.current);
           }
 
           // 有効なBlobのみURLを作成
@@ -224,10 +324,12 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
             // 録画データを保存
             saveRecordingData(blob);
           } else {
-            console.warn("Empty blob generated");
+            // 空のBlobはアップロードされないため、待機側が90秒待たされないよう失敗として通知する
+            reportRecordingFailure("recording.emptyRecordingError");
           }
         } catch (err) {
           console.error("Recording data processing error:", err);
+          reportRecordingFailure("recording.recordingDataProcessingFailed", err);
         }
 
         // 録画時間をリセット
@@ -237,13 +339,12 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
 
       // 録画開始
       mediaRecorderRef.current.start(100); // 100msごとにデータを取得
+      hasStartedRecordingRef.current = true;
       setIsRecording(true);
       startDurationTimer();
+      if (onRecordingStateChange) onRecordingStateChange("recording");
     } catch (error) {
-      console.error("Recording start error:", error);
-      setError(t("recording.startError"));
-      setSnackbarOpen(true);
-      if (onError) onError(t("recording.startError"));
+      reportRecordingFailure("recording.startError", error);
     }
   };
 
@@ -251,7 +352,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
   const stopRecording = () => {
     if (!isRecording || !mediaRecorderRef.current) return;
 
-    if (import.meta.env.DEV) console.log("Recording stopped");
+    if (isDevEnvironment()) console.log("Recording stopped");
 
     try {
       if (mediaRecorderRef.current.state !== "inactive") {
@@ -262,6 +363,10 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
       console.error("Recording stop error:", error);
     }
   };
+
+  // 上の isActive 監視 effect から最新の実装を呼べるようにする（latest ref パターン）
+  startRecordingRef.current = startRecording;
+  stopRecordingRef.current = stopRecording;
 
   // 録画時間タイマー開始
   const startDurationTimer = () => {
@@ -311,7 +416,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
           throw new Error(`ETag header not found for part ${partNumber}`);
         }
 
-        if (import.meta.env.DEV) {
+        if (isDevEnvironment()) {
           console.log(`Part ${partNumber} uploaded: eTag=${eTag}`);
         }
         return eTag;
@@ -355,7 +460,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
     const partCount = Math.ceil(blob.size / MULTIPART_PART_SIZE_BYTES);
     const fileName = videoKey.split("/").pop() || "recording.mp4";
 
-    if (import.meta.env.DEV) {
+    if (isDevEnvironment()) {
       console.log(
         `Multipart upload start: size=${Math.round(blob.size / 1024 / 1024 * 100) / 100}MB, parts=${partCount}`,
       );
@@ -380,7 +485,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
       // 全パート完了後、S3にパート結合を指示
       await apiService.completeMultipartUpload(serverVideoKey, uploadId, uploadedParts);
 
-      if (import.meta.env.DEV) console.log("Multipart upload success:", serverVideoKey);
+      if (isDevEnvironment()) console.log("Multipart upload success:", serverVideoKey);
 
       // サーバー採番のキーで保存・通知し、フロント/バックエンドのキーを一致させる
       safeSetLocalStorage("lastRecordingKey", serverVideoKey);
@@ -411,7 +516,7 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
 
       // ローカルの仮キー。アップロード成功時はサーバー採番のキーで上書きする
       const localVideoKey = `session_${sessionId}_${new Date().getTime()}.mp4`;
-      if (import.meta.env.DEV) console.log("S3 upload start:", localVideoKey, "size:", Math.round(blob.size / 1024 / 1024 * 100) / 100, "MB");
+      if (isDevEnvironment()) console.log("S3 upload start:", localVideoKey, "size:", Math.round(blob.size / 1024 / 1024 * 100) / 100, "MB");
 
       // マルチパートアップロードでS3に保存する
       // ファイルサイズに関わらずマルチパート方式に統一しており、
@@ -421,15 +526,13 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
       try {
         resultVideoKey = await uploadWithMultipart(blob, sessionId, localVideoKey);
       } catch (uploadError) {
-        console.error("S3 upload process error:", uploadError);
-        // エラーが発生した場合でも、親コンポーネントにエラー情報を渡す
-        if (onError) {
-          onError(t("recording.uploadError"));
-        }
+        // アップロード失敗は利用者に明示し、待機側（ConversationPage）が
+        // 90秒のタイムアウトを待たずに進めるよう通知する
+        reportRecordingFailure("recording.uploadError", uploadError);
         // エラーが発生してもvideoKeyは渡して処理を続行
       }
 
-      if (import.meta.env.DEV) console.log("Recording data saved:", resultVideoKey);
+      if (isDevEnvironment()) console.log("Recording data saved:", resultVideoKey);
 
       // コールバックを呼び出し（エラーが発生してもvideoKeyは渡す）
       // 成功時はサーバー採番のキー、失敗時はローカル仮キーを渡す
@@ -437,24 +540,21 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
         onRecordingComplete(resultVideoKey);
       }
     } catch (err) {
-      console.error("Recording data processing failed:", err);
-      if (onError) {
-        onError(t("recording.recordingDataProcessingFailed"));
-      }
+      reportRecordingFailure("recording.recordingDataProcessingFailed", err);
     }
   };
 
   // 明示的な録画停止のためのメソッドを外部に公開
   useImperativeHandle(ref, () => ({
     forceStopRecording: async () => {
-      if (import.meta.env.DEV) console.log("VideoRecorder: forceStopRecording called");
+      if (isDevEnvironment()) console.log("VideoRecorder: forceStopRecording called");
       return new Promise<void>((resolve) => {
         if (isRecording && mediaRecorderRef.current) {
-          if (import.meta.env.DEV) console.log("VideoRecorder: Recording in progress, stopping");
+          if (isDevEnvironment()) console.log("VideoRecorder: Recording in progress, stopping");
 
           // 録画停止完了を待つためのイベントリスナーを設定
           const handleStop = () => {
-            if (import.meta.env.DEV) console.log("VideoRecorder: Recording stopped");
+            if (isDevEnvironment()) console.log("VideoRecorder: Recording stopped");
             if (mediaRecorderRef.current) {
               mediaRecorderRef.current.removeEventListener('stop', handleStop);
             }
@@ -464,7 +564,16 @@ const VideoRecorder = forwardRef<VideoRecorderRef, VideoRecorderProps>(({
           mediaRecorderRef.current.addEventListener('stop', handleStop);
           stopRecording();
         } else {
-          if (import.meta.env.DEV) console.log("VideoRecorder: Not recording, skipping stop");
+          // 録画が一度も開始されていない状態で停止が要求された場合は、
+          // 「正常に停止した」ように見せず失敗として明示する。
+          // （従来はここで黙って resolve していたため、録画されていないことに気づけなかった）
+          // 停止要求時点では既に isActive=false になっているため、
+          // 「このセッションで録画すべきだったか」は wasActiveRef で判定する。
+          if (wasActiveRef.current && !hasStartedRecordingRef.current) {
+            reportRecordingFailure("recording.notStartedError");
+          } else if (isDevEnvironment()) {
+            console.log("VideoRecorder: Not recording, skipping stop");
+          }
           resolve();
         }
       });

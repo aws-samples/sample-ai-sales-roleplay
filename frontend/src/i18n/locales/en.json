@@ -911,7 +911,10 @@
     "s3UploadStart": "Starting S3 upload of recording data",
     "signedUrlObtained": "Signed URL obtained",
     "s3UploadProcessError": "S3 upload process error",
-    "browserNotSupported": "Your browser does not support MP4 recording"
+    "browserNotSupported": "Your browser does not support MP4 recording",
+    "notStartedError": "Recording could not be started. This session was not recorded, so video-based performance analysis will not be available. Please check your camera permissions.",
+    "emptyRecordingError": "The recording was empty and could not be saved. Video-based performance analysis will not be available.",
+    "waitingForUpload": "Uploading the recording. Please wait until it finishes..."
   },
   "videoFeedback": {
     "title": "Expression & Gesture Analysis",

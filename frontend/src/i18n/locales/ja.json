@@ -911,7 +911,10 @@
     "s3UploadStart": "録画データをS3にアップロード開始",
     "signedUrlObtained": "署名付きURLを取得しました",
     "s3UploadProcessError": "S3アップロード処理エラー",
-    "browserNotSupported": "お使いのブラウザはMP4形式の録画をサポートしていません"
+    "browserNotSupported": "お使いのブラウザはMP4形式の録画をサポートしていません",
+    "notStartedError": "録画を開始できませんでした。この商談は録画されておらず、映像を使ったパフォーマンス分析は行われません。カメラの許可設定をご確認ください。",
+    "emptyRecordingError": "録画データが空のため保存できませんでした。映像を使ったパフォーマンス分析は行われません。",
+    "waitingForUpload": "録画をアップロードしています。完了するまでこのままお待ちください..."
   },
   "videoFeedback": {
     "title": "表情・身振り分析",

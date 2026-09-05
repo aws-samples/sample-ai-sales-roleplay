@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import { Box } from "@mui/material";
 import VideoRecorder from "./VideoRecorder";
+import type { RecordingState } from "./VideoRecorder";
 import type { VideoManagerRef, VideoRecorderRef } from "../../../types/components";
 
 interface VideoManagerProps {
@@ -8,6 +9,7 @@ interface VideoManagerProps {
   sessionStarted: boolean;
   sessionEnded: boolean;
   onCameraInitialized?: (initialized: boolean) => void; // カメラ初期化状態の通知
+  onRecordingStateChange?: (state: RecordingState) => void; // 録画状態の通知
 }
 
 /**
@@ -21,6 +23,7 @@ const VideoManager = forwardRef<VideoManagerRef, VideoManagerProps>(({
   sessionStarted,
   sessionEnded,
   onCameraInitialized,
+  onRecordingStateChange,
 }, ref) => {
   const [videoKey, setVideoKey] = useState<string>("");
   const [recordingError, setRecordingError] = useState<string>("");
@@ -128,6 +131,7 @@ const VideoManager = forwardRef<VideoManagerRef, VideoManagerProps>(({
         onRecordingComplete={handleRecordingComplete}
         onError={handleRecordingError}
         onCameraInitialized={onCameraInitialized}
+        onRecordingStateChange={onRecordingStateChange}
       />
 
       {recordingError && (

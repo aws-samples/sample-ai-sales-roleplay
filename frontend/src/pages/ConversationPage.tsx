@@ -29,6 +29,7 @@ import {
   mergeGoalStatus,
 } from "../utils/goalUtils";
 import VideoManager from "../components/recording/v2/VideoManager";
+import type { RecordingState } from "../components/recording/v2/VideoRecorder";
 import {
   loadVideoRecordingEnabled,
   saveVideoRecordingEnabled,
@@ -53,7 +54,7 @@ import SessionSettingsPanel from "../components/conversation/SessionSettingsPane
 import SlideTray from "../components/conversation/SlideTray";
 import SlideZoomModal from "../components/conversation/SlideZoomModal";
 import type { SlideImageInfo } from "../types/api";
-import { Dialog, DialogTitle, DialogContent } from "@mui/material";
+import { Dialog, DialogTitle, DialogContent, Backdrop, CircularProgress, Typography } from "@mui/material";
 
 /**
  * NPC応答遅延設定（ミリ秒）
@@ -65,6 +66,13 @@ const NPC_RESPONSE_BASE_DELAY = import.meta.env.VITE_NPC_RESPONSE_DELAY
 const NPC_RESPONSE_RANDOM_DELAY = import.meta.env.VITE_NPC_RESPONSE_DELAY
   ? 0
   : 1000;
+
+/**
+ * 録画アップロード完了を待つ最大時間（ミリ秒）。
+ * 大容量動画のマルチパートアップロードを考慮した値。
+ * 録画が開始されていない場合はそもそも待機しない（Issue #100）。
+ */
+const RECORDING_UPLOAD_TIMEOUT_MS = 90000;
 
 /**
  * 会話ページコンポーネント
@@ -198,6 +206,10 @@ const ConversationPage: React.FC = () => {
   const [isCameraInitialized, setIsCameraInitialized] = useState<boolean>(false);
   // カメラエラー状態管理
   const [cameraError, setCameraError] = useState<boolean>(false);
+  // 録画の実行状態。録画が実際に開始されていない場合はアップロード完了を待たずに遷移する
+  const recordingStateRef = useRef<RecordingState>("idle");
+  // 録画アップロード待機中フラグ（画面に待機中であることを表示するため）
+  const [isWaitingForUpload, setIsWaitingForUpload] = useState<boolean>(false);
   // ビデオ録画機能のオン/オフ設定（localStorageで永続化、デフォルトはオン）
   const [videoRecordingEnabled, setVideoRecordingEnabled] = useState<boolean>(
     loadVideoRecordingEnabled,
@@ -213,6 +225,7 @@ const ConversationPage: React.FC = () => {
     if (!videoRecordingEnabled) {
       setIsCameraInitialized(false);
       setCameraError(false);
+      recordingStateRef.current = "idle";
     }
   }, [videoRecordingEnabled]);
 
@@ -996,11 +1009,19 @@ const ConversationPage: React.FC = () => {
           // 前回の録画キーを保存（新しいセッションの録画を待つため）
           const previousKey = localStorage.getItem("lastRecordingKey");
 
-          // 90秒でタイムアウト（大きなファイル対応）
-          const timeoutId = setTimeout(() => {
+          // タイマー・リスナーを一箇所で片付けて resolve する
+          const finish = () => {
+            if (uploadCompleted) return;
+            uploadCompleted = true;
+            clearTimeout(timeoutId);
+            clearInterval(checkInterval);
             window.removeEventListener('recordingComplete', handleRecordingComplete as EventListener);
+            window.removeEventListener('recordingFailed', handleRecordingFailed);
             resolve();
-          }, 90000);
+          };
+
+          // 90秒でタイムアウト（大きなファイル対応）
+          const timeoutId = setTimeout(finish, RECORDING_UPLOAD_TIMEOUT_MS);
 
           const checkUploadComplete = (newVideoKey?: string) => {
             if (uploadCompleted) return;
@@ -1012,11 +1033,8 @@ const ConversationPage: React.FC = () => {
             // 2. 前回のキーと異なること（または前回のキーがない場合）
             if (videoKey && videoKey.includes(session.id)) {
               if (!previousKey || videoKey !== previousKey) {
-                uploadCompleted = true;
                 localStorage.setItem(`session_${session.id}_videoKey`, videoKey);
-                clearTimeout(timeoutId);
-                window.removeEventListener('recordingComplete', handleRecordingComplete as EventListener);
-                resolve();
+                finish();
               } else {
                 // 前回と同じキーのためスキップ
               }
@@ -1032,7 +1050,14 @@ const ConversationPage: React.FC = () => {
             }
           };
 
+          // 録画の開始・アップロードが失敗した場合は待機しても完了しないため、
+          // タイムアウトを待たずに打ち切って採点画面へ進む
+          const handleRecordingFailed = () => {
+            finish();
+          };
+
           window.addEventListener('recordingComplete', handleRecordingComplete as EventListener);
+          window.addEventListener('recordingFailed', handleRecordingFailed);
 
           // 定期的にlocalStorageをチェック（イベントが発火しない場合の対策）
           const checkInterval = setInterval(() => {
@@ -1040,24 +1065,29 @@ const ConversationPage: React.FC = () => {
               const currentKey = localStorage.getItem("lastRecordingKey");
               if (currentKey && currentKey.includes(session.id) && currentKey !== previousKey) {
                 checkUploadComplete(currentKey);
-                clearInterval(checkInterval);
               }
             } else {
               clearInterval(checkInterval);
             }
           }, 1000);
-
-          // タイムアウト時にインターバルもクリア
-          setTimeout(() => {
-            clearInterval(checkInterval);
-          }, 90000);
         });
       };
 
-      // 録画アップロード完了を待ってから遷移
-      // ビデオ録画が無効な場合は待機をスキップ
-      if (videoRecordingEnabled) {
-        await waitForRecordingUpload();
+      // 録画アップロード完了を待ってから遷移する。
+      // ただし録画が実際に開始されていない場合はアップロードイベントが永遠に来ないため、
+      // 90秒のタイムアウトを無駄に待たずに即座に次へ進む（Issue #100）。
+      if (videoRecordingEnabled && recordingStateRef.current === "recording") {
+        // 待機中であることを画面に表示し、「フリーズした」ように見えないようにする
+        setIsWaitingForUpload(true);
+        try {
+          await waitForRecordingUpload();
+        } finally {
+          setIsWaitingForUpload(false);
+        }
+      } else if (videoRecordingEnabled) {
+        console.warn(
+          `Skipping recording upload wait: recording state is "${recordingStateRef.current}"`,
+        );
       }
 
       // セッション分析を非同期で開始（Step Functions）
@@ -1283,6 +1313,12 @@ const ConversationPage: React.FC = () => {
     }
   }, []);
 
+  // 録画状態のハンドラー。
+  // 録画が実際に開始されたかどうかで、セッション終了時にアップロード完了を待つか判断する。
+  const handleRecordingStateChange = useCallback((state: RecordingState) => {
+    recordingStateRef.current = state;
+  }, []);
+
   // ゴール達成時の通知表示
   useEffect(() => {
     // 前回のゴール状態と比較して新たに達成されたゴールを検出
@@ -1452,6 +1488,7 @@ const ConversationPage: React.FC = () => {
                   sessionStarted={sessionStarted}
                   sessionEnded={sessionEnded}
                   onCameraInitialized={handleCameraInitialized}
+                onRecordingStateChange={handleRecordingStateChange}
                 />
               </Box>
             )}
@@ -1493,6 +1530,7 @@ const ConversationPage: React.FC = () => {
                 sessionStarted={sessionStarted}
                 sessionEnded={sessionEnded}
                 onCameraInitialized={handleCameraInitialized}
+                onRecordingStateChange={handleRecordingStateChange}
               />
             </Box>
           )}
@@ -1656,6 +1694,22 @@ const ConversationPage: React.FC = () => {
           />
         </DialogContent>
       </Dialog>
+
+      {/* 録画アップロード待機中の表示。
+          待機中に画面が固まったように見えるのを防ぐ（Issue #100） */}
+      <Backdrop
+        open={isWaitingForUpload}
+        data-testid="recording-upload-backdrop"
+        sx={{
+          color: "#fff",
+          zIndex: (theme) => theme.zIndex.modal + 1,
+          flexDirection: "column",
+          gap: 2,
+        }}
+      >
+        <CircularProgress color="inherit" />
+        <Typography variant="body1">{t("recording.waitingForUpload")}</Typography>
+      </Backdrop>
     </Box>
   );
 };
