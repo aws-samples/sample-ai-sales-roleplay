@@ -48,7 +48,6 @@
     "@aws-solutions-constructs/aws-cloudfront-apigateway": "^2.100.1",
     "@aws-solutions-constructs/aws-cloudfront-oai-s3": "^2.100.1",
     "@aws-solutions-constructs/aws-cloudfront-s3": "^2.100.1",
-    "@aws/pdk": "^0.26.15",
     "@cdklabs/generative-ai-cdk-constructs": "^0.1.316",
     "constructs": "^10.6.0",
     "deploy-time-build": "^0.4.10",
