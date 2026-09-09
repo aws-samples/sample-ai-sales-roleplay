@@ -174,18 +174,23 @@ def get_rankings():
             raise InternalServerError("システムエラーが発生しました")
         
         # 期間に基づいて日付フィルターを作成
-        now = datetime.datetime.now()
+        # createdAt は UTC を明示した 'Z' 付き ISO 8601 文字列として保存されているため、
+        # 文字列比較が正しく機能するよう、フィルター基準も UTC・'Z' 付きで生成する。
+        now = datetime.datetime.now(datetime.timezone.utc)
         filter_date = None
-        
+
+        def _to_filter_str(dt):
+            return dt.isoformat().replace("+00:00", "Z")
+
         if period == 'daily':
             # 24時間以内のデータ
-            filter_date = (now - datetime.timedelta(days=1)).isoformat()
+            filter_date = _to_filter_str(now - datetime.timedelta(days=1))
         elif period == 'weekly':
             # 7日以内のデータ
-            filter_date = (now - datetime.timedelta(weeks=1)).isoformat()
+            filter_date = _to_filter_str(now - datetime.timedelta(weeks=1))
         elif period == 'monthly':
             # 30日以内のデータ
-            filter_date = (now - datetime.timedelta(days=30)).isoformat()
+            filter_date = _to_filter_str(now - datetime.timedelta(days=30))
         
         logger.info(f"期間フィルター: {period}, フィルター日付: {filter_date}", extra={
             "period": period,

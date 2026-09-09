@@ -141,14 +141,15 @@ def save_metrics_to_dynamodb(session_id: str, actor_id: str, scores: Dict, analy
     
     try:
         import boto3
-        from datetime import datetime
+        from datetime import datetime, timezone
         from decimal import Decimal
         import time
         
         dynamodb = boto3.resource('dynamodb', region_name=AWS_REGION)
         table = dynamodb.Table(table_name)
         
-        current_timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        # UTC を明示して 'Z' を付与（naive なローカル時刻に 'Z' を付けると値がずれるため）
+        current_timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
         ttl = int(time.time()) + (180 * 24 * 60 * 60)
         
         item = {
@@ -226,7 +227,7 @@ def handle_invocation(payload: Dict[str, Any]) -> Dict[str, Any]:
             model_id=BEDROCK_MODEL,
             region_name=AWS_REGION,
             temperature=0.3,
-            # ScoringResult（8フィールド: スコア3 + analysis≤120字 + goalUpdates + 感情3）の
+            # ScoringResult（8フィールド: スコア3 + analysis≦120字 + goalUpdates + 感情3）の
             # structured output と、AgentCore Memory から取得する会話履歴（最大5件）を併せて
             # 生成するため、1024では出力途中でmax_tokens上限に達しAGENT_ERRORとなる事例があった。
             # 兄弟エージェント（audio-analysis=2048, feedback-analysis=4096）と整合させ2048に設定。

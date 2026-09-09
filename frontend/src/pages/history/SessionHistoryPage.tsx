@@ -35,6 +35,7 @@ import { useNavigate } from "react-router-dom";
 import { ApiService } from "../../services/ApiService";
 import { SessionInfo, ScenarioInfo } from "../../types/api";
 import { AuthService } from "../../services/AuthService";
+import { parseServerDate } from "../../utils/datetime";
 
 /**
  * セッション履歴一覧ページ（リデザイン版）
@@ -168,7 +169,7 @@ const SessionHistoryPage: React.FC = () => {
   const formatDate = (dateString: string) => {
     if (!dateString) return "-";
     try {
-      const date = new Date(dateString);
+      const date = parseServerDate(dateString);
       if (isNaN(date.getTime())) return "-";
       return new Intl.DateTimeFormat("ja-JP", {
         year: "numeric",
@@ -186,7 +187,7 @@ const SessionHistoryPage: React.FC = () => {
   const formatRelativeTime = (dateString: string) => {
     if (!dateString) return "";
     try {
-      const date = new Date(dateString);
+      const date = parseServerDate(dateString);
       if (isNaN(date.getTime())) return "";
       const now = new Date();
       const diffMs = now.getTime() - date.getTime();
@@ -242,14 +243,14 @@ const SessionHistoryPage: React.FC = () => {
     } else if (sortBy === "date-desc") {
       result = [...result].sort(
         (a, b) =>
-          new Date(b.createdAt || "").getTime() -
-          new Date(a.createdAt || "").getTime(),
+          parseServerDate(b.createdAt || "").getTime() -
+          parseServerDate(a.createdAt || "").getTime(),
       );
     } else if (sortBy === "date-asc") {
       result = [...result].sort(
         (a, b) =>
-          new Date(a.createdAt || "").getTime() -
-          new Date(b.createdAt || "").getTime(),
+          parseServerDate(a.createdAt || "").getTime() -
+          parseServerDate(b.createdAt || "").getTime(),
       );
     }
 
