@@ -54,6 +54,7 @@ import ReferenceCheck from "../components/referenceCheck/ReferenceCheck";
 import type { ScenarioInfo } from "../types/api";
 import type { SlideImageInfo } from "../types/api";
 import SlideZoomModal from "../components/conversation/SlideZoomModal";
+import { parseServerDate } from "../utils/datetime";
 import ComplianceViolationsList from "../components/compliance/ComplianceViolationsList";
 
 // サービスのインポート
@@ -302,8 +303,8 @@ const ResultPage: React.FC = () => {
       const constructedSession: Session = {
         id: sessionId,
         scenarioId: (completeData.sessionInfo?.scenarioId as string) || "default",
-        startTime: new Date((completeData.sessionInfo?.createdAt as string) || new Date().toISOString()),
-        endTime: new Date((completeData.sessionInfo?.createdAt as string) || new Date().toISOString()),
+        startTime: parseServerDate((completeData.sessionInfo?.createdAt as string) || new Date().toISOString()),
+        endTime: parseServerDate((completeData.sessionInfo?.createdAt as string) || new Date().toISOString()),
         messages: messages,
         finalMetrics: completeData.finalMetrics as Metrics,
         finalScore: (completeData.feedback?.scores?.overall as number) || 0,
@@ -513,10 +514,10 @@ const ResultPage: React.FC = () => {
         const constructedSession: Session = {
           id: sessionId,
           scenarioId: sessionInfo.scenarioId || "default",
-          startTime: new Date(
+          startTime: parseServerDate(
             sessionInfo.createdAt || new Date().toISOString(),
           ),
-          endTime: new Date(
+          endTime: parseServerDate(
             sessionInfo.updatedAt ||
             sessionInfo.createdAt ||
             new Date().toISOString(),

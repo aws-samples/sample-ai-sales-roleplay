@@ -6,7 +6,7 @@
 
 import json
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from aws_lambda_powertools import Logger
 from aws_lambda_powertools.event_handler import APIGatewayRestResolver
 from aws_lambda_powertools.event_handler.exceptions import (
@@ -19,9 +19,19 @@ from utils import get_user_id_from_event, sessions_table, SESSIONS_TABLE
 logger = Logger(service="session-handlers")
 
 
+def utc_now_iso() -> str:
+    """タイムゾーン（UTC）を明示したISO 8601文字列を返す（末尾 'Z'）。
+
+    createdAt/updatedAt など、フロントエンドで new Date() によりパースされる
+    タイムスタンプに使用する。'Z' が無いとブラウザのローカルタイム扱いになり
+    時刻がずれるため、必ず 'Z' を付与してフォーマットを統一する。
+    """
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def calculate_expiration_time(days: int = 90) -> int:
     """TTL用の有効期限を計算（UNIXタイムスタンプ）"""
-    expiry_date = datetime.now() + timedelta(days=days)
+    expiry_date = datetime.now(timezone.utc) + timedelta(days=days)
     return int(expiry_date.timestamp())
 
 def register_session_routes(app: APIGatewayRestResolver):
@@ -236,8 +246,8 @@ def register_session_routes(app: APIGatewayRestResolver):
                 logger.error("セッションテーブル未定義", extra={"table_name": SESSIONS_TABLE})
                 raise InternalServerError("システムエラーが発生しました")
             
-            # 現在の日時を取得
-            current_time = datetime.now().isoformat()
+            # 現在の日時を取得（UTCを明示: 末尾 'Z' 付き ISO 8601）
+            current_time = utc_now_iso()
             
             # セッションが既に存在するかチェック
             try:
