@@ -155,7 +155,6 @@ InfrastructureStack
 | @cdklabs/generative-ai-cdk-constructs | ^0.1.312 | AI CDKコンストラクト | Apache-2.0 |
 | @aws-amplify/auth-construct | ^1.10.0 | Amplify認証 | Apache-2.0 |
 | @aws-solutions-constructs/* | ^2.97.0 | AWSソリューション | Apache-2.0 |
-| @aws/pdk | ^0.26.15 | AWS PDK | Apache-2.0 |
 | cdk-nag | ^2.37.55 | セキュリティチェック | Apache-2.0 |
 | deploy-time-build | ^0.4.5 | デプロイ時ビルド | MIT |
 | jsonwebtoken | ^9.0.3 | JWT処理 | MIT |
