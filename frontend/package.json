@@ -32,7 +32,7 @@
     "@types/three": "^0.183.1",
     "aws-amplify": "^6.16.3",
     "chart.js": "^4.5.1",
-    "i18next": "^25.10.10",
+    "i18next": "^27.2.7",
     "i18next-browser-languagedetector": "^8.2.1",
     "react": "^19.2.4",
     "react-chartjs-2": "^5.3.1",
